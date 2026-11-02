@@ -1,0 +1,33 @@
+appId: dev.macsec.app
+productName: MacSec
+directories:
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - node_modules/electron-liquid-glass/**/*
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  # No Apple Developer account: scripts/adhoc-sign.cjs gives the app an ad-hoc signature,
+  # which Apple Silicon requires before it will run anything.
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+afterSign: scripts/adhoc-sign.cjs
+dmg:
+  title: MacSec ${version}
+  artifactName: MacSec-${version}-${arch}.dmg
+npmRebuild: false
+# The app cannot be run as a plain Node.js process, and Node debugging flags are ignored.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableCookieEncryption: true
+  onlyLoadAppFromAsar: true
