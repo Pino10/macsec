@@ -1,3 +1,4 @@
+import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle } from 'lucide-react'
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity } from '@shared/types'
@@ -27,7 +28,7 @@ export default function Sessions(): React.JSX.Element {
         <>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
             <div className="chips">
-              {(['all', 'code-review', 'web-scan', 'api-scan', 'audit'] as const).map((k) => (
+              {(['all', 'code-review', 'web-scan', 'api-scan', 'mobile-scan', 'audit'] as const).map((k) => (
                 <button key={k} className="chip" aria-pressed={kind === k} onClick={() => setKind(k)} style={{ textTransform: 'none' }}>
                   {k === 'all' ? 'All' : kindName(k)} <i>{k === 'all' ? sessions.length : sessions.filter((s) => s.kind === k).length}</i>
                 </button>
@@ -52,7 +53,7 @@ export default function Sessions(): React.JSX.Element {
                 </span>
                 {s.status === 'running' ? (
                   <span className="tag tag-ion">
-                    <span className="dot" data-s="busy" style={{ width: 6, height: 6 }} /> Running
+                    <span className="dot" data-s="busy" style={{ width: 6, height: 6 }} /> Running {overall(s)}%
                   </span>
                 ) : s.status === 'done' ? (
                   <Counts counts={s.counts} />
@@ -77,7 +78,11 @@ const CATS: [FindingCategory | 'all', string][] = [
   ['dependency', 'Packages'],
   ['config', 'Config'],
   ['web', 'Web'],
-  ['api', 'API']
+  ['api', 'API'],
+  ['mobile', 'Mobile'],
+  ['binary', 'Binary'],
+  ['cloud', 'Cloud'],
+  ['network', 'Ports']
 ]
 
 function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.JSX.Element {
@@ -90,6 +95,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [tab, setTab] = useState<'findings' | 'report' | 'run'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const live = sessions.find((s) => s.id === id)
+  const now = useNow(live?.status === 'running')
 
   const stamp = `${live?.status}|${live?.steps.map((s) => `${s.status}${s.findings ?? ''}`).join(',')}`
   useEffect(() => {
@@ -204,6 +210,8 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
         </p>
       )}
 
+      {running && <LiveRun s={s} />}
+
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
         <div className="tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'findings'} onClick={() => setTab('findings')}>
@@ -249,10 +257,15 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
             <div key={st.id} className="tl" data-status={st.status}>
               <StepIcon status={st.status} />
               <span>{st.label}</span>
-              <span className="detail" title={st.detail}>
-                {st.detail ?? (st.status === 'waiting' ? 'Waiting' : '')}
-                {st.ms ? `, ${duration(st.ms)}` : ''}
+              <span className="detail" title={st.lastLine ?? st.detail}>
+                {st.status === 'running' ? (st.lastLine ?? st.detail ?? 'Working…') : (st.detail ?? (st.status === 'waiting' ? 'Waiting' : ''))}
+                {st.ms ? `, ${duration(st.ms)}` : st.status === 'running' && st.startedAt ? `, ${clock(now - new Date(st.startedAt).getTime())}` : ''}
               </span>
+              {st.status === 'running' && (
+                <div className={`bar thin tl-bar${typeof st.progress === 'number' ? '' : ' busy'}`}>
+                  <i style={typeof st.progress === 'number' ? { width: `${st.progress}%` } : undefined} />
+                </div>
+              )}
             </div>
           ))}
         </div>

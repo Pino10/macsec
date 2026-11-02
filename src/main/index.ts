@@ -14,6 +14,9 @@ import { log, logEvents, listLogs, clearLogs } from './logs'
 import { checkUpdates, checkUpdatesDaily, installTool, listTools, removeTool, toolDef, updateToolData } from './toolbox'
 import { localSites, startWebScan } from './webscan'
 import { loadSpec, startApiScan } from './apiscan'
+import { startMobileScan } from './mobilescan'
+import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
+import { optionalTools } from './optional'
 import { startAudit } from './audit'
 import { cancelOp } from './engine'
 import { accounts, azureProjects, connectAzure, connectGitHub, githubRepos, importIntoWww, listLocal } from './projects'
@@ -149,6 +152,13 @@ function validWeb(req: unknown): WebScanRequest {
   else if (t?.kind === 'url' && typeof t.url === 'string' && /^https?:\/\/[^\s'"<>]+$/.test(t.url.trim())) target = { kind: 'url', url: new URL(t.url.trim()).href }
   else throw new ValidationError('Enter the address to scan, starting with http:// or https://.')
   return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, reviewer: pick(r.reviewer, REVIEWERS, 'none') }
+}
+
+/** A host name or IP address only: never something a tool could read as an option. */
+export function validHost(v: unknown): string {
+  const h = typeof v === 'string' ? v.trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/[/:].*$/, '') : ''
+  if (!h || h.length > 253 || h.startsWith('-') || !/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(h)) throw new ValidationError('Enter a server name or IP address, such as example.com or 203.0.113.10.')
+  return h
 }
 
 function validApi(req: unknown): ApiScanRequest {
@@ -344,6 +354,12 @@ function registerIpc(): void {
         if (!/^https?:\/\/[^\s]+$/.test(site)) throw new ValidationError('Enter the site’s address.')
         return startAudit({ kind: 'full', path: allowedProject(r.path), site: new URL(site).href.replace(/\/$/, ''), reviewer: pick(r.reviewer, REVIEWERS, 'claude'), depth: pick(r.depth, ['quick', 'standard', 'deep'] as const, 'standard'), authorized: r.authorized === true })
       }
+      if (r.kind === 'cloud') return startAudit({ kind: 'cloud', provider: pick((r as { provider?: unknown }).provider, ['azure', 'aws'] as const, 'azure'), reviewer: pick(r.reviewer, REVIEWERS, 'none') })
+      if (r.kind === 'server') {
+        const host = validHost((r as { host?: unknown }).host)
+        if (!isLocalHost(host) && r.authorized !== true) throw new ValidationError('Confirm that you own this server or have permission to test it.')
+        return startAudit({ kind: 'server', host, ports: pick((r as { ports?: unknown }).ports, ['top100', 'top1000'] as const, 'top100'), reviewer: pick(r.reviewer, REVIEWERS, 'none'), authorized: r.authorized === true })
+      }
       throw new ValidationError('Choose an audit.')
     } catch (e) {
       throw new ValidationError((e as Error).message)
@@ -363,6 +379,32 @@ function registerIpc(): void {
       throw new ValidationError((e as Error).message)
     }
   })
+  handle('mobile:pick', async (what) => {
+    if (!mainWindow) return null
+    const r = await dialog.showOpenDialog(mainWindow, what === 'file'
+      ? { title: 'Choose a built app', buttonLabel: 'Check', properties: ['openFile'], filters: [{ name: 'Android or iOS app', extensions: ['apk', 'ipa'] }] }
+      : { title: 'Choose the app’s source folder', buttonLabel: 'Check', properties: ['openDirectory'] })
+    if (r.canceled || !r.filePaths[0]) return null
+    const p = resolve(r.filePaths[0])
+    picked.add(p)
+    return p
+  })
+  handle('mobile:start', (req) => {
+    const r = (req ?? {}) as { path?: unknown; reviewer?: unknown }
+    try {
+      return startMobileScan({ path: allowedProject(r.path), reviewer: pick(r.reviewer, REVIEWERS, 'none') })
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
+  handle('cloud:status', () => cloudStatus())
+  handle('cloud:azure-login', async () => {
+    await azureLogin().catch((e) => {
+      throw new ValidationError(`Azure sign-in did not finish: ${(e as Error).message}`)
+    })
+    return cloudStatus()
+  })
+  handle('tools:optional', () => optionalTools())
   handle('api:start', (req) => {
     try {
       return startApiScan(validApi(req))

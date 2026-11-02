@@ -39,11 +39,14 @@ export function createSession(kind: SessionKind, title: string, target: string):
 }
 
 export function saveSession(info: SessionInfo): void {
+  // A session deleted while it was still finishing stays deleted.
+  if (!existsSync(sessionDir(info.id))) return
   writeFileSync(join(sessionDir(info.id), 'session.json'), JSON.stringify(info, null, 2))
   sessionEvents.emit('updated', info)
 }
 
 export function saveFindings(id: string, findings: Finding[]): void {
+  if (!existsSync(sessionDir(id))) return
   writeFileSync(join(sessionDir(id), 'findings.json'), JSON.stringify(findings, null, 2))
 }
 

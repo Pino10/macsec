@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
-import { GitCompareArrows, Layers3, Radar, ShieldHalf } from 'lucide-react'
+import { Cloud, GitCompareArrows, Layers3, LogIn, Radar, Server, ShieldHalf, Smartphone } from 'lucide-react'
+import { MobileFlow } from './Mobile'
 import type { LocalProject, LocalSite, ReviewDepth, Reviewer } from '@shared/types'
 import { useApp } from '../store'
 import { FlowStep, PageHead } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
 import { isLocal } from './WebScan'
 
-type Kind = 'full' | 'portfolio' | 'changes'
+type Kind = 'full' | 'portfolio' | 'changes' | 'mobile' | 'cloud' | 'server'
 
 const AUDITS: { id: Kind; g: string; icon: React.ReactNode; title: string; text: string }[] = [
   { id: 'full', g: '#3ef0a8', icon: <ShieldHalf size={24} />, title: 'Full audit', text: 'A code review and a web scan of the same project, then one AI report that connects them: the route the code leaves open and the page that shows it.' },
   { id: 'portfolio', g: '#38e1ff', icon: <Layers3 size={24} />, title: 'Portfolio sweep', text: 'Every project in your www folder at once: keys and passwords in files and Git history, and packages with known flaws.' },
-  { id: 'changes', g: '#8b6cff', icon: <GitCompareArrows size={24} />, title: 'Change review', text: 'Claude Code’s own /security-review of the changes on a project’s current branch, before you merge or deploy.' }
+  { id: 'changes', g: '#8b6cff', icon: <GitCompareArrows size={24} />, title: 'Change review', text: 'Claude Code’s own /security-review of the changes on a project’s current branch, before you merge or deploy.' },
+  { id: 'mobile', g: '#ffc94a', icon: <Smartphone size={24} />, title: 'Mobile app', text: 'An Android or iOS app, from source or a built .apk or .ipa: risky settings, weak code hardening and keys left inside.' },
+  { id: 'cloud', g: '#ff8a3d', icon: <Cloud size={24} />, title: 'Cloud account', text: 'Your Azure or AWS account against best practice (ScoutSuite), what it exposes (CloudFox) and, on AWS, who could raise their own access (PMapper). Only reads.' },
+  { id: 'server', g: '#ff3d7f', icon: <Server size={24} />, title: 'Server and ports', text: 'The open ports on a server you own and the service behind each one, with the ones that should not be reachable from the internet.' }
 ]
 
 export default function Audits(): React.JSX.Element {
@@ -25,6 +29,13 @@ export default function Audits(): React.JSX.Element {
   const [reviewer, setReviewer] = useState<Reviewer>(settings?.reviewer ?? 'claude')
   const [depth, setDepth] = useState<ReviewDepth>('standard')
   const [ok, setOk] = useState(false)
+  const [provider, setProvider] = useState<'azure' | 'aws'>('azure')
+  const [cloud, setCloud] = useState<{ azure: string | null; aws: string | null } | null>(null)
+  const [host, setHost] = useState('')
+  const [ports, setPorts] = useState<'top100' | 'top1000'>('top100')
+  useEffect(() => {
+    if (kind === 'cloud' && !cloud) void api.invoke('cloud:status').then(setCloud)
+  }, [api, kind, cloud])
 
   useEffect(() => {
     void api.invoke('projects:local').then((p) => {
@@ -42,8 +53,17 @@ export default function Audits(): React.JSX.Element {
 
   const project = projects.find((p) => p.path === path)
   const validSite = /^https?:\/\/[^\s]+$/.test(site.trim())
-  const needsOk = kind === 'full' && validSite && !isLocal(site.trim())
-  const ready = kind === 'portfolio' || (kind === 'changes' && !!project) || (kind === 'full' && !!project && validSite && (!needsOk || ok))
+  const cleanHost = host.trim().replace(/^[a-z]+:\/\//i, '').replace(/[/:].*$/, '')
+  const validHost = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i.test(cleanHost)
+  const localHost = /^(localhost|127\.\d+\.\d+\.\d+)$/.test(cleanHost) || /\.(test|localhost)$/.test(cleanHost)
+  const needsOk = (kind === 'full' && validSite && !isLocal(site.trim())) || (kind === 'server' && validHost && !localHost)
+  const signedIn = cloud?.[provider]
+  const ready =
+    kind === 'portfolio' ||
+    (kind === 'changes' && !!project) ||
+    (kind === 'full' && !!project && validSite && (!needsOk || ok)) ||
+    (kind === 'cloud' && !!signedIn) ||
+    (kind === 'server' && validHost && (!needsOk || ok))
 
   return (
     <>
@@ -60,8 +80,73 @@ export default function Audits(): React.JSX.Element {
         ))}
       </div>
 
+      {kind === 'mobile' ? (
+        <MobileFlow />
+      ) : (
       <div className="flow">
-        {kind !== 'portfolio' && (
+        {kind === 'cloud' && (
+          <>
+            <FlowStep n={1} title="Which cloud" help="Azure signs in through Microsoft’s page and the sign-in stays inside MacSec. AWS uses the profile you already set up with the AWS CLI (aws configure or aws sso login), and only reads it." state={signedIn ? 'done' : 'current'}>
+              <div className="choices" role="radiogroup" aria-label="Cloud">
+                {(['azure', 'aws'] as const).map((p) => (
+                  <button key={p} className="choice" role="radio" aria-checked={provider === p} onClick={() => setProvider(p)}>
+                    <strong>{p === 'azure' ? 'Azure' : 'AWS'}</strong>
+                    <span>{cloud === null ? 'Checking…' : cloud[p] ? `Signed in: ${cloud[p]}` : 'Not signed in'}</span>
+                  </button>
+                ))}
+              </div>
+              {cloud && !signedIn && (
+                <div style={{ marginTop: 12, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {provider === 'azure' ? (
+                    <button className="btn" disabled={busy.has('azlogin')} onClick={async () => {
+                      const r = await act('azlogin', () => api.invoke('cloud:azure-login'))
+                      if (r) setCloud(r)
+                    }}>
+                      <LogIn size={15} /> {busy.has('azlogin') ? 'Waiting for the browser…' : 'Sign in to Azure'}
+                    </button>
+                  ) : (
+                    <span className="hint">In Terminal, run <span className="mono">aws configure</span> or <span className="mono">aws sso login</span>, then check again.</span>
+                  )}
+                  <button className="link" onClick={() => setCloud(null)}>Check again</button>
+                </div>
+              )}
+            </FlowStep>
+            <FlowStep n={2} title="Who writes the report" state="current">
+              <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
+            </FlowStep>
+          </>
+        )}
+
+        {kind === 'server' && (
+          <>
+            <FlowStep n={1} title="Which server" help="A name or IP address. Only connections are opened: nothing is logged into, guessed or changed. Install Nmap (brew install nmap) to also name the service on each port." state={validHost ? 'done' : 'current'}>
+              <input className="input mono" value={host} onChange={(e) => setHost(e.target.value)} placeholder="example.com or 203.0.113.10" aria-label="Server" />
+            </FlowStep>
+            <FlowStep n={2} title="How many ports" state="current">
+              <div className="choices" role="radiogroup" aria-label="Ports">
+                {(['top100', 'top1000'] as const).map((p) => (
+                  <button key={p} className="choice" role="radio" aria-checked={ports === p} onClick={() => setPorts(p)}>
+                    <strong>{p === 'top100' ? 'The 100 most common' : 'The 1,000 most common'}</strong>
+                    <span>{p === 'top100' ? 'About a minute.' : 'A few minutes. Finds less common services too.'}</span>
+                  </button>
+                ))}
+              </div>
+            </FlowStep>
+            <FlowStep n={3} title="Who writes the report" state="current">
+              <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
+            </FlowStep>
+            {needsOk && (
+              <label className="consent">
+                <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
+                <span>
+                  <strong style={{ color: 'var(--ink)' }}>I own this server, or have written permission to test it.</strong> Port checks of servers you do not own may break the provider’s rules or the law.
+                </span>
+              </label>
+            )}
+          </>
+        )}
+
+        {(kind === 'full' || kind === 'changes') && (
           <FlowStep n={1} title="Which project" help={kind === 'changes' ? 'It needs to be a Git project: the review reads the changes on its current branch.' : 'Projects from your www folder.'} state={project ? 'done' : 'current'}>
             <select className="input" value={path} onChange={(e) => setPath(e.target.value)} aria-label="Project">
               {projects.length === 0 && <option value="">No projects in your www folder</option>}
@@ -110,13 +195,18 @@ export default function Audits(): React.JSX.Element {
               ? `Sweeps every project in ${settings?.wwwPath ?? 'your www folder'}.`
               : kind === 'changes'
                 ? 'Runs as a normal Claude Code session, read-only, that you can continue in Terminal.'
-                : 'The code review and the web scan each get their own session too.'}
+                : kind === 'cloud'
+                  ? 'Read-only. A large account can take 20 minutes or more; you can watch every step.'
+                  : kind === 'server'
+                    ? 'Plain connections only, at a gentle rate.'
+                    : 'The code review and the web scan each get their own session too.'}
           </span>
           <button
             className="btn btn-primary btn-lg"
             disabled={!ready || busy.has('audit')}
             onClick={async () => {
-              const req = kind === 'portfolio' ? { kind } : kind === 'changes' ? { kind, path } : { kind, path, site: site.trim(), reviewer, depth, authorized: ok }
+              const req =
+                kind === 'portfolio' ? { kind } : kind === 'changes' ? { kind, path } : kind === 'cloud' ? { kind, provider, reviewer } : kind === 'server' ? { kind, host: cleanHost, ports, reviewer, authorized: ok } : { kind, path, site: site.trim(), reviewer, depth, authorized: ok }
               const s = await act('audit', () => api.invoke('audit:start', req as never))
               if (s) showSession(s.id)
             }}
@@ -125,6 +215,7 @@ export default function Audits(): React.JSX.Element {
           </button>
         </div>
       </div>
+      )}
     </>
   )
 }

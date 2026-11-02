@@ -154,11 +154,11 @@ async function runApiScan(id: string, spec: ParsedSpec, base: string, req: ApiSc
     await s.run(st.spec, async () => reviewSpec(spec))
     await s.run(st.probe, (note) => probe(gets, base, req.auth, () => s.cancelled, note))
     if (st.nuclei)
-      await s.run(st.nuclei, async () => {
+      await s.run(st.nuclei, async (_n, line) => {
         const d = toolDef('nuclei')
         if (d && !isInstalled(d)) await installTool('nuclei', () => undefined)
         const out = join(s.raw, 'nuclei.jsonl')
-        await runTool({ name: 'nuclei', bin: 'nuclei', args: ['-u', base, '-t', nucleiTemplatesDir(), '-ud', nucleiTemplatesDir(), '-tags', 'api,exposure,misconfig,swagger,graphql,token,config', '-etags', NOT_READ_ONLY, '-duc', '-nc', '-silent', '-jsonl', '-o', out, '-rl', '20', '-c', '10', '-timeout', '10'], timeoutMs: 30 * 60_000, output: out }, op, s.raw).catch((e) => {
+        await runTool({ name: 'nuclei', bin: 'nuclei', args: ['-u', base, '-t', nucleiTemplatesDir(), '-ud', nucleiTemplatesDir(), '-tags', 'api,exposure,misconfig,swagger,graphql,token,config', '-etags', NOT_READ_ONLY, '-duc', '-nc', '-silent', '-jsonl', '-o', out, '-rl', '20', '-c', '10', '-timeout', '10'], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
           if (!existsSync(out)) throw e
           return ''
         })

@@ -3,12 +3,14 @@ import { Plus } from 'lucide-react'
 import { AppProvider, useApp } from './store'
 import Rail, { PAGE_ORDER } from './components/Rail'
 import JobsBar from './components/JobsBar'
+import { overall } from './components/LiveRun'
 import Overview from './pages/Overview'
 import Projects from './pages/Projects'
 import CodeReview from './pages/CodeReview'
 import WebScan from './pages/WebScan'
 import ApiSecurity from './pages/ApiSecurity'
 import Audits from './pages/Audits'
+import Mobile from './pages/Mobile'
 import Sessions from './pages/Sessions'
 import Tools from './pages/Tools'
 import Logs from './pages/Logs'
@@ -27,6 +29,9 @@ function EngineBar(): React.JSX.Element {
           <>
             <b>Scanning</b> {running[0].title}
             {running.length > 1 ? ` and ${running.length - 1} more` : ''}
+            <span className="engine-step">
+              {running[0].steps.find((x) => x.status === 'running')?.label ?? 'Starting'}, {overall(running[0])}%
+            </span>
           </>
         ) : (
           <>
@@ -71,6 +76,7 @@ function Shell(): React.JSX.Element {
               {page === 'review' && <CodeReview />}
               {page === 'web' && <WebScan />}
               {page === 'api' && <ApiSecurity />}
+              {page === 'mobile' && <Mobile />}
               {page === 'audit' && <Audits />}
               {page === 'sessions' && <Sessions />}
               {page === 'tools' && <Tools />}

@@ -10,7 +10,8 @@ with free scanners plus an AI reviewer, and keeps every run as a session. Read M
 - Everything MacSec writes goes under `~/MacSec` (`paths.ts`). Scanners run with `toolEnv()` so their caches stay there. Do not write anywhere else on the Mac.
 - Downloads are checked against the publisher's checksum when one exists.
 - AI agents run read-only. Secrets found by scanners are never stored in findings (only the kind, file and line).
-- Only test what the person owns or is allowed to test; anything not on this Mac needs their confirmation. Web and API scans only read: never add fuzzing, brute force, exploitation, token forging or requests that change data. Keep Nuclei's `NOT_READ_ONLY` tags excluded.
+- Only test what the person owns or is allowed to test; anything not on this Mac needs their confirmation. Web and API scans only read: never add fuzzing, brute force, exploitation, token forging or requests that change data. Keep Nuclei's `NOT_READ_ONLY` tags excluded. Never run Nmap scripts (`-sC`, `--script`), and never let WPScan guess passwords or list users.
+- Attack tools (Metasploit, sqlmap, Hydra, Frida and the rest in `optional.ts`) are listed only: never install, run or control them from MacSec.
 - UI and docs: plain, friendly English for non-experts. Never use em dashes; use a colon and a space instead.
 
 ## Checks before committing

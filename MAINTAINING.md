@@ -37,6 +37,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 | `src/main/skills.ts` | MacSec's Claude Code plugin (written to `tools/claude-plugin`) and your skills (`extensions/claude`), loaded with `--plugin-dir`. |
 | `src/main/webextra.ts` | TLS check, keys in public JavaScript, signed-in versus signed-out comparison. |
 | `src/main/audit.ts` | Special audits: full audit, portfolio sweep, change review. |
+| `src/main/mobilescan.ts`, `src/main/scanners/mobile.ts` | Mobile app checks: mobsfscan, the Android manifest and Info.plist checks, and binary hardening (`hardening()` reads Mach-O and ELF headers). |
+| `src/main/infraaudit.ts`, `src/main/scanners/infra.ts` | Cloud account audits (ScoutSuite, CloudFox, PMapper) and server checks (naabu, Nmap); also the WPScan parser. |
+| `src/main/optional.ts` | The attack tools from the T3MP3ST pack, listed only. Never add an install or run for these. |
+| `components/LiveRun.tsx` | The live progress panel. Tools' output reaches it through `SessionRun.line()` (redacted, then `friendly()`), and `percentOf()` reads percentages. |
 | `src/main/aisummary.ts` | The AI summary for web and API scans (it reads the findings only). |
 | `src/renderer/src/macsec.css` | The whole design: colours, glass, controls. `components/ThreatCore.tsx` is the posture orb. |
 | `src/shared/types.ts` | Every message between the window and the main process (`Channels`). |
@@ -54,6 +58,8 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 npm run typecheck
 npm test
 ```
+
+`tests/v04.test.ts` uses real output from mobsfscan, Androguard, naabu and Nmap (in `tests/fixtures`), and `tests/e2e-v04.test.ts` runs a real mobile check and port check when mobsfscan is in `/tmp/scanvenv`, a sample app is in `/tmp/mob` and naabu is at `/tmp/nb/naabu`.
 
 `tests/core.test.ts` checks download picking, every parser, merging, the AI output and the PDF HTML. `tests/e2e.test.ts` runs a real review with real Semgrep and Bandit when they are installed in `/tmp/scanvenv` (`python3 -m venv /tmp/scanvenv && /tmp/scanvenv/bin/pip install semgrep bandit`).
 

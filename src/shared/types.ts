@@ -5,7 +5,7 @@ export const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'inf
 
 // ---------------------------------------------------------------- Tools
 
-export type ToolCategory = 'code' | 'secrets' | 'deps' | 'web' | 'api' | 'runtime'
+export type ToolCategory = 'code' | 'secrets' | 'deps' | 'web' | 'api' | 'mobile' | 'cloud' | 'network' | 'optional' | 'runtime'
 
 export interface ToolInfo {
   id: string
@@ -67,7 +67,7 @@ export type ReviewSource =
 
 // ---------------------------------------------------------------- Sessions and findings
 
-export type FindingCategory = 'code' | 'secret' | 'dependency' | 'config' | 'ai' | 'web' | 'api'
+export type FindingCategory = 'code' | 'secret' | 'dependency' | 'config' | 'ai' | 'web' | 'api' | 'mobile' | 'cloud' | 'network' | 'binary'
 
 export interface Finding {
   id: string
@@ -168,14 +168,36 @@ export interface SessionStep {
   detail?: string
   findings?: number
   ms?: number
+  /** When this step started, so the window can show a running clock. */
+  startedAt?: string
+  /** 0 to 100 when the tool reports it. */
+  progress?: number
+  /** The latest line the tool printed. */
+  lastLine?: string
 }
 
-export type SessionKind = 'code-review' | 'web-scan' | 'api-scan' | 'audit'
+export type SessionKind = 'code-review' | 'web-scan' | 'api-scan' | 'mobile-scan' | 'audit'
 
 export type AuditRequest =
   | { kind: 'full'; path: string; site: string; reviewer: Reviewer; depth: ReviewDepth; authorized: boolean }
   | { kind: 'portfolio' }
   | { kind: 'changes'; path: string }
+  | { kind: 'cloud'; provider: 'azure' | 'aws'; reviewer: Reviewer }
+  | { kind: 'server'; host: string; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean }
+
+/** A mobile app: its source folder, or a built .apk or .ipa file. */
+export interface MobileScanRequest {
+  path: string
+  reviewer: Reviewer
+}
+
+/** A tool that was in the T3MP3ST pack but MacSec does not install or run, because it attacks. */
+export interface OptionalTool {
+  name: string
+  what: string
+  homepage: string
+  installed: boolean
+}
 
 export interface SessionInfo {
   id: string
@@ -301,6 +323,8 @@ export interface LogLine {
   session?: string
   level: 'info' | 'warn' | 'error'
   text: string
+  /** Live tool output, not kept in the log file. */
+  live?: boolean
 }
 
 export interface Channels {
@@ -334,6 +358,12 @@ export interface Channels {
   'audit:start': { args: [AuditRequest]; result: SessionInfo }
   'api:load-spec': { args: []; result: ApiSpecInfo | null }
   'api:start': { args: [ApiScanRequest]; result: SessionInfo }
+  /** Picks an app's source folder or a built .apk / .ipa file. */
+  'mobile:pick': { args: ['folder' | 'file']; result: string | null }
+  'mobile:start': { args: [MobileScanRequest]; result: SessionInfo }
+  'cloud:status': { args: []; result: { azure: string | null; aws: string | null } }
+  'cloud:azure-login': { args: []; result: { azure: string | null; aws: string | null } }
+  'tools:optional': { args: []; result: OptionalTool[] }
   'sessions:list': { args: []; result: SessionInfo[] }
   'sessions:get': { args: [string]; result: SessionDetail }
   'sessions:delete': { args: [string]; result: SessionInfo[] }

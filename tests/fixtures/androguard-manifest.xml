@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="1" android:versionName="1.0" package="tests.androguard">
+  <uses-sdk android:minSdkVersion="9" android:targetSdkVersion="16"/>
+  <application android:label="@7F040001" android:icon="@7F020000" android:debuggable="true" android:allowBackup="false">
+    <activity android:label="@7F040001" android:name="TestActivity">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

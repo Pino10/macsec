@@ -17,7 +17,8 @@ import { beginOp, endOp, runTool, SessionRun } from './engine'
 import { createSession, saveAiReport } from './sessions'
 import { checkHeaders, parseHttpx, parseKatana, parseNuclei, pathSeverity, SENSITIVE_PATHS, type Fingerprint } from './scanners/web'
 import { fid } from './scanners/parse'
-import { installTool, isInstalled, nucleiTemplatesDir, toolDef } from './toolbox'
+import { appPath, installTool, isInstalled, nucleiTemplatesDir, toolDef } from './toolbox'
+import { parseWpscan } from './scanners/infra'
 import { dirs } from './paths'
 import { getSettings } from './settings'
 import { log } from './logs'
@@ -162,14 +163,15 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     files: s.step('exposed', `Look for files that should not be public (${m.paths})`),
     js: m.depth ? s.step('js', 'Look for keys in the site’s public JavaScript') : null,
     access: m.depth && Object.keys(headers).length ? s.step('access', 'Compare private pages signed in and signed out') : null,
+    wp: s.step('wpscan', 'WordPress: version, plugins and themes (when the site uses it)'),
     templates: s.step('templates', 'Update Nuclei’s community checks'),
     nuclei: s.step('nuclei', m.everyPage ? 'Nuclei read-only checks on every page' : req.mode === 'quick' ? 'Nuclei checks for serious known problems' : 'Every read-only Nuclei check'),
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what matters most and how to fix it') : null
   }
   try {
-    await s.run(st.fp, async (note) => {
+    await s.run(st.fp, async (note, line) => {
       await ensure('httpx')
-      const out = await runTool({ name: 'httpx', bin: 'httpx', args: ['-u', url, '-json', '-silent', '-tech-detect', '-title', '-status-code', '-web-server', '-follow-redirects', '-no-color', ...headerArgs(headers, '-H')], timeoutMs: 120_000 }, op, s.raw)
+      const out = await runTool({ name: 'httpx', bin: 'httpx', args: ['-u', url, '-json', '-silent', '-tech-detect', '-title', '-status-code', '-web-server', '-follow-redirects', '-no-color', ...headerArgs(headers, '-H')], timeoutMs: 120_000 }, op, s.raw, line)
       fp = parseHttpx(out)
       const f = fp[0]
       if (!f) throw new Error('The site did not answer.')
@@ -186,10 +188,10 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     })
 
     if (st.crawl)
-      await s.run(st.crawl, async (note) => {
+      await s.run(st.crawl, async (note, line) => {
         await ensure('katana')
         const out = join(s.raw, 'katana.jsonl')
-        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode === 'thorough' ? ['-jc'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out, ...headerArgs(headers, '-H')], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw).catch((e) => {
+        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode === 'thorough' ? ['-jc'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out, ...headerArgs(headers, '-H')], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
           if (!existsSync(out)) throw e
           return ''
         })
@@ -205,16 +207,30 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     if (st.js) await s.run(st.js, (note) => keysInJavaScript(urls, host, s.raw, op, headers, note))
     if (st.access) await s.run(st.access, (note) => signedOutCheck(urls, headers, () => s.cancelled, note))
 
-    await s.run(st.templates, async (note) => {
+    await s.run(st.wp, async (note, line) => {
+      const isWp = fp.some((f) => f.tech.some((t) => /wordpress/i.test(t)))
+      if (!isWp) return note('Not a WordPress site')
+      const bin = appPath('wpscan')
+      if (!bin) return note('Nuclei’s WordPress checks run below. Install WPScan for plugin and theme versions.')
+      const out = join(s.raw, 'wpscan.json')
+      // Passive plugin detection and read-only checks: no password guessing, no user lists.
+      await runTool({ name: 'wpscan', bin, absolute: true, args: ['--url', url, '--format', 'json', '--output', out, '--no-banner', '--random-user-agent', '--plugins-detection', 'passive', '--enumerate', 'vp,vt,cb,dbe', '--throttle', '150', ...(Object.keys(headers).length ? ['--headers', Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('; ')] : [])], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
+        if (!existsSync(out)) throw e
+        return ''
+      })
+      return parseWpscan(readFileSync(out, 'utf8'), url)
+    })
+
+    await s.run(st.templates, async (note, line) => {
       await ensure('nuclei')
       if (templatesFresh()) return note('Up to date')
-      await runTool({ name: 'nuclei-update', bin: 'nuclei', args: ['-update-templates', '-ud', nucleiTemplatesDir(), '-silent', '-nc'], timeoutMs: 10 * 60_000 }, op, s.raw).catch((e) => {
+      await runTool({ name: 'nuclei-update', bin: 'nuclei', args: ['-update-templates', '-ud', nucleiTemplatesDir(), '-silent', '-nc'], timeoutMs: 10 * 60_000 }, op, s.raw, line).catch((e) => {
         if (!existsSync(nucleiTemplatesDir())) throw e
       })
       note('Updated')
     })
 
-    await s.run(st.nuclei, async () => {
+    await s.run(st.nuclei, async (_n, line) => {
       const out = join(s.raw, 'nuclei.jsonl')
       const custom = join(dirs.extensions(), 'nuclei-templates')
       const hasCustom = existsSync(custom) && readdirSync(custom).some((f) => /\.ya?ml$/.test(f))
@@ -225,11 +241,11 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         '-ud', nucleiTemplatesDir(),
         '-etags', NOT_READ_ONLY,
         ...(req.mode === 'quick' ? ['-severity', 'critical,high,medium'] : []),
-        '-duc', '-nc', '-silent', '-jsonl', '-o', out,
+        '-duc', '-nc', '-silent', '-jsonl', '-o', out, '-stats', '-sj', '-si', '5',
         '-rl', String(m.rate), '-c', '10', '-timeout', '10', '-retries', '1',
         ...headerArgs(headers, '-H')
       ]
-      await runTool({ name: 'nuclei', bin: 'nuclei', args, timeoutMs: (req.mode === 'thorough' ? 120 : 45) * 60_000, output: out }, op, s.raw).catch((e) => {
+      await runTool({ name: 'nuclei', bin: 'nuclei', args, timeoutMs: (req.mode === 'thorough' ? 120 : 45) * 60_000, output: out }, op, s.raw, line).catch((e) => {
         if (!existsSync(out)) throw e
         return ''
       })

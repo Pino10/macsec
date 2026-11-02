@@ -42,8 +42,40 @@ export const CATALOG: ToolDef[] = [
   // Web
   { id: 'nuclei', name: 'Nuclei', category: 'web', method: 'release', repo: 'projectdiscovery/nuclei', binaries: ['nuclei'], purpose: 'Runs thousands of community checks for known problems against a site.', homepage: 'https://docs.projectdiscovery.io/tools/nuclei', versionArgs: ['-version'] },
   { id: 'katana', name: 'Katana', category: 'web', method: 'release', repo: 'projectdiscovery/katana', binaries: ['katana'], purpose: 'Crawls a site to find every page, form and endpoint before scanning.', homepage: 'https://docs.projectdiscovery.io/tools/katana', versionArgs: ['-version'] },
+  { id: 'wpscan', name: 'WPScan', category: 'web', method: 'app', apps: brew('wpscan'), purpose: 'WordPress: the version, plugins and themes, and known problems in them. Used in web scans of WordPress sites when installed (brew install wpscanteam/tap/wpscan).', homepage: 'https://wpscan.com' },
   { id: 'httpx', name: 'httpx', category: 'web', method: 'release', repo: 'projectdiscovery/httpx', binaries: ['httpx'], purpose: 'Checks which addresses answer and what they run (server, framework, title).', homepage: 'https://docs.projectdiscovery.io/tools/httpx', versionArgs: ['-version'] },
+
+  // Mobile apps
+  { id: 'mobsfscan', name: 'mobsfscan', category: 'mobile', method: 'python', pkg: 'mobsfscan', binaries: ['mobsfscan'], languages: ['Java', 'Kotlin', 'Swift', 'Objective-C'], purpose: 'MobSF’s rules for Android and iOS source: insecure storage, weak crypto, WebView and network settings.', homepage: 'https://github.com/MobSF/mobsfscan' },
+  { id: 'androguard', name: 'Androguard', category: 'mobile', method: 'python', pkg: 'androguard', binaries: ['androguard'], purpose: 'Reads a built Android app (.apk): its manifest, permissions and exported parts.', homepage: 'https://github.com/androguard/androguard' },
+
+  // Cloud accounts (read-only)
+  { id: 'scoutsuite', name: 'ScoutSuite', category: 'cloud', method: 'python', pkg: 'scoutsuite', binaries: ['scout'], purpose: 'Audits the settings of an Azure or AWS account against best practice. Only reads.', homepage: 'https://github.com/nccgroup/ScoutSuite' },
+  { id: 'azure-cli', name: 'Azure CLI', category: 'cloud', method: 'python', pkg: 'azure-cli', binaries: ['az'], purpose: 'Signs in to Azure for the cloud audit. Its sign-in stays inside MacSec.', homepage: 'https://learn.microsoft.com/cli/azure/' },
+  { id: 'awscli', name: 'AWS CLI', category: 'cloud', method: 'python', pkg: 'awscli', binaries: ['aws'], purpose: 'Reads your AWS profile for the cloud audit.', homepage: 'https://aws.amazon.com/cli/' },
+  { id: 'cloudfox', name: 'CloudFox', category: 'cloud', method: 'release', repo: 'BishopFox/cloudfox', binaries: ['cloudfox'], purpose: 'Maps what an account can reach: roles, public storage, endpoints and secrets stores.', homepage: 'https://github.com/BishopFox/cloudfox', versionArgs: ['--version'] },
+  { id: 'pmapper', name: 'PMapper', category: 'cloud', method: 'python', pkg: 'principalmapper', binaries: ['pmapper'], purpose: 'Finds AWS users and roles that could give themselves more access.', homepage: 'https://github.com/nccgroup/PMapper' },
+  { id: 'gcloud', name: 'Google Cloud CLI', category: 'cloud', method: 'app', apps: [...brew('gcloud'), '/opt/homebrew/share/google-cloud-sdk/bin/gcloud', '/usr/local/share/google-cloud-sdk/bin/gcloud'], purpose: 'Detected when installed, for your own Google Cloud checks.', homepage: 'https://cloud.google.com/sdk/docs/install' },
+
+  // Servers and ports (your own hosts)
+  { id: 'naabu', name: 'naabu', category: 'network', method: 'release', repo: 'projectdiscovery/naabu', binaries: ['naabu'], purpose: 'Lists the open ports on a server you own, with plain connection checks.', homepage: 'https://docs.projectdiscovery.io/tools/naabu', versionArgs: ['-version'] },
+  { id: 'nmap', name: 'Nmap', category: 'network', method: 'app', apps: brew('nmap'), purpose: 'Names the service and version on each open port. Used by the server audit when installed (brew install nmap). MacSec never runs its scripts.', homepage: 'https://nmap.org/download' },
+
+  // Deeper analysis you open yourself
+  { id: 'radare2', name: 'radare2', category: 'optional', method: 'app', apps: brew('r2'), purpose: 'Reverse engineering of app binaries, for when you want to look inside by hand.', homepage: 'https://rada.re' },
+  { id: 'ghidra', name: 'Ghidra', category: 'optional', method: 'app', apps: [...brew('ghidraRun'), '/Applications/Ghidra.app'], purpose: 'The NSA’s free decompiler, for reading compiled apps by hand.', homepage: 'https://ghidra-sre.org' },
 ]
+
+/** Where Homebrew puts a command, on Apple silicon and Intel Macs. */
+function brew(bin: string): string[] {
+  return [`/opt/homebrew/bin/${bin}`, `/usr/local/bin/${bin}`]
+}
+
+/** The path of a tool you installed yourself (Nmap, WPScan), if it is there. */
+export function appPath(id: string): string | null {
+  const t = toolDef(id)
+  return t?.method === 'app' ? (t.apps.find((a) => existsSync(a)) ?? null) : null
+}
 
 export const toolDef = (id: string): ToolDef | undefined => CATALOG.find((t) => t.id === id)
 export const toolPath = (bin: string): string => join(dirs.bin(), bin)

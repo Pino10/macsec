@@ -10,21 +10,24 @@ import { parseAiOutput, type Verdict } from './aireview'
 import { pluginArgs } from './skills'
 import type { Op } from './engine'
 
-export function summaryPrompt(kind: 'web' | 'api', target: string, context: string, findings: Finding[]): string {
+const WHAT = { web: ['web', 'site'], api: ['API', 'API'], mobile: ['mobile app', 'app'], cloud: ['cloud account', 'cloud account'], server: ['server and open ports', 'server'] } as const
+
+export function summaryPrompt(kind: keyof typeof WHAT, target: string, context: string, findings: Finding[]): string {
+  const [scan, thing] = WHAT[kind]
   const list = findings
     .slice(0, 150)
     .map((f) => `- id=${f.id} [${f.severity}] ${f.tool}: ${f.title}${f.url ? ` at ${f.url}` : f.file ? ` at ${f.file}` : ''}${f.cwe ? ` (${f.cwe})` : ''}${f.description ? `: ${f.description.slice(0, 200).replace(/\n/g, ' ')}` : ''}`)
     .join('\n')
-  return `You are a senior application security engineer. A read-only ${kind === 'web' ? 'web' : 'API'} security scan of ${target} found the items below.
+  return `You are a senior application security engineer. A read-only ${scan} security check of ${target} found the items below.
 ${context}
 
-Write a tailored report in Markdown for the person who owns this ${kind === 'web' ? 'site' : 'API'}, specific to the technologies detected:
+Write a tailored report in Markdown for the person who owns this ${thing}, specific to the technologies detected:
 ## Executive summary
 3 to 5 sentences: the overall state and the single most urgent fix.
 ## Risk overview
 A table: | Severity | Finding | Where |, most severe first. Group repeated items (all missing headers in one row).
 ## Findings
-For each problem worth fixing, "### [SEVERITY] Title" (CRITICAL, HIGH, MEDIUM or LOW) with: **Where** (the address), **Evidence** (what the scan saw), **Why it is rated SEVERITY**, **Impact** in plain words, **Fix** with the exact configuration or code for this stack in a fenced code block (Nginx, Apache, Laravel, Express and so on), and **How to verify** (a command such as curl -I, or what to check in the browser).
+For each problem worth fixing, "### [SEVERITY] Title" (CRITICAL, HIGH, MEDIUM or LOW) with: **Where** (the address), **Evidence** (what the scan saw), **Why it is rated SEVERITY**, **Impact** in plain words, **Fix** with the exact configuration, code or command for this stack in a fenced code block, and **How to verify** (a command such as curl -I, or what to check in the browser).
 ## Probably harmless
 Items that look alarming but are not, and why.
 

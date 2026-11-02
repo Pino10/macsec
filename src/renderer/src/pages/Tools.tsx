@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Cloud, Microscope, Server, Smartphone, Swords } from 'lucide-react'
 import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
-import type { AgentInfo, LocalLlm, ToolCategory, ToolInfo } from '@shared/types'
+import type { AgentInfo, LocalLlm, OptionalTool, ToolCategory, ToolInfo } from '@shared/types'
 import { useApp } from '../store'
 import { PageHead, Seg } from '../ui'
 
@@ -9,7 +10,11 @@ const GROUPS: { id: ToolCategory; title: string; icon: React.ReactNode }[] = [
   { id: 'secrets', title: 'Keys and passwords', icon: <KeyRound size={18} /> },
   { id: 'deps', title: 'Packages and configuration', icon: <Package size={18} /> },
   { id: 'web', title: 'Web and API', icon: <Globe2 size={18} /> },
-  { id: 'runtime', title: 'Helpers', icon: <Wrench size={18} /> }
+  { id: 'mobile', title: 'Mobile apps', icon: <Smartphone size={18} /> },
+  { id: 'cloud', title: 'Cloud accounts', icon: <Cloud size={18} /> },
+  { id: 'network', title: 'Servers and ports', icon: <Server size={18} /> },
+  { id: 'runtime', title: 'Helpers', icon: <Wrench size={18} /> },
+  { id: 'optional', title: 'Deeper analysis you open yourself', icon: <Microscope size={18} /> }
 ]
 
 export default function Tools(): React.JSX.Element {
@@ -246,7 +251,53 @@ export default function Tools(): React.JSX.Element {
           </div>
         )
       })}
+
+      <OptionalList />
     </>
+  )
+}
+
+/** The attack tools from the T3MP3ST pack: listed, never installed or run by MacSec. */
+function OptionalList(): React.JSX.Element {
+  const [list, setList] = useState<OptionalTool[]>([])
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    void window.macsec.invoke('tools:optional').then(setList)
+  }, [])
+  return (
+    <div style={{ marginTop: 8 }}>
+      <h2 className="section-title">In the T3MP3ST pack, not installed by MacSec</h2>
+      <div className="notice" style={{ alignItems: 'flex-start' }}>
+        <Swords size={18} style={{ flexShrink: 0, marginTop: 2, color: 'var(--sev-high)' }} />
+        <div>
+          These tools attack rather than inspect: they exploit, guess passwords, fuzz or change running apps. MacSec does not install, run or control them. If you need one for a test you are authorised to do,
+          install it yourself from its official site and use it outside MacSec. Burp Suite, on the Tools list above, is the companion for hands-on web testing.{' '}
+          <button className="link" onClick={() => setOpen((o) => !o)}>
+            {open ? 'Hide the list' : `Show the ${list.length} tools`}
+          </button>
+        </div>
+      </div>
+      {open && (
+        <div className="panel">
+          {list.map((t) => (
+            <div key={t.name} className="arsenal-row" data-on={t.installed}>
+              <span className="glyph">
+                <Swords size={18} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div className="row-title">
+                  {t.name} {t.installed ? <span className="tag tag-ok">On this Mac</span> : <span className="tag">Not installed</span>}
+                </div>
+                <div className="row-sub">{t.what}</div>
+              </div>
+              <button className="btn btn-sm" onClick={() => void window.macsec.invoke('app:open-external', t.homepage)}>
+                <ExternalLink size={13} /> Official site
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -266,7 +317,7 @@ function ToolRow({ t, icon, onInstall, onRemove, busy }: { t: ToolInfo; icon: Re
           <ExternalLink />
         </button>
         {t.method === 'app' ? (
-          !t.installed && (
+          t.installed ? null : (
             <button className="btn btn-sm" onClick={() => void window.macsec.invoke('app:open-external', t.homepage)}>
               Get it
             </button>

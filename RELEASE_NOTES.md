@@ -1,3 +1,40 @@
+## MacSec 0.4
+
+### Watch every test as it runs
+A running test now shows the step it is on, how long it has taken, a progress bar with the real percentage when the tool reports one (Nuclei, for example), the tool's latest line in plain words, and a live output panel. The top bar and the session list show the step and percentage too. When a tool has to be installed first, the step says so.
+
+### Mobile apps
+A new **Mobile apps** page, and a Mobile app option in Special audits. Check Android and iOS apps from source or a built .apk or .ipa:
+- **mobsfscan** (MobSF's rules) on source code
+- the Android manifest: debuggable builds, backups, plain HTTP, very old Android, and activities, services and providers any app can open (a built .apk is decoded with **Androguard**)
+- Info.plist: App Transport Security turned off, file sharing, URL schemes
+- how the compiled code is hardened: PIE, stack canaries, NX, RELRO, ARC and App Store encryption
+- keys and passwords left in the app
+
+### Cloud accounts and servers
+- **Cloud account** audit for Azure or AWS: **ScoutSuite** against best practice, **CloudFox** for what the account exposes and, on AWS, **PMapper** for users and roles that could raise their own access. Only reads. Sign in to Azure from MacSec; the sign-in stays in your MacSec folder.
+- **Server and ports** check: **naabu** finds the open ports, **Nmap** (when installed) names the service on each, and MacSec says which ones should not be reachable from the internet. Servers that are not on your Mac need your confirmation.
+
+### WordPress
+Web scans of WordPress sites add **WPScan** when you have it installed: the version, plugins and themes, with their known problems and exposed backups. Passive only.
+
+### Every inspect-only tool from T3MP3ST
+New on Tools: mobsfscan, Androguard, ScoutSuite, Azure CLI, AWS CLI, CloudFox, PMapper, naabu, plus Nmap, WPScan and the Google Cloud CLI when you have them. radare2 and Ghidra are listed for reading compiled apps by hand.
+
+### The attack tools, listed
+Tools now lists the attack tools that were in the T3MP3ST pack (Metasploit, sqlmap, ffuf, Dalfox, Hydra, hashcat, John the Ripper, Pacu, Frida, objection, drozer, GDB with pwndbg) with their official sites. MacSec does not install, run or control them: install one yourself if you need it for a test you are authorised to do.
+
+### A new logo
+A glass shield with a radar and the engine's iris. It sweeps in the sidebar while a test runs.
+
+### Safer
+An audit of MacSec itself:
+- tool output is redacted before it is shown live or saved with the session
+- built apps are unpacked with macOS's tar, which refuses paths that escape the session folder, and links inside an app are never followed
+- an app's own file names cannot point MacSec at files outside it
+- server names are checked so they can never be read as tool options
+- a session deleted while it is finishing stays deleted
+
 ## MacSec 0.3
 
 ### See exactly what was found

@@ -5,6 +5,7 @@
  *                    connects them (a route the code leaves open and the page that shows it)
  *   Portfolio sweep  keys and vulnerable packages across every project in your www folder
  *   Change review    Claude Code's own /security-review of the changes on the current branch
+ *   Cloud account    and Server: see infraaudit.ts. Mobile app: see mobilescan.ts.
  */
 import { spawn } from 'child_process'
 import { randomUUID } from 'crypto'
@@ -23,8 +24,10 @@ import { summarizeWithAi } from './aisummary'
 import { agentEnv, findCli } from './agents'
 import { pluginArgs } from './skills'
 import { log } from './logs'
+import { startInfraAudit } from './infraaudit'
 
 export function startAudit(req: AuditRequest): SessionInfo {
+  if (req.kind === 'cloud' || req.kind === 'server') return startInfraAudit(req)
   if (req.kind === 'portfolio') {
     const info = createSession('audit', 'Portfolio sweep', getSettings().wwwPath)
     void portfolio(info.id).catch((e) => log('error', `Portfolio sweep: ${(e as Error).message}`, info.id))
@@ -58,7 +61,7 @@ async function full(id: string, req: Extract<AuditRequest, { kind: 'full' }>): P
   try {
     let codeId = ''
     let webId = ''
-    await s.run(code, async (note) => {
+    await s.run(code, async (note, line) => {
       const r = startReview({ source: { kind: 'local', path: req.path }, reviewer: req.reviewer, depth: req.depth, focus: 'security', keepCode: false })
       codeId = (await r).id
       s.info.children = [codeId]
@@ -68,7 +71,7 @@ async function full(id: string, req: Extract<AuditRequest, { kind: 'full' }>): P
       if (d.aiReport) note(`${d.findings.length} findings, with an AI review`)
       return d.findings.map((f) => ({ ...f, tool: `Code: ${f.tool}` }))
     })
-    await s.run(web, async (note) => {
+    await s.run(web, async (note, line) => {
       webId = startWebScan({ target: { kind: 'url', url: req.site }, mode: req.depth === 'deep' ? 'thorough' : req.depth === 'quick' ? 'quick' : 'standard', authorized: req.authorized, reviewer: 'none' }).id
       s.info.children = [codeId, webId].filter(Boolean)
       note('Running as its own session')
@@ -107,18 +110,18 @@ async function portfolio(id: string): Promise<void> {
       }
     })
     for (const { p, st } of steps) {
-      await s.run(st, async (note) => {
+      await s.run(st, async (note, line) => {
         const root = join(www, p)
         const out: Finding[] = []
         const git = existsSync(join(root, '.git'))
         note(git ? 'Keys in files and history' : 'Keys in files')
         const gl = join(s.raw, `gitleaks-${p}.json`)
-        await runTool({ name: `gitleaks-${p}`, bin: 'gitleaks', args: [git ? 'git' : 'dir', '.', '--report-format', 'json', '--report-path', gl, '--no-banner', '--redact', '--exit-code', '0', '--log-level', 'error'], cwd: root, timeoutMs: 15 * 60_000, output: gl }, op, s.raw)
+        await runTool({ name: `gitleaks-${p}`, bin: 'gitleaks', args: [git ? 'git' : 'dir', '.', '--report-format', 'json', '--report-path', gl, '--no-banner', '--redact', '--exit-code', '0', '--log-level', 'error'], cwd: root, timeoutMs: 15 * 60_000, output: gl }, op, s.raw, line)
           .then((t) => out.push(...parseGitleaks(t, root)))
           .catch(() => undefined)
         note('Vulnerable packages')
         const osv = join(s.raw, `osv-${p}.json`)
-        await runTool({ name: `osv-${p}`, bin: 'osv-scanner', args: ['scan', 'source', '-r', '--format', 'json', '--output', osv, '.'], cwd: root, timeoutMs: 15 * 60_000, output: osv }, op, s.raw)
+        await runTool({ name: `osv-${p}`, bin: 'osv-scanner', args: ['scan', 'source', '-r', '--format', 'json', '--output', osv, '.'], cwd: root, timeoutMs: 15 * 60_000, output: osv }, op, s.raw, line)
           .then((t) => out.push(...parseOsv(t, root)))
           .catch(() => undefined)
         // Evidence comes from each project; the file names then say which project it is.
@@ -139,7 +142,7 @@ async function changes(id: string, path: string): Promise<void> {
   const s = new SessionRun(id, op)
   const st = s.step('claude', 'Claude Code /security-review of the current branch')
   try {
-    await s.run(st, async (note) => {
+    await s.run(st, async (note, line) => {
       const bin = findCli('claude')
       if (!bin) throw new Error('Claude Code’s command line tool is not installed. Set it up on Tools.')
       s.info.claudeSession = randomUUID()

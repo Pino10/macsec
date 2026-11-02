@@ -1,4 +1,4 @@
-import { CheckCircle2, CircleDashed, FileSearch, Globe, Loader2, MinusCircle, Plug, ShieldHalf, XCircle } from 'lucide-react'
+import { CheckCircle2, CircleDashed, FileSearch, Globe, Loader2, MinusCircle, Plug, ShieldHalf, XCircle, Smartphone } from 'lucide-react'
 import { SEVERITIES, type SessionInfo, type Severity, type SessionStep } from '@shared/types'
 
 export function PageHead({ title, desc, children }: { title: string; desc?: string; children?: React.ReactNode }): React.JSX.Element {
@@ -81,15 +81,15 @@ export function Spectrum({ counts, legend = true }: { counts: Record<Severity, n
 }
 
 export function KindIcon({ kind, size = 18 }: { kind: SessionInfo['kind']; size?: number }): React.JSX.Element {
-  const g = kind === 'web-scan' ? '#8b6cff' : kind === 'api-scan' ? '#ff3d7f' : kind === 'audit' ? '#3ef0a8' : '#38e1ff'
+  const g = kind === 'web-scan' ? '#8b6cff' : kind === 'api-scan' ? '#ff3d7f' : kind === 'audit' ? '#3ef0a8' : kind === 'mobile-scan' ? '#ffc94a' : '#38e1ff'
   return (
     <span className="glyph" style={{ ['--g' as string]: g, width: size + 20, height: size + 20, borderRadius: 11 }}>
-      {kind === 'web-scan' ? <Globe size={size} /> : kind === 'api-scan' ? <Plug size={size} /> : kind === 'audit' ? <ShieldHalf size={size} /> : <FileSearch size={size} />}
+      {kind === 'web-scan' ? <Globe size={size} /> : kind === 'api-scan' ? <Plug size={size} /> : kind === 'mobile-scan' ? <Smartphone size={size} /> : kind === 'audit' ? <ShieldHalf size={size} /> : <FileSearch size={size} />}
     </span>
   )
 }
 
-export const kindName = (k: SessionInfo['kind']): string => (k === 'web-scan' ? 'Web scan' : k === 'api-scan' ? 'API security' : k === 'audit' ? 'Special audit' : 'Code review')
+export const kindName = (k: SessionInfo['kind']): string => (k === 'web-scan' ? 'Web scan' : k === 'api-scan' ? 'API security' : k === 'mobile-scan' ? 'Mobile app check' : k === 'audit' ? 'Special audit' : 'Code review')
 
 export function StepIcon({ status }: { status: SessionStep['status'] }): React.JSX.Element {
   if (status === 'running') return <Loader2 size={16} className="spin" style={{ color: 'var(--pulse)' }} />

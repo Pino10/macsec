@@ -17,9 +17,9 @@ import { planScanners, projectStats, SKIP_DIRS, type ScannerRun } from './scanne
 import { countBySeverity, mergeFindings } from './scanners/parse'
 import { installTool, isInstalled, toolDef, toolEnv, toolPath } from './toolbox'
 import { reviewPrompt, reviewWithClaude, reviewWithCodex, reviewWithModel, type AiResult } from './aireview'
-import { log } from './logs'
+import { log, redact } from './logs'
 import { addEvidence } from './evidence'
-import { beginOp, cancelOp, endOp, type Op } from './engine'
+import { beginOp, cancelOp, endOp, type Op, friendly, percentOf } from './engine'
 import { getSettings } from './settings'
 
 
@@ -68,7 +68,7 @@ export function sourceFiles(root: string, limit = 20000): string[] {
   return out
 }
 
-function runScanner(run: ScannerRun, root: string, rawDir: string, r: Running, args = run.args): Promise<string> {
+function runScanner(run: ScannerRun, root: string, rawDir: string, r: Running, args = run.args, onLine?: (l: string) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     mkdirSync(join(toolEnv().TMPDIR as string), { recursive: true })
     const child = spawn(toolPath(run.bin), args, { cwd: run.cwd ?? root, env: toolEnv(), stdio: ['ignore', 'pipe', 'pipe'] })
@@ -80,6 +80,8 @@ function runScanner(run: ScannerRun, root: string, rawDir: string, r: Running, a
     })
     child.stderr.on('data', (d) => {
       err += d.toString()
+      const last = d.toString().replace(/\x1b\[[0-9;]*m/g, '').trim().split('\n').filter(Boolean).pop()
+      if (last && onLine) onLine(last.slice(0, 200))
       if (err.length > 200_000) err = err.slice(-100_000)
     })
     const timer = setTimeout(() => child.kill('SIGTERM'), run.timeoutMs)
@@ -128,6 +130,18 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
     Object.assign(s, patch)
     saveSession(info)
   }
+  let pushed = 0
+  const live = (s: SessionStep) => (raw: string): void => {
+    const text = redact(raw)
+    s.lastLine = friendly(text)
+    const p = percentOf(text)
+    if (p !== null) s.progress = p
+    log('info', friendly(text), id, true)
+    if (Date.now() - pushed > 500) {
+      pushed = Date.now()
+      saveSession(info)
+    }
+  }
   let findings: Finding[] = []
 
   try {
@@ -156,7 +170,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
     for (const [i, run] of runs.entries()) {
       if (r.cancelled) break
       const st = steps[i]
-      set(st, { status: 'running' })
+      set(st, { status: 'running', startedAt: new Date().toISOString() })
       const t = Date.now()
       try {
         const def = toolDef(run.id)
@@ -166,15 +180,15 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
         }
         let report: string
         try {
-          report = await runScanner(run, root, raw, r)
+          report = await runScanner(run, root, raw, r, run.args, live(st))
         } catch (e) {
           if (!run.retryArgs || r.cancelled) throw e
           log('warn', `${run.tool} failed, trying again with its core rules: ${(e as Error).message}`, id)
-          report = await runScanner(run, root, raw, r, run.retryArgs)
+          report = await runScanner(run, root, raw, r, run.retryArgs, live(st))
         }
         const found = run.parse(report, root)
         findings.push(...found)
-        set(st, { status: 'done', findings: found.length, ms: Date.now() - t, detail: found.length ? `${found.length} found` : 'Nothing found' })
+        set(st, { status: 'done', progress: 100, lastLine: undefined, findings: found.length, ms: Date.now() - t, detail: found.length ? `${found.length} found` : 'Nothing found' })
         log('info', `${run.tool}: ${found.length} findings`, id)
       } catch (e) {
         if (r.cancelled) break
@@ -190,7 +204,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
     // 3. The AI reviewer.
     if (req.reviewer !== 'none' && !r.cancelled) {
       const name = req.reviewer === 'claude' ? 'Claude Code' : req.reviewer === 'codex' ? 'Codex' : getSettings().llm.model || 'Your model'
-      const ai = step({ id: 'ai', label: `${name} reviews the code and checks the findings`, status: 'running' })
+      const ai = step({ id: 'ai', label: `${name} reviews the code and checks the findings`, status: 'running', startedAt: new Date().toISOString() })
       const t = Date.now()
       try {
         const prompt = reviewPrompt(info.title, req.focus, req.depth, findings.filter((f) => f.category !== 'dependency'))

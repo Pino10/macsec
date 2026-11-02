@@ -16,8 +16,13 @@ export function redact(text: string): string {
     .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/g, '$1[hidden]@')
 }
 
-export function log(level: LogLine['level'], text: string, session?: string): void {
-  const line: LogLine = { at: new Date().toISOString(), level, text: redact(text).slice(0, 2000), ...(session ? { session } : {}) }
+/** `live` lines are tool output: shown live in the window, not written to the log file. */
+export function log(level: LogLine['level'], text: string, session?: string, live = false): void {
+  const line: LogLine = { at: new Date().toISOString(), level, text: redact(text).slice(0, 2000), ...(session ? { session } : {}), ...(live ? { live: true } : {}) }
+  if (live) {
+    logEvents.emit('line', line)
+    return
+  }
   recent.push(line)
   if (recent.length > 2000) recent.splice(0, recent.length - 2000)
   try {

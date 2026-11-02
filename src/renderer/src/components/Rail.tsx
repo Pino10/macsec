@@ -1,7 +1,6 @@
-import { FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Wrench } from 'lucide-react'
+import Logo from './Logo'
+import { FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Wrench, Smartphone } from 'lucide-react'
 import { useApp, type Page } from '../store'
-import ThreatCore from './ThreatCore'
-import { SEVERITIES, type Severity } from '@shared/types'
 
 type Item = { id: Page; label: string; icon: React.ReactNode }
 const I = 16
@@ -13,6 +12,7 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
       { id: 'review', label: 'Code review', icon: <FileSearch size={I} /> },
       { id: 'web', label: 'Web scan', icon: <Globe size={I} /> },
       { id: 'api', label: 'API security', icon: <Plug size={I} /> },
+      { id: 'mobile', label: 'Mobile apps', icon: <Smartphone size={I} /> },
       { id: 'audit', label: 'Special audits', icon: <ShieldHalf size={I} /> }
     ]
   },
@@ -27,9 +27,6 @@ export const PAGE_ORDER: Page[] = [...GROUPS.flatMap((g) => g.items), ...FOOT].m
 export default function Rail(): React.JSX.Element {
   const { page, setPage, sessions, updates } = useApp()
   const running = sessions.filter((s) => s.status === 'running').length
-  const latest = new Map<string, (typeof sessions)[number]>()
-  for (const s of sessions) if (s.status === 'done' && !latest.has(s.target)) latest.set(s.target, s)
-  const totals = SEVERITIES.reduce((acc, k) => ({ ...acc, [k]: [...latest.values()].reduce((n, s) => n + s.counts[k], 0) }), {} as Record<Severity, number>)
 
   const item = (it: Item): React.JSX.Element => (
     <button key={it.id} className="rail-item" aria-current={page === it.id ? 'page' : undefined} onClick={() => setPage(it.id)}>
@@ -42,7 +39,7 @@ export default function Rail(): React.JSX.Element {
   return (
     <aside className="rail glass">
       <div className="brand drag">
-        <ThreatCore counts={totals} size={38} running={running > 0} label={false} hasData={latest.size > 0} />
+        <Logo size={40} running={running > 0} />
         <div>
           <strong>MacSec</strong>
           <small>{running ? `${running} ${running === 1 ? 'test' : 'tests'} running` : 'Security engine'}</small>

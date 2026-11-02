@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.demo">
+    <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="30" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:allowBackup="true" android:debuggable="true" android:usesCleartextTraffic="true" android:label="Demo">
+        <activity android:name=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".DeepLinkActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <data android:scheme="demo" />
+            </intent-filter>
+        </activity>
+        <provider android:name=".NotesProvider" android:authorities="com.demo.notes" android:exported="true" />
+        <service android:name=".SafeService" android:exported="true" android:permission="com.demo.PRIVATE" />
+    </application>
+</manifest>

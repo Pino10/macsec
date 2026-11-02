@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Mon Nov  2 02:20:56 2026 as: nmap -sT -sV -&#45;version-light -Pn -n -p 6379,3306,8765 -oX nmap.xml 127.0.0.1 -->
+<nmaprun scanner="nmap" args="nmap -sT -sV -&#45;version-light -Pn -n -p 6379,3306,8765 -oX nmap.xml 127.0.0.1" start="1793586056" startstr="Mon Nov  2 02:20:56 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="3" services="3306,6379,8765"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<host starttime="1793586056" endtime="1793586087"><status state="up" reason="user-set" reason_ttl="0"/>
+<address addr="127.0.0.1" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><port protocol="tcp" portid="3306"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="mysql" method="table" conf="3"/></port>
+<port protocol="tcp" portid="6379"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="redis" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8765"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="SimpleHTTPServer" version="0.6" extrainfo="Python 3.13.18" method="probed" conf="10"><cpe>cpe:/a:python:simplehttpserver:0.6</cpe></service></port>
+</ports>
+<times srtt="484" rttvar="2959" to="100000"/>
+</host>
+<runstats><finished time="1793586087" timestr="Mon Nov  2 02:21:27 2026" summary="Nmap done at Mon Nov  2 02:21:27 2026; 1 IP address (1 host up) scanned in 31.28 seconds" elapsed="31.28" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>
