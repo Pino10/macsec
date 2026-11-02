@@ -33,6 +33,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 | `src/main/engine.ts` | Runs tools for any session, stops them, and records each step (`SessionRun`). |
 | `src/main/webscan.ts` | Web scan: httpx, header checks, Katana, the exposed-files check and Nuclei (read-only tags only, see `NOT_READ_ONLY`). |
 | `src/main/apispec.ts`, `src/main/apiscan.ts` | Reading Postman, OpenAPI, Swagger and HAR files, and the API review. |
+| `src/main/evidence.ts` | The code lines behind each finding, with secrets masked (`maskSecrets`). |
+| `src/main/skills.ts` | MacSec's Claude Code plugin (written to `tools/claude-plugin`) and your skills (`extensions/claude`), loaded with `--plugin-dir`. |
+| `src/main/webextra.ts` | TLS check, keys in public JavaScript, signed-in versus signed-out comparison. |
+| `src/main/audit.ts` | Special audits: full audit, portfolio sweep, change review. |
 | `src/main/aisummary.ts` | The AI summary for web and API scans (it reads the findings only). |
 | `src/renderer/src/macsec.css` | The whole design: colours, glass, controls. `components/ThreatCore.tsx` is the posture orb. |
 | `src/shared/types.ts` | Every message between the window and the main process (`Channels`). |

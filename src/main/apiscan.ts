@@ -167,7 +167,13 @@ async function runApiScan(id: string, spec: ParsedSpec, base: string, req: ApiSc
     if (st.ai)
       await s.run(st.ai, async () => {
         const r = await summarizeWithAi(req.reviewer, summaryPrompt('api', base, `The API has ${spec.endpoints.length} endpoints (${spec.format}).`, s.findings), op, s.raw)
-        for (const x of s.findings) if (r.verdicts.has(x.id)) x.verdict = r.verdicts.get(x.id)
+        for (const x of s.findings) {
+          const d = r.details.get(x.id)
+          if (d) {
+            x.verdict = d.verdict
+            x.aiNote = d.reason
+          }
+        }
         saveAiReport(id, r.report)
         return []
       })

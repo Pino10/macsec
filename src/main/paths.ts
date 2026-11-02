@@ -39,7 +39,7 @@ export function ensureDirs(): void {
   for (const d of [dirs.bin(), dirs.toolHome(), dirs.downloads(), dirs.sessions(), dirs.logs(), dirs.config()]) {
     mkdirSync(d, { recursive: true, mode: 0o700 })
   }
-  for (const sub of ['nuclei-templates', 'semgrep-rules', 'skills', 'wordlists']) {
+  for (const sub of ['nuclei-templates', 'semgrep-rules']) {
     mkdirSync(join(dirs.extensions(), sub), { recursive: true })
   }
 }

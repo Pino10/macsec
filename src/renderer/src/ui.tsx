@@ -1,4 +1,4 @@
-import { CheckCircle2, CircleDashed, FileSearch, Globe, Loader2, MinusCircle, Plug, XCircle } from 'lucide-react'
+import { CheckCircle2, CircleDashed, FileSearch, Globe, Loader2, MinusCircle, Plug, ShieldHalf, XCircle } from 'lucide-react'
 import { SEVERITIES, type SessionInfo, type Severity, type SessionStep } from '@shared/types'
 
 export function PageHead({ title, desc, children }: { title: string; desc?: string; children?: React.ReactNode }): React.JSX.Element {
@@ -81,15 +81,15 @@ export function Spectrum({ counts, legend = true }: { counts: Record<Severity, n
 }
 
 export function KindIcon({ kind, size = 18 }: { kind: SessionInfo['kind']; size?: number }): React.JSX.Element {
-  const g = kind === 'web-scan' ? '#8b6cff' : kind === 'api-scan' ? '#ff3d7f' : '#38e1ff'
+  const g = kind === 'web-scan' ? '#8b6cff' : kind === 'api-scan' ? '#ff3d7f' : kind === 'audit' ? '#3ef0a8' : '#38e1ff'
   return (
     <span className="glyph" style={{ ['--g' as string]: g, width: size + 20, height: size + 20, borderRadius: 11 }}>
-      {kind === 'web-scan' ? <Globe size={size} /> : kind === 'api-scan' ? <Plug size={size} /> : <FileSearch size={size} />}
+      {kind === 'web-scan' ? <Globe size={size} /> : kind === 'api-scan' ? <Plug size={size} /> : kind === 'audit' ? <ShieldHalf size={size} /> : <FileSearch size={size} />}
     </span>
   )
 }
 
-export const kindName = (k: SessionInfo['kind']): string => (k === 'web-scan' ? 'Web scan' : k === 'api-scan' ? 'API security' : 'Code review')
+export const kindName = (k: SessionInfo['kind']): string => (k === 'web-scan' ? 'Web scan' : k === 'api-scan' ? 'API security' : k === 'audit' ? 'Special audit' : 'Code review')
 
 export function StepIcon({ status }: { status: SessionStep['status'] }): React.JSX.Element {
   if (status === 'running') return <Loader2 size={16} className="spin" style={{ color: 'var(--pulse)' }} />
@@ -118,3 +118,33 @@ export function ago(iso: string): string {
 }
 
 export const duration = (ms?: number): string => (!ms ? '' : ms < 60000 ? `${Math.round(ms / 1000)} s` : `${Math.floor(ms / 60000)} min ${Math.round((ms % 60000) / 1000)} s`)
+
+/** One step of a setup flow: a number, a title, a line of help, and its controls. */
+export function FlowStep({ n, title, help, state, children }: { n: number; title: string; help?: string; state: 'done' | 'current' | 'todo'; children: React.ReactNode }): React.JSX.Element {
+  return (
+    <section className="flow-step glass" data-state={state}>
+      <span className="flow-num" aria-hidden>
+        {state === 'done' ? '✓' : n}
+      </span>
+      <div className="flow-body">
+        <h2 className="flow-title">{title}</h2>
+        {help && <p className="flow-help">{help}</p>}
+        {children}
+      </div>
+    </section>
+  )
+}
+
+/** The lines behind a finding, numbered, with the line that matters lit up. */
+export function CodeView({ context, sev }: { context: { start: number; lines: string[]; at: number }; sev?: Severity }): React.JSX.Element {
+  return (
+    <div className="codeview" style={sev ? { ['--c' as string]: `var(--sev-${sev})` } : undefined}>
+      {context.lines.map((l, i) => (
+        <div key={i} data-hit={context.start + i === context.at}>
+          <i>{context.start + i}</i>
+          <span>{l || ' '}</span>
+        </div>
+      ))}
+    </div>
+  )
+}

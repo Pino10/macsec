@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
 import type { AgentInfo, LocalLlm, ToolCategory, ToolInfo } from '@shared/types'
 import { useApp } from '../store'
-import { PageHead } from '../ui'
+import { PageHead, Seg } from '../ui'
 
 const GROUPS: { id: ToolCategory; title: string; icon: React.ReactNode }[] = [
   { id: 'code', title: 'Code', icon: <Shield size={18} /> },
@@ -17,6 +17,13 @@ export default function Tools(): React.JSX.Element {
   const api = window.macsec
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [llms, setLlms] = useState<LocalLlm[] | null>(null)
+  const [hasKey, setHasKey] = useState(false)
+  const [key, setKey] = useState('')
+  const [skills, setSkills] = useState<{ name: string; mine: boolean }[]>([])
+  useEffect(() => {
+    void api.invoke('ai:key-status').then((r) => setHasKey(r.hasKey))
+    void api.invoke('ai:skills').then(setSkills)
+  }, [api])
 
   const refreshAi = (): void => {
     void api.invoke('ai:agents').then(setAgents)
@@ -115,6 +122,74 @@ export default function Tools(): React.JSX.Element {
       <p className="hint" style={{ margin: '8px 2px 0' }}>
         MacSec uses Claude Code’s command line tool (the Claude desktop app is separate). <strong>Continue in Claude Code</strong> on a session opens it in Terminal with Remote Control on, so you can carry on at claude.ai/code or on your phone. A session started on the web comes back to Terminal with <span className="mono">claude --teleport</span>.
       </p>
+
+      <h2 className="section-title">How Claude Code signs in</h2>
+      <div className="ms-form glass">
+        <div className="hint">
+          MacSec runs Claude Code as a normal session of yours: the same sign-in as when you type claude in Terminal (your Pro, Max, Team or Enterprise plan), no API key needed. Every review is saved under its own name, so <strong>Fix with Claude Code</strong> continues that exact conversation. If you prefer to pay per use, add an Anthropic API key instead.
+        </div>
+        <Seg<'account' | 'key'>
+          label="Sign-in"
+          value={settings?.claudeAuth ?? 'account'}
+          onChange={(v) => void updateSettings({ claudeAuth: v })}
+          options={[
+            ['account', 'My Claude account'],
+            ['key', 'An API key']
+          ]}
+        />
+        {settings?.claudeAuth === 'key' && (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input className="input mono" type="password" autoComplete="off" placeholder={hasKey ? 'A key is saved in your Keychain' : 'sk-ant-…'} value={key} onChange={(e) => setKey(e.target.value)} aria-label="Anthropic API key" style={{ flex: 1 }} />
+            <button
+              className="btn btn-primary"
+              disabled={!key.trim()}
+              onClick={async () => {
+                const r = await act('key', () => api.invoke('ai:set-key', key))
+                setKey('')
+                if (r) {
+                  setHasKey(r.hasKey)
+                  notify({ kind: 'info', text: 'Saved in your Keychain.' })
+                }
+              }}
+            >
+              Save key
+            </button>
+            {hasKey && (
+              <button className="btn" onClick={async () => setHasKey((await act('key', () => api.invoke('ai:set-key', null)))?.hasKey ?? false)}>
+                Remove
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <h2 className="section-title">Skills for Claude Code</h2>
+      <div className="panel">
+        {skills.map((sk) => (
+          <div key={sk.name} className="arsenal-row" data-on>
+            <span className="glyph" style={{ ['--g' as string]: sk.mine ? '#8b6cff' : '#38e1ff' }}>
+              <Sparkles size={18} />
+            </span>
+            <div>
+              <div className="row-title">{sk.name.replace(/-/g, ' ')}</div>
+              <div className="row-sub">{sk.mine ? 'Your skill' : 'Built into MacSec'}. Loaded into every Claude Code review, for MacSec only.</div>
+            </div>
+            <span />
+          </div>
+        ))}
+        <div className="arsenal-row">
+          <span className="glyph" style={{ ['--g' as string]: '#8c95b8' }}>
+            <FolderOpen size={18} />
+          </span>
+          <div>
+            <div className="row-title">Add your own</div>
+            <div className="row-sub">Put a folder with a SKILL.md into MacSec’s extensions/claude/skills. Your normal Claude Code setup is not touched.</div>
+          </div>
+          <button className="btn btn-sm" onClick={() => void api.invoke('app:open-folder', 'extensions')}>
+            Open folder
+          </button>
+        </div>
+      </div>
 
       <h2 className="section-title">Your model</h2>
       <div className="ms-form glass">

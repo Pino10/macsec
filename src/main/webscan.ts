@@ -22,6 +22,7 @@ import { dirs } from './paths'
 import { getSettings } from './settings'
 import { log } from './logs'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
+import { checkTls, keysInJavaScript, signedOutCheck } from './webextra'
 
 /** Laramac's sites, from the www folder, at their .test addresses. */
 export function localSites(): { name: string; url: string }[] {
@@ -156,8 +157,11 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
   const st = {
     fp: s.step('httpx', 'Fingerprint the server and technologies'),
     headers: s.step('headers', 'Check security headers, cookies and HTTPS'),
+    tls: url.startsWith('https://') ? s.step('tls', 'Check the certificate and TLS versions') : null,
     crawl: m.depth ? s.step('katana', `Map the site, ${m.depth} levels deep`) : null,
     files: s.step('exposed', `Look for files that should not be public (${m.paths})`),
+    js: m.depth ? s.step('js', 'Look for keys in the site’s public JavaScript') : null,
+    access: m.depth && Object.keys(headers).length ? s.step('access', 'Compare private pages signed in and signed out') : null,
     templates: s.step('templates', 'Update Nuclei’s community checks'),
     nuclei: s.step('nuclei', m.everyPage ? 'Nuclei read-only checks on every page' : req.mode === 'quick' ? 'Nuclei checks for serious known problems' : 'Every read-only Nuclei check'),
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what matters most and how to fix it') : null
@@ -194,7 +198,12 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         note(`${urls.length} pages and endpoints`)
       })
 
+    if (st.tls) await s.run(st.tls, () => checkTls(url))
+
     await s.run(st.files, (note) => exposedFiles(url, SENSITIVE_PATHS.slice(0, m.paths), headers, () => s.cancelled, note))
+
+    if (st.js) await s.run(st.js, (note) => keysInJavaScript(urls, host, s.raw, op, headers, note))
+    if (st.access) await s.run(st.access, (note) => signedOutCheck(urls, headers, () => s.cancelled, note))
 
     await s.run(st.templates, async (note) => {
       await ensure('nuclei')
@@ -231,7 +240,13 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       await s.run(st.ai, async () => {
         const tech = fp[0] ? `Detected: ${[fp[0].server, ...fp[0].tech].filter(Boolean).join(', ')}.` : ''
         const r = await summarizeWithAi(req.reviewer, summaryPrompt('web', url, tech, s.findings.filter((f) => f.severity !== 'info')), op, s.raw)
-        for (const f of s.findings) if (r.verdicts.has(f.id)) f.verdict = r.verdicts.get(f.id)
+        for (const f of s.findings) {
+          const d = r.details.get(f.id)
+          if (d) {
+            f.verdict = d.verdict
+            f.aiNote = d.reason
+          }
+        }
         saveAiReport(id, r.report)
         return []
       })

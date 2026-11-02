@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle } from 'lucide-react'
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity } from '@shared/types'
 import { useApp } from '../store'
-import { Answer } from '../components/Answer'
-import { Counts, Empty, KindIcon, PageHead, Sev, StepIcon, ago, duration, kindName } from '../ui'
+import Markdown from '../components/Markdown'
+import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
+import { CodeView, Counts, Empty, KindIcon, PageHead, Sev, Spectrum, StepIcon, ago, duration, kindName } from '../ui'
 
 const reviewerName = (s: SessionInfo): string => (s.reviewer === 'claude' ? 'Claude Code' : s.reviewer === 'codex' ? 'Codex' : s.reviewer === 'model' ? 'Your model' : 'No AI')
 
@@ -26,7 +27,7 @@ export default function Sessions(): React.JSX.Element {
         <>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
             <div className="chips">
-              {(['all', 'code-review', 'web-scan', 'api-scan'] as const).map((k) => (
+              {(['all', 'code-review', 'web-scan', 'api-scan', 'audit'] as const).map((k) => (
                 <button key={k} className="chip" aria-pressed={kind === k} onClick={() => setKind(k)} style={{ textTransform: 'none' }}>
                   {k === 'all' ? 'All' : kindName(k)} <i>{k === 'all' ? sessions.length : sessions.filter((s) => s.kind === k).length}</i>
                 </button>
@@ -80,13 +81,13 @@ const CATS: [FindingCategory | 'all', string][] = [
 ]
 
 function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.JSX.Element {
-  const { sessions, act, busy, setSessions, notify } = useApp()
+  const { sessions, act, busy, setSessions, notify, showSession: showSessionById } = useApp()
   const api = window.macsec
   const [detail, setDetail] = useState<SessionDetail | null>(null)
   const [sevs, setSevs] = useState<Set<Severity>>(new Set(['critical', 'high', 'medium', 'low']))
   const [cat, setCat] = useState<FindingCategory | 'all'>('all')
   const [showFp, setShowFp] = useState(false)
-  const [tab, setTab] = useState<'findings' | 'ai' | 'run'>('findings')
+  const [tab, setTab] = useState<'findings' | 'report' | 'run'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const live = sessions.find((s) => s.id === id)
 
@@ -107,7 +108,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const s = { ...detail, ...(live ?? {}) }
   const fp = detail.findings.filter((f) => f.verdict === 'false-positive').length
   const running = s.status === 'running'
-  const hasCode = s.kind === 'code-review' && !!s.codePath
+  const hasCode = (s.kind === 'code-review' || s.kind === 'audit') && !!s.codePath
   const current = findings.find((f) => f.id === sel) ?? null
   const cats = CATS.filter(([k]) => k === 'all' || detail.findings.some((f) => f.category === k))
   const total = SEVERITIES.reduce((n, k) => n + s.counts[k], 0)
@@ -208,8 +209,8 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <button role="tab" aria-selected={tab === 'findings'} onClick={() => setTab('findings')}>
             Findings
           </button>
-          <button role="tab" aria-selected={tab === 'ai'} onClick={() => setTab('ai')} disabled={!detail.aiReport}>
-            AI report
+          <button role="tab" aria-selected={tab === 'report'} onClick={() => setTab('report')}>
+            Report
           </button>
           <button role="tab" aria-selected={tab === 'run'} onClick={() => setTab('run')}>
             What ran
@@ -257,10 +258,48 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
         </div>
       )}
 
-      {tab === 'ai' && detail.aiReport && (
-        <div className="panel">
-          <Answer text={detail.aiReport} />
-        </div>
+      {tab === 'report' && (
+        <>
+          <div className="report-cover glass">
+            <ThreatCore counts={s.counts} size={190} hasData={s.status === 'done'} running={running} />
+            <div style={{ display: 'grid', gap: 16 }}>
+              <div>
+                <h2>{s.status === 'done' ? `${postureWord(postureScore(s.counts), true)} posture, ${total} open ${total === 1 ? 'finding' : 'findings'}` : running ? 'The report is being written' : 'This test did not finish'}</h2>
+                <p className="page-desc" style={{ margin: 0 }}>
+                  {kindName(s.kind)} of {s.target}. {detail.aiReport ? `Written by ${reviewerName(s)} after reading ${s.kind === 'code-review' ? 'the code and every scanner result' : 'every finding'}.` : 'No AI report for this test: the findings come straight from the scanners.'}
+                </p>
+              </div>
+              <Spectrum counts={s.counts} />
+            </div>
+          </div>
+          {s.children && s.children.length > 0 && (
+            <div className="panel" style={{ marginBottom: 18 }}>
+              {s.children.map((c) => {
+                const child = sessions.find((x) => x.id === c)
+                return child ? (
+                  <button key={c} className="row" onClick={() => showSessionById(c)}>
+                    <KindIcon kind={child.kind} size={15} />
+                    <span className="grow">
+                      <span className="row-title" style={{ display: 'block' }}>
+                        {kindName(child.kind)}: {child.title}
+                      </span>
+                      <span className="row-sub">Its own session, with every detail</span>
+                    </span>
+                    <Counts counts={child.counts} />
+                    <ChevronRight size={15} />
+                  </button>
+                ) : null
+              })}
+            </div>
+          )}
+          {detail.aiReport ? (
+            <div className="md glass">
+              <Markdown text={detail.aiReport} />
+            </div>
+          ) : (
+            <Empty title="No AI report">Choose Claude Code, Codex or your model next time for a written report that explains every finding.</Empty>
+          )}
+        </>
       )}
 
       {tab === 'findings' &&
@@ -292,39 +331,55 @@ function Detail({ f, id, canOpen }: { f: Finding; id: string; canOpen: boolean }
         <Sev s={f.severity} />
         {f.verdict === 'confirmed' && <span className="tag tag-ok">Confirmed by AI</span>}
         {f.verdict === 'false-positive' && <span className="tag tag-warn">Ruled out by AI</span>}
+        <span className="tag">{f.tool}</span>
+        {f.cwe && (
+          <button className="tag" style={{ border: 0, cursor: 'pointer' }} onClick={() => void api.invoke('app:open-external', `https://cwe.mitre.org/data/definitions/${f.cwe!.replace('CWE-', '')}.html`)}>
+            {f.cwe} <ExternalLink size={10} />
+          </button>
+        )}
+        {f.advisory && <span className="tag">{f.advisory}</span>}
       </div>
       <h3>{f.title}</h3>
       {(f.file || f.url) && <div className="where">{f.file ? `${f.file}${f.line ? `:${f.line}` : ''}` : f.url}</div>}
       {f.description && <p>{f.description}</p>}
-      {f.snippet && <pre>{f.snippet}</pre>}
-      {f.fix && (
+      {f.context ? (
+        <>
+          <h5>The code</h5>
+          <CodeView context={f.context} sev={f.severity} />
+        </>
+      ) : f.snippet ? (
+        <>
+          <h5>The code</h5>
+          <pre>{f.snippet}</pre>
+        </>
+      ) : null}
+      {(f.why || f.aiNote) && (
+        <div className="ai-note">
+          <b style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>{f.verdict === 'false-positive' ? 'Why the AI ruled it out' : `Why it is ${f.severity}`}</b>
+          {f.why ?? f.aiNote}
+        </div>
+      )}
+      {f.impact && (
+        <>
+          <h5>What could happen</h5>
+          <p>{f.impact}</p>
+        </>
+      )}
+      {(f.fix || f.fixCode) && (
         <div className="fix">
           <b>How to fix</b>
           {f.fix}
+          {f.fixCode && <pre style={{ marginTop: 10 }}>{f.fixCode}</pre>}
         </div>
       )}
-      <dl className="meta-grid">
-        <dt>Found by</dt>
-        <dd>{f.tool}</dd>
-        {f.cwe && (
-          <>
-            <dt>Weakness</dt>
-            <dd>
-              <button className="link" onClick={() => void api.invoke('app:open-external', `https://cwe.mitre.org/data/definitions/${f.cwe!.replace('CWE-', '')}.html`)}>
-                {f.cwe} <ExternalLink size={11} />
-              </button>
-            </dd>
-          </>
-        )}
-        {f.advisory && (
-          <>
-            <dt>Advisory</dt>
-            <dd>{f.advisory}</dd>
-          </>
-        )}
-      </dl>
+      {f.verify && (
+        <>
+          <h5>How to check the fix</h5>
+          <p>{f.verify}</p>
+        </>
+      )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {canOpen && f.file && (
+        {canOpen && f.file && !/^https?:/.test(f.file) && (
           <button className="btn btn-sm" onClick={() => void api.invoke('sessions:open', id, 'file', f.file, f.line)}>
             <FileSearch size={13} /> Open in editor
           </button>

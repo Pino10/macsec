@@ -12,6 +12,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import type { Finding, ReviewDepth, ReviewFocus, Severity } from '../shared/types'
 import { agentEnv, findCli } from './agents'
+import { pluginArgs } from './skills'
 import { chatWithLlm } from './models'
 import { fid } from './scanners/parse'
 
@@ -36,20 +37,44 @@ const CHECKLIST = `Work through, in this order:
 12. Dependencies used in a dangerous way.
 Trace data from where it enters to where it is used, across files. Only report what the code actually shows.`
 
-const OUTPUT = `Write the report in Markdown:
-- Start with "## Summary": 2 to 4 sentences on the overall state and the most urgent fix.
-- Then one section per finding, most severe first, headed "### [SEVERITY] Title" where SEVERITY is CRITICAL, HIGH, MEDIUM or LOW, with: **Where:** \`path/to/file:line\`, **What is wrong**, **How it could be abused** (one or two sentences, no working exploit), **How to fix** (concrete code-level change).
-- If there is nothing worth reporting, say so plainly.
+const OUTPUT = `Write a tailored security report in Markdown, for the owner of this code. Explain like a senior engineer briefing a colleague: concrete, specific to THIS code, no generic advice.
+
+## Executive summary
+3 to 5 sentences: overall state, the most urgent fix, and the main risk themes.
+
+## Risk overview
+A Markdown table: | Severity | Finding | Where | Status |, one row per finding (yours and the confirmed scanner ones), most severe first.
+
+## Findings
+For each finding, most severe first, a section headed "### [SEVERITY] Title" (SEVERITY is CRITICAL, HIGH, MEDIUM or LOW) containing:
+- **Where:** \`path/to/file:line\`
+- **Evidence:** a fenced code block quoting the exact lines from the code (mask any secret value after its first 4 characters).
+- **Why it is rated SEVERITY:** what makes it this serious here (reachability, who can trigger it, what data it touches).
+- **Impact:** what could happen, in plain words (no working exploit).
+- **Fix:** what to change, then a fenced code block with the corrected code.
+- **How to verify:** how to confirm the fix worked.
+
+## Scanner results checked
+For each scanner finding you checked: confirmed or false alarm, and why, in one line each.
+
+## What was reviewed
+Entry points and areas you read, and anything you could not check.
 
 At the very end, add one fenced code block tagged json with this exact shape:
-{"findings":[{"severity":"high","title":"...","file":"path","line":12,"cwe":"CWE-639","description":"...","fix":"..."}],"verdicts":[{"id":"<scanner finding id>","verdict":"confirmed"}]}
-"findings" lists every finding in your report. "verdicts" gives, for each scanner finding you checked, "confirmed" (a real problem) or "false-positive" (explain why in the report).`
+{"findings":[{"severity":"high","title":"...","file":"path","line":12,"cwe":"CWE-639","description":"what is wrong","why":"why this severity","impact":"what could happen","fix":"what to change","fixCode":"corrected code","verify":"how to check"}],
+ "verdicts":[{"id":"<scanner finding id>","verdict":"confirmed","severity":"high","reason":"why"}]}
+"findings" lists every finding YOU found (not the scanner ones). "verdicts" covers each scanner finding you checked: "confirmed" or "false-positive", the severity you would give it, and one sentence of reasoning.`
 
 /** The scanner findings the reviewer should check, most severe first. */
-export function scannerBrief(findings: Finding[], max = 120): string {
+export function scannerBrief(findings: Finding[], max = 150): string {
   if (findings.length === 0) return 'The scanners found nothing. Look carefully anyway: they miss logic and access-control flaws.'
-  const lines = findings.slice(0, max).map((f) => `- id=${f.id} [${f.severity}] ${f.tool}: ${f.title}${f.file ? ` at ${f.file}${f.line ? `:${f.line}` : ''}` : ''}${f.cwe ? ` (${f.cwe})` : ''}`)
-  return `Automated scanners reported these (${findings.length} in total${findings.length > max ? `, the ${max} most severe shown` : ''}). Check the code-level ones in the code and give a verdict for each you checked:\n${lines.join('\n')}`
+  const lines = findings.slice(0, max).map((f, i) => {
+    const head = `- id=${f.id} [${f.severity}] ${f.tool} (${f.category}): ${f.title}${f.file ? ` at ${f.file}${f.line ? `:${f.line}` : ''}` : ''}${f.cwe ? ` (${f.cwe})` : ''}${f.advisory ? ` ${f.advisory}` : ''}`
+    // The most severe come with their code, so even a model without file access can judge them.
+    const ctx = i < 40 && f.context ? `\n  \`\`\`\n${f.context.lines.map((l, j) => `  ${f.context!.start + j}${f.context!.start + j === f.context!.at ? '>' : ':'} ${l}`).join('\n')}\n  \`\`\`` : ''
+    return head + ctx
+  })
+  return `Automated scanners (Semgrep, Bearer, Gitleaks, TruffleHog, OSV-Scanner, Trivy and others) reported these (${findings.length} in total${findings.length > max ? `, the ${max} most severe shown` : ''}). Open each code-level one in the code, decide whether it is real, and give a verdict with a reason. Package advisories: check whether the vulnerable part is actually used.\n${lines.join('\n')}`
 }
 
 export function reviewPrompt(name: string, focus: ReviewFocus, depth: ReviewDepth, findings: Finding[]): string {
@@ -58,6 +83,7 @@ export function reviewPrompt(name: string, focus: ReviewFocus, depth: ReviewDept
     depth === 'deep' ? 'This is a deep review: read every entry point and follow the data through the code. Take the time you need.' : depth === 'quick' ? 'This is a quick review: concentrate on the most exposed code (routes, auth, database access, uploads).' : '',
     CHECKLIST,
     scannerBrief(findings),
+    'Use your security-code-review, secrets-triage, dependency-triage and security-report skills if they are available.',
     'Do not modify any file. Do not run anything.',
     OUTPUT
   ]
@@ -65,10 +91,17 @@ export function reviewPrompt(name: string, focus: ReviewFocus, depth: ReviewDept
     .join('\n\n')
 }
 
+export interface Verdict {
+  verdict: 'confirmed' | 'false-positive'
+  severity?: Severity
+  reason?: string
+}
+
 export interface AiResult {
   report: string
   findings: Finding[]
   verdicts: Map<string, 'confirmed' | 'false-positive'>
+  details: Map<string, Verdict>
 }
 
 /** Pulls the json block out of the reviewer's answer. */
@@ -76,24 +109,33 @@ export function parseAiOutput(text: string, tool: string): AiResult {
   const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
   const blocks = [...clean.matchAll(/```json\s*([\s\S]*?)```/g)]
   const verdicts = new Map<string, 'confirmed' | 'false-positive'>()
+  const details = new Map<string, Verdict>()
   const findings: Finding[] = []
+  const sevOf = (v: unknown): Severity | undefined => {
+    const x = String(v ?? '').toLowerCase()
+    return (['critical', 'high', 'medium', 'low', 'info'] as const).includes(x as Severity) ? (x as Severity) : undefined
+  }
   const last = blocks.at(-1)
   if (last) {
     try {
-      const j = JSON.parse(last[1]) as { findings?: { severity?: string; title?: string; file?: string; line?: number; cwe?: string; description?: string; fix?: string }[]; verdicts?: { id: string; verdict: string }[] }
+      const j = JSON.parse(last[1]) as { findings?: { severity?: string; title?: string; file?: string; line?: number; cwe?: string; description?: string; fix?: string; why?: string; impact?: string; fixCode?: string; verify?: string }[]; verdicts?: { id: string; verdict: string; severity?: string; reason?: string }[] }
       for (const f of j.findings ?? []) {
         if (!f.title) continue
         const s = String(f.severity ?? 'medium').toLowerCase()
         const severity: Severity = (['critical', 'high', 'medium', 'low', 'info'] as const).includes(s as Severity) ? (s as Severity) : 'medium'
-        findings.push({ id: fid(tool, f.file, f.line, f.title), tool, category: 'ai', severity, title: f.title, file: f.file, line: typeof f.line === 'number' ? f.line : undefined, cwe: f.cwe, description: f.description, fix: f.fix, verdict: 'confirmed' })
+        findings.push({ id: fid(tool, f.file, f.line, f.title), tool, category: 'ai', severity, title: f.title, file: f.file, line: typeof f.line === 'number' ? f.line : undefined, cwe: f.cwe, description: f.description, fix: f.fix, why: f.why, impact: f.impact, fixCode: f.fixCode, verify: f.verify, verdict: 'confirmed' })
       }
-      for (const v of j.verdicts ?? []) if (v.verdict === 'confirmed' || v.verdict === 'false-positive') verdicts.set(v.id, v.verdict)
+      for (const v of j.verdicts ?? []) {
+        if (v.verdict !== 'confirmed' && v.verdict !== 'false-positive') continue
+        verdicts.set(v.id, v.verdict)
+        details.set(v.id, { verdict: v.verdict, severity: sevOf(v.severity), reason: v.reason })
+      }
     } catch {
       // The model wrote invalid JSON: the report is still shown, without the structured list.
     }
   }
   const report = last ? clean.replace(last[0], '').trim() : clean
-  return { report, findings, verdicts }
+  return { report, findings, verdicts, details }
 }
 
 function runCli(bin: string, args: string[], cwd: string, onChild: (c: ChildProcess) => void, timeoutMs: number, onActivity: () => void): Promise<{ code: number | null; out: string; err: string }> {
@@ -121,13 +163,20 @@ function runCli(bin: string, args: string[], cwd: string, onChild: (c: ChildProc
 
 const TIMEOUT: Record<ReviewDepth, number> = { quick: 15, standard: 40, deep: 120 }
 
-export async function reviewWithClaude(root: string, prompt: string, depth: ReviewDepth, onChild: (c: ChildProcess) => void, onActivity: () => void): Promise<AiResult> {
+/**
+ * Claude Code runs as a normal session of yours (your sign-in, or an API key if you set one), with
+ * MacSec's security skills loaded for that session only. It is saved under a known id and name, so
+ * "Continue in Claude Code" picks up the same conversation. Read-only: plan mode, and only the
+ * Read, Grep and Glob tools.
+ */
+export async function reviewWithClaude(root: string, prompt: string, depth: ReviewDepth, onChild: (c: ChildProcess) => void, onActivity: () => void, session?: { id: string; name: string }): Promise<AiResult> {
   const bin = findCli('claude')
   if (!bin) throw new Error('Claude Code’s command line tool is not installed (the Claude desktop app is separate). Install it on the Tools page.')
-  // Plan mode and read-only tools; a one-off session that Claude Code does not save.
-  const base = ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob']
-  let r = await runCli(bin, [...base, '--no-session-persistence'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
-  if (r.code !== 0 && /unknown option.*no-session-persistence/i.test(r.err)) r = await runCli(bin, base, root, onChild, TIMEOUT[depth] * 60_000, onActivity)
+  const base = ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', ...pluginArgs()]
+  const keep = session ? ['--session-id', session.id, '--name', session.name] : ['--no-session-persistence']
+  let r = await runCli(bin, [...base, ...keep], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
+  // Older Claude Code versions: without the newer options.
+  if (r.code !== 0 && /unknown option/i.test(r.err)) r = await runCli(bin, ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
   if (r.code !== 0 || !r.out.trim()) {
     if (/log ?in|auth|credential|api key/i.test(r.err)) throw new Error('Claude Code is not signed in. Run claude once in Terminal to sign in.')
     throw new Error(`Claude Code stopped without a report. ${r.err.trim().split('\n').slice(-2).join(' ')}`.trim())
@@ -211,6 +260,7 @@ export async function reviewWithModel(root: string, name: string, files: string[
   const parts = notes.map((n) => parseAiOutput(n, 'Model'))
   const findingsOut = parts.flatMap((p) => p.findings)
   const verdicts = new Map(parts.flatMap((p) => [...p.verdicts]))
+  const details = new Map(parts.flatMap((p) => [...p.details]))
   let report = parts.map((p) => p.report).join('\n\n')
   if (parts.length > 1) {
     progress('Model writing the final report')
@@ -218,7 +268,7 @@ export async function reviewWithModel(root: string, name: string, files: string[
       report = (
         await chatWithLlm(
           [
-            { role: 'system', content: 'You merge security review notes into one report. Remove duplicates, keep every real finding with its file and line, order by severity. Start with "## Summary". Use "### [SEVERITY] Title" headings. Do not add a JSON block.' },
+            { role: 'system', content: 'You merge security review notes into one tailored report. Remove duplicates, keep every real finding with its file, line, evidence code, why it has its severity, impact, fix with code, and how to verify. Use the sections: ## Executive summary, ## Risk overview (a table), ## Findings ("### [SEVERITY] Title"), ## Scanner results checked, ## What was reviewed. Do not add a JSON block.' },
             { role: 'user', content: parts.map((p, i) => `--- Notes for part ${i + 1} ---\n${p.report}`).join('\n\n') }
           ],
           20 * 60_000
@@ -230,5 +280,5 @@ export async function reviewWithModel(root: string, name: string, files: string[
       // Keep the joined notes.
     }
   }
-  return { report, findings: findingsOut, verdicts }
+  return { report, findings: findingsOut, verdicts, details }
 }

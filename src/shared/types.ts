@@ -87,6 +87,18 @@ export interface Finding {
   /** AI's view after reading the code: real, likely false positive, or not checked. */
   verdict?: 'confirmed' | 'false-positive' | 'unreviewed'
   url?: string
+  /** The lines around the problem, with secrets masked. */
+  context?: { start: number; lines: string[]; at: number }
+  /** The AI's explanation: why it has this severity. */
+  why?: string
+  /** What could happen if it is left. */
+  impact?: string
+  /** A corrected version of the code. */
+  fixCode?: string
+  /** How to check the fix worked. */
+  verify?: string
+  /** The AI's reason for its verdict on a scanner finding. */
+  aiNote?: string
 }
 
 export type Reviewer = 'none' | 'claude' | 'codex' | 'model'
@@ -158,7 +170,12 @@ export interface SessionStep {
   ms?: number
 }
 
-export type SessionKind = 'code-review' | 'web-scan' | 'api-scan'
+export type SessionKind = 'code-review' | 'web-scan' | 'api-scan' | 'audit'
+
+export type AuditRequest =
+  | { kind: 'full'; path: string; site: string; reviewer: Reviewer; depth: ReviewDepth; authorized: boolean }
+  | { kind: 'portfolio' }
+  | { kind: 'changes'; path: string }
 
 export interface SessionInfo {
   id: string
@@ -176,6 +193,10 @@ export interface SessionInfo {
   /** Where the code is, while it exists: the project itself, or a private copy. */
   codePath?: string
   codeKept?: boolean
+  /** For audits: the sessions it ran. */
+  children?: string[]
+  /** The Claude Code session that did the review, to continue it. */
+  claudeSession?: string
   error?: string
   languages?: string[]
   files?: number
@@ -257,6 +278,8 @@ export interface AppSettings {
   /** Default reviewer for new reviews. */
   reviewer: Reviewer
   notifications: boolean
+  /** How Claude Code signs in: your normal account, or an Anthropic API key from the Keychain. */
+  claudeAuth: 'account' | 'key'
 }
 
 export interface AppInfo {
@@ -307,6 +330,8 @@ export interface Channels {
   'web:sites': { args: []; result: LocalSite[] }
   'web:start': { args: [WebScanRequest]; result: SessionInfo }
   'burp:open': { args: []; result: void }
+  'web:login': { args: [string]; result: { cookie: string; count: number } | null }
+  'audit:start': { args: [AuditRequest]; result: SessionInfo }
   'api:load-spec': { args: []; result: ApiSpecInfo | null }
   'api:start': { args: [ApiScanRequest]; result: SessionInfo }
   'sessions:list': { args: []; result: SessionInfo[] }
@@ -319,6 +344,9 @@ export interface Channels {
 
   'ai:agents': { args: []; result: AgentInfo[] }
   'ai:install-agent': { args: ['claude' | 'codex']; result: void }
+  'ai:set-key': { args: [string | null]; result: { hasKey: boolean } }
+  'ai:key-status': { args: []; result: { hasKey: boolean } }
+  'ai:skills': { args: []; result: { name: string; mine: boolean }[] }
   'ai:open-app': { args: ['claude' | 'codex' | 'lmstudio' | 'burp']; result: void }
   'ai:detect': { args: []; result: LocalLlm[] }
   'ai:test': { args: [string, string]; result: LlmTest }

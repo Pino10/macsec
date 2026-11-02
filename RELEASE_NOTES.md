@@ -1,3 +1,27 @@
+## MacSec 0.3
+
+### See exactly what was found
+Every finding now shows the code behind it: the lines around the problem, numbered, with the problem line lit up. Keys and passwords are masked after their first four characters, so you can tell which key it is without it being shown. The PDF has the same evidence.
+
+### A real report
+The AI reviewer now reads the code and every scanner result, and writes a tailored report: an executive summary, a risk table, and for each finding the evidence, **why it has that severity**, what could happen, the fix with corrected code, and how to check it. Its verdict on each scanner finding comes with a reason. A new **Report** tab shows it with your posture at the top.
+
+### Claude Code, as your own session
+- Reviews run as normal Claude Code sessions with your usual sign-in. No API key needed; you can add one on Tools if you prefer.
+- **Fix with Claude Code** resumes the exact conversation that did the review.
+- MacSec's own security skills (code review method, secrets triage, dependency triage, report writing) are loaded for its reviews only. Add your own skills too.
+
+### Web scan
+- **Sign in through MacSec:** a private window opens your site; sign in and close it. The scan then covers members-only pages and checks that private pages really need the login.
+- Checks the certificate and TLS versions.
+- Looks for keys left in the site's public JavaScript.
+
+### Special audits
+Full audit (code and site together, one report), Portfolio sweep (every project in www), and Change review (Claude Code's /security-review of a branch).
+
+### A cleaner, rounder interface
+Poppins throughout, more space, rounder detached cards, a sidebar with tonal icons, and step-by-step setup for every test.
+
 ## MacSec 0.2
 
 ### A new look

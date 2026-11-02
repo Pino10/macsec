@@ -6,13 +6,15 @@ import { release } from 'os'
 import type { ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest } from '../shared/types'
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
-import { setSecretsCrypto } from './secrets'
+import { getSecret, setSecret, setSecretsCrypto } from './secrets'
+import { ensureSkills, listSkills } from './skills'
 import { setModelCrypto, detectLlms, testLlm, listServers, saveServer, deleteServer } from './models'
 import { jobs } from './jobs'
 import { log, logEvents, listLogs, clearLogs } from './logs'
 import { checkUpdates, checkUpdatesDaily, installTool, listTools, removeTool, toolDef, updateToolData } from './toolbox'
 import { localSites, startWebScan } from './webscan'
 import { loadSpec, startApiScan } from './apiscan'
+import { startAudit } from './audit'
 import { cancelOp } from './engine'
 import { accounts, azureProjects, connectAzure, connectGitHub, githubRepos, importIntoWww, listLocal } from './projects'
 import { cancelSession, startReview } from './review'
@@ -88,15 +90,20 @@ function createWindow(): void {
   else void mainWindow.loadFile(RENDERER_FILE)
 }
 
+/** The sign-in windows, which may browse your site; every other window is locked down. */
+const loginContents = new Set<number>()
+
 /** No navigation away, no popups, no webviews, no permissions. */
 function hardenWebContents(): void {
   app.on('web-contents-created', (_e, contents) => {
     contents.on('will-navigate', (event, url) => {
-      if (!isAppUrl(url)) event.preventDefault()
+      if (!isAppUrl(url) && !loginContents.has(contents.id)) event.preventDefault()
     })
     contents.on('will-attach-webview', (event) => event.preventDefault())
     contents.setWindowOpenHandler(({ url }) => {
-      if (isWebUrl(url)) void shell.openExternal(url)
+      // In a sign-in window, pop-ups (single sign-on) open in the same window.
+      if (loginContents.has(contents.id) && /^https?:\/\//.test(url)) void contents.loadURL(url)
+      else if (isWebUrl(url)) void shell.openExternal(url)
       return { action: 'deny' }
     })
   })
@@ -176,6 +183,42 @@ function validReview(req: unknown): ReviewRequest {
   }
 }
 
+/**
+ * Opens your site in a private MacSec window. You sign in as usual and close the window; the
+ * cookies for that site become the login for this scan. They live in memory only.
+ */
+function signIn(url: string): Promise<{ cookie: string; count: number } | null> {
+  return new Promise((resolve) => {
+    const partition = `macsec-login-${Date.now()}`
+    const win = new BrowserWindow({
+      width: 1100,
+      height: 800,
+      parent: mainWindow ?? undefined,
+      title: 'Sign in, then close this window',
+      backgroundColor: '#ffffff',
+      webPreferences: { partition, sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true }
+    })
+    loginContents.add(win.webContents.id)
+    win.on('page-title-updated', (e) => {
+      e.preventDefault()
+      win.setTitle(`Sign in, then close this window: ${new URL(win.webContents.getURL() || url).host}`)
+    })
+    const ses = win.webContents.session
+    win.on('close', async () => {
+      loginContents.delete(win.webContents.id)
+      const host = new URL(url).hostname
+      const all = await ses.cookies.get({})
+      const mine = all.filter((c) => {
+        const d = (c.domain ?? '').replace(/^\./, '')
+        return d && (host === d || host.endsWith(`.${d}`))
+      })
+      resolve(mine.length ? { cookie: `Cookie: ${mine.map((c) => `${c.name}=${c.value}`).join('; ')}`, count: mine.length } : null)
+      void ses.clearStorageData()
+    })
+    void win.loadURL(url)
+  })
+}
+
 async function exportPdf(id: string): Promise<string | null> {
   const detail = sessionDetail(id)
   const html = join(sessionDir(id), 'report.html')
@@ -215,6 +258,7 @@ function registerIpc(): void {
     }
     if (['none', 'claude', 'codex', 'model'].includes(p.reviewer as string)) safe.reviewer = p.reviewer as never
     if (typeof p.notifications === 'boolean') safe.notifications = p.notifications
+    if (p.claudeAuth === 'account' || p.claudeAuth === 'key') safe.claudeAuth = p.claudeAuth
     return setSettings(safe)
   })
   handle('settings:choose-www', async () => {
@@ -290,6 +334,25 @@ function registerIpc(): void {
     }
   })
   handle('burp:open', () => openBurp())
+  handle('audit:start', (req) => {
+    const r = (req ?? {}) as { kind?: string; path?: unknown; site?: unknown; reviewer?: unknown; depth?: unknown; authorized?: unknown }
+    try {
+      if (r.kind === 'portfolio') return startAudit({ kind: 'portfolio' })
+      if (r.kind === 'changes') return startAudit({ kind: 'changes', path: allowedProject(r.path) })
+      if (r.kind === 'full') {
+        const site = typeof r.site === 'string' ? r.site.trim() : ''
+        if (!/^https?:\/\/[^\s]+$/.test(site)) throw new ValidationError('Enter the site’s address.')
+        return startAudit({ kind: 'full', path: allowedProject(r.path), site: new URL(site).href.replace(/\/$/, ''), reviewer: pick(r.reviewer, REVIEWERS, 'claude'), depth: pick(r.depth, ['quick', 'standard', 'deep'] as const, 'standard'), authorized: r.authorized === true })
+      }
+      throw new ValidationError('Choose an audit.')
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
+  handle('web:login', (url) => {
+    if (typeof url !== 'string' || !/^https?:\/\/[^\s]+$/.test(url)) throw new ValidationError('Enter the site’s address first.')
+    return signIn(url)
+  })
   handle('api:load-spec', async () => {
     if (!mainWindow) return null
     const r = await dialog.showOpenDialog(mainWindow, { title: 'Load an API description', buttonLabel: 'Load', properties: ['openFile'], filters: [{ name: 'Postman, OpenAPI, Swagger or HAR', extensions: ['json', 'yaml', 'yml', 'har'] }] })
@@ -340,6 +403,10 @@ function registerIpc(): void {
     const report = join(sessionDir(s.id), 'findings.json')
     const ask = `Read the security review in ${report}${existsSync(join(sessionDir(s.id), 'ai-report.md')) ? ` and ${join(sessionDir(s.id), 'ai-report.md')}` : ''}. Go through the confirmed findings, most severe first, and help me fix them one by one.`
     if (what === 'codex') return void (await openTerminal(code, `codex ${shellQuote(ask)}`))
+    // The review was a normal Claude Code session: pick up that same conversation.
+    if (s.claudeSession && /^[0-9a-f-]{36}$/.test(s.claudeSession)) {
+      return void (await openTerminal(code, `claude --resume ${s.claudeSession} || claude ${shellQuote(ask)}`))
+    }
     // Remote Control makes the same session reachable at claude.ai and in the Claude app on your
     // phone. Older Claude Code versions without it start a normal session instead.
     const name = `MacSec: ${s.title}`.slice(0, 60)
@@ -352,6 +419,15 @@ function registerIpc(): void {
   // AI
   handle('ai:agents', () => listAgents())
   handle('ai:install-agent', (id) => installAgent(id === 'codex' ? 'codex' : 'claude'))
+  handle('ai:key-status', () => ({ hasKey: !!getSecret('anthropic') }))
+  handle('ai:set-key', (key) => {
+    const k = typeof key === 'string' ? key.trim() : ''
+    if (k && !/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) throw new ValidationError('That does not look like an Anthropic API key (it starts with sk-ant-).')
+    setSecret('anthropic', k || null)
+    if (!k) setSettings({ claudeAuth: 'account' })
+    return { hasKey: !!k }
+  })
+  handle('ai:skills', () => listSkills())
   handle('ai:open-app', async (id) => {
     const app = findApp(id === 'claude' ? 'claudeApp' : id === 'codex' ? 'codexApp' : id === 'burp' ? 'burp' : 'lmstudio')
     if (!app) throw new ValidationError('That app was not found on this Mac.')
@@ -385,6 +461,7 @@ app.whenReady().then(() => {
   setSecretsCrypto(crypto)
   setModelCrypto(crypto)
   recoverSessions()
+  ensureSkills()
   hardenWebContents()
   registerIpc()
   createWindow()

@@ -19,7 +19,8 @@ const defaults = (): AppSettings => ({
   wwwPath: laramacWww(),
   llm: { baseUrl: 'http://127.0.0.1:1234/v1', model: '' },
   reviewer: 'claude',
-  notifications: true
+  notifications: true,
+  claudeAuth: 'account'
 })
 
 const file = (): string => join(dirs.config(), 'settings.json')

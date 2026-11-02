@@ -8,6 +8,7 @@ import Projects from './pages/Projects'
 import CodeReview from './pages/CodeReview'
 import WebScan from './pages/WebScan'
 import ApiSecurity from './pages/ApiSecurity'
+import Audits from './pages/Audits'
 import Sessions from './pages/Sessions'
 import Tools from './pages/Tools'
 import Logs from './pages/Logs'
@@ -70,6 +71,7 @@ function Shell(): React.JSX.Element {
               {page === 'review' && <CodeReview />}
               {page === 'web' && <WebScan />}
               {page === 'api' && <ApiSecurity />}
+              {page === 'audit' && <Audits />}
               {page === 'sessions' && <Sessions />}
               {page === 'tools' && <Tools />}
               {page === 'logs' && <Logs />}

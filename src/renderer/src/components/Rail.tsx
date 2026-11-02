@@ -1,10 +1,10 @@
-import { FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, Wrench } from 'lucide-react'
+import { FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Wrench } from 'lucide-react'
 import { useApp, type Page } from '../store'
 import ThreatCore from './ThreatCore'
 import { SEVERITIES, type Severity } from '@shared/types'
 
 type Item = { id: Page; label: string; icon: React.ReactNode }
-const I = 17
+const I = 16
 export const GROUPS: { label: string | null; items: Item[] }[] = [
   { label: null, items: [{ id: 'overview', label: 'Overview', icon: <LayoutDashboard size={I} /> }, { id: 'projects', label: 'Projects', icon: <FolderGit2 size={I} /> }] },
   {
@@ -12,7 +12,8 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
     items: [
       { id: 'review', label: 'Code review', icon: <FileSearch size={I} /> },
       { id: 'web', label: 'Web scan', icon: <Globe size={I} /> },
-      { id: 'api', label: 'API security', icon: <Plug size={I} /> }
+      { id: 'api', label: 'API security', icon: <Plug size={I} /> },
+      { id: 'audit', label: 'Special audits', icon: <ShieldHalf size={I} /> }
     ]
   },
   { label: 'Results', items: [{ id: 'sessions', label: 'Sessions', icon: <History size={I} /> }, { id: 'logs', label: 'Logs', icon: <ScrollText size={I} /> }] }
@@ -32,7 +33,7 @@ export default function Rail(): React.JSX.Element {
 
   const item = (it: Item): React.JSX.Element => (
     <button key={it.id} className="rail-item" aria-current={page === it.id ? 'page' : undefined} onClick={() => setPage(it.id)}>
-      {it.icon}
+      <span className="ri">{it.icon}</span>
       {it.label}
       {it.id === 'sessions' && (running ? <span className="live" aria-label={`${running} running`} /> : sessions.length ? <span className="count">{sessions.length}</span> : null)}
       {it.id === 'tools' && updates.length > 0 && <span className="tag tag-ion" style={{ marginLeft: 'auto' }}>{updates.length} new</span>}

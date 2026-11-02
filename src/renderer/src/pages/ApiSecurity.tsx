@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FileJson, Plug, Radar, Upload } from 'lucide-react'
 import type { ApiAuth, ApiSpecInfo, Reviewer, ScanMode } from '@shared/types'
 import { useApp } from '../store'
-import { PageHead, Seg } from '../ui'
+import { FlowStep, PageHead, Seg } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
 import { MODES } from './WebScan'
 
@@ -25,9 +25,8 @@ export default function ApiSecurity(): React.JSX.Element {
   return (
     <>
       <PageHead title="API security" desc="Load the file that describes your API. MacSec reviews what it says, then makes ordinary GET requests signed in as you to see what the API gives away. Nothing is sent that could change data." />
-      <div className="setup glass">
-        <div className="field">
-          <span className="field-label">The API</span>
+      <div className="flow">
+        <FlowStep n={1} title="The API" help="A Postman collection, an OpenAPI or Swagger file, or a HAR recording from your browser." state={spec ? 'done' : 'current'}>
           {spec ? (
             <div className="pick-list" style={{ maxHeight: 'none' }}>
               <div className="pick-item" aria-selected style={{ cursor: 'default' }}>
@@ -62,15 +61,16 @@ export default function ApiSecurity(): React.JSX.Element {
               <span className="hint">.json, .yaml or .har. A copy is kept in MacSec so you can test it again.</span>
             </button>
           )}
-        </div>
+        </FlowStep>
 
         {spec && (
           <>
+            <FlowStep n={2} title="Where it runs, and who you are" help="Point it at staging if you can. Your token is used for this test only and never saved." state={valid ? 'done' : 'current'}>
             <div className="two">
               <div className="field">
                 <span className="field-label">Address</span>
                 <input className="input mono" placeholder={spec.baseUrl || 'https://api.example.com'} value={base} onChange={(e) => setBase(e.target.value)} aria-label="API address" />
-                <span className="field-help">Leave empty to use the one in the file{spec.baseUrl ? ` (${spec.baseUrl})` : ''}. Point it at staging if you can.</span>
+                <span className="field-help">Leave empty to use the one in the file{spec.baseUrl ? ` (${spec.baseUrl})` : ''}.</span>
               </div>
               <div className="field">
                 <span className="field-label">Sign in as you</span>
@@ -90,28 +90,27 @@ export default function ApiSecurity(): React.JSX.Element {
                     <input className="input mono" type="password" autoComplete="off" placeholder={auth.kind === 'bearer' ? 'Your token' : 'Your key'} value={auth.value ?? ''} onChange={(e) => setAuth({ ...auth, value: e.target.value })} aria-label="Token" />
                   </div>
                 )}
-                <span className="field-help">Used for this test only, never saved.</span>
               </div>
             </div>
+            </FlowStep>
 
-            <div className="field">
-              <span className="field-label">How much to cover</span>
+            <FlowStep n={3} title="How much to cover" state="current">
               <div className="choices" role="radiogroup" aria-label="Mode">
                 {API_MODES.map((m) => (
                   <button key={m.id} className="choice" role="radio" aria-checked={mode === m.id} onClick={() => setMode(m.id)}>
-                    <strong>
-                      {m.icon} {m.title}
-                    </strong>
+                    <span className="ci" style={{ ['--g' as string]: '#ff3d7f' }}>
+                      {m.icon}
+                    </span>
+                    <strong>{m.title}</strong>
                     <span>{m.text}</span>
                   </button>
                 ))}
               </div>
-            </div>
+            </FlowStep>
 
-            <div className="field">
-              <span className="field-label">AI summary</span>
+            <FlowStep n={4} title="Who writes the report" state="current">
               <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
-            </div>
+            </FlowStep>
 
             {valid && !local && (
               <label className="consent">
@@ -124,7 +123,7 @@ export default function ApiSecurity(): React.JSX.Element {
           </>
         )}
 
-        <div className="go-bar">
+        <div className="flow-go glass">
           <span className="hint grow">{spec ? (valid ? `Tests ${target}` : 'Enter the API’s address.') : 'Start by loading the file.'}</span>
           <button
             className="btn btn-primary btn-lg"

@@ -7,6 +7,8 @@ import { existsSync, readdirSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import type { AgentInfo } from '../shared/types'
+import { getSettings } from './settings'
+import { getSecret } from './secrets'
 
 function binDirs(): string[] {
   const h = homedir()
@@ -104,7 +106,13 @@ function version(bin: string): Promise<string | null> {
 /** PATH for running Claude Code and Codex: they need the real home folder for their sign-in. */
 export function agentEnv(): NodeJS.ProcessEnv {
   const extra = binDirs().join(':')
-  return { ...process.env, PATH: `${extra}:${process.env.PATH ?? ''}`, NO_COLOR: '1' }
+  const env: NodeJS.ProcessEnv = { ...process.env, PATH: `${extra}:${process.env.PATH ?? ''}`, NO_COLOR: '1' }
+  // With "API key" chosen, Claude Code uses the key from the Keychain instead of your sign-in.
+  if (getSettings().claudeAuth === 'key') {
+    const key = getSecret('anthropic')
+    if (key) env.ANTHROPIC_API_KEY = key
+  } else delete env.ANTHROPIC_API_KEY
+  return env
 }
 
 export async function listAgents(): Promise<AgentInfo[]> {

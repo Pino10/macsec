@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { FileSearch, Gauge, Microscope, Radar, Zap } from 'lucide-react'
 import type { ReviewDepth, ReviewFocus, Reviewer } from '@shared/types'
 import { useApp, type PresetSource } from '../store'
-import { PageHead, Seg } from '../ui'
+import { FlowStep, PageHead, Seg } from '../ui'
 import SourcePicker, { sourceName } from '../components/SourcePicker'
 import ReviewerChoice from '../components/ReviewerChoice'
 
 const DEPTHS: { id: ReviewDepth; icon: React.ReactNode; title: string; text: string }[] = [
-  { id: 'quick', icon: <Zap size={16} />, title: 'Quick', text: 'Core Semgrep rules, keys in files, known flaws in packages. A few minutes.' },
-  { id: 'standard', icon: <Gauge size={16} />, title: 'Standard', text: 'Adds language rule sets, Bearer’s data-flow checks, TruffleHog and Trivy.' },
-  { id: 'deep', icon: <Microscope size={16} />, title: 'Deep', text: 'Everything, the whole Git history and the full audit rules. The AI follows every entry point.' }
+  { id: 'quick', icon: <Zap size={18} />, title: 'Quick', text: 'Core Semgrep rules, keys in files, known flaws in packages. A few minutes.' },
+  { id: 'standard', icon: <Gauge size={18} />, title: 'Standard', text: 'Adds language rule sets, Bearer’s data-flow checks, TruffleHog and Trivy.' },
+  { id: 'deep', icon: <Microscope size={18} />, title: 'Deep', text: 'Everything, the whole Git history and the full audit rules. The AI follows every entry point.' }
 ]
 
 export default function CodeReview(): React.JSX.Element {
@@ -47,13 +47,12 @@ export default function CodeReview(): React.JSX.Element {
         </div>
       )}
 
-      <div className="setup glass">
-        <div className="field">
-          <span className="field-label">What to review</span>
+      <div className="flow">
+        <FlowStep n={1} title="What to review" help="A project in your www folder, a GitHub repository or an Azure DevOps repository." state={source ? 'done' : 'current'}>
           {source ? (
             <div className="pick-list" style={{ maxHeight: 'none' }}>
               <div className="pick-item" aria-selected style={{ cursor: 'default' }}>
-                <FileSearch size={17} style={{ color: 'var(--ion)' }} />
+                <FileSearch size={18} style={{ color: 'var(--ion)' }} />
                 <span className="grow">
                   {sourceName(source)}
                   <span className="sub">{source.kind === 'local' ? source.path : source.kind === 'github' ? `github.com/${source.repo}` : source.url.replace(/^https:\/\/[^@/]+@/, 'https://')}</span>
@@ -66,45 +65,44 @@ export default function CodeReview(): React.JSX.Element {
           ) : (
             <SourcePicker selected={source} onPick={setSource} />
           )}
-        </div>
+        </FlowStep>
 
-        <div className="field">
-          <span className="field-label">AI reviewer</span>
+        <FlowStep n={2} title="Who reads the results" help="The scanners always run first. The AI then reads the code and every scanner result, decides what is real, and writes the report." state={source ? 'current' : 'todo'}>
           <ReviewerChoice value={reviewer} onChange={setReviewer} what="code" />
-        </div>
+        </FlowStep>
 
-        <div className="field">
-          <span className="field-label">How deep</span>
+        <FlowStep n={3} title="How deep" state={source ? 'current' : 'todo'}>
           <div className="choices" role="radiogroup" aria-label="Depth">
             {DEPTHS.map((d) => (
               <button key={d.id} className="choice" role="radio" aria-checked={depth === d.id} onClick={() => setDepth(d.id)}>
-                <strong>
-                  {d.icon} {d.title}
-                </strong>
+                <span className="ci">{d.icon}</span>
+                <strong>{d.title}</strong>
                 <span>{d.text}</span>
               </button>
             ))}
           </div>
-        </div>
+          <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Seg<ReviewFocus>
+              label="Look for"
+              value={focus}
+              onChange={setFocus}
+              options={[
+                ['security', 'Security'],
+                ['bugs', 'Bugs'],
+                ['all', 'Both']
+              ]}
+            />
+            {remote && (
+              <label className="check">
+                <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Keep the downloaded code to fix it here
+              </label>
+            )}
+          </div>
+        </FlowStep>
 
-        <div className="go-bar">
-          <Seg<ReviewFocus>
-            label="Look for"
-            value={focus}
-            onChange={setFocus}
-            options={[
-              ['security', 'Security'],
-              ['bugs', 'Bugs'],
-              ['all', 'Both']
-            ]}
-          />
-          {remote ? (
-            <label className="check">
-              <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Keep the downloaded code to fix it
-            </label>
-          ) : null}
-          <span className="hint grow" style={{ textAlign: 'right' }}>
-            {remote ? (keep ? 'The private copy stays until you remove it.' : 'The private copy is deleted when the review ends.') : source ? 'Read in place. Nothing in your project changes.' : ''}
+        <div className="flow-go glass">
+          <span className="hint grow">
+            {!source ? 'Choose what to review to begin.' : remote ? (keep ? 'A private copy is downloaded and kept until you remove it.' : 'A private copy is downloaded and deleted when the review ends. The report keeps the code it quotes.') : 'Read in place. Nothing in your project changes.'}
           </span>
           <button
             className="btn btn-primary btn-lg"
@@ -123,7 +121,7 @@ export default function CodeReview(): React.JSX.Element {
               if (s) showSession(s.id)
             }}
           >
-            <Radar size={16} /> Start review
+            <Radar size={17} /> Start review
           </button>
         </div>
       </div>

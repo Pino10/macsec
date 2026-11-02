@@ -7,6 +7,7 @@
  *  5. Delete the private copy, unless you asked to keep it for fixing.
  */
 import { spawn, type ChildProcess } from 'child_process'
+import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Finding, ReviewRequest, SessionInfo, SessionStep } from '../shared/types'
@@ -17,6 +18,7 @@ import { countBySeverity, mergeFindings } from './scanners/parse'
 import { installTool, isInstalled, toolDef, toolEnv, toolPath } from './toolbox'
 import { reviewPrompt, reviewWithClaude, reviewWithCodex, reviewWithModel, type AiResult } from './aireview'
 import { log } from './logs'
+import { addEvidence } from './evidence'
 import { beginOp, cancelOp, endOp, type Op } from './engine'
 import { getSettings } from './settings'
 
@@ -179,7 +181,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
         set(st, { status: 'failed', ms: Date.now() - t, detail: (e as Error).message.slice(0, 300) })
         log('error', `${run.tool}: ${(e as Error).message}`, id)
       }
-      findings = mergeFindings(findings)
+      findings = addEvidence(root, mergeFindings(findings))
       info.counts = countBySeverity(findings)
       saveFindings(id, findings)
       saveSession(info)
@@ -194,11 +196,26 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
         const prompt = reviewPrompt(info.title, req.focus, req.depth, findings.filter((f) => f.category !== 'dependency'))
         let res: AiResult
         const beat = (): void => set(ai, { detail: `Reading… ${Math.round((Date.now() - t) / 60000)} min` })
-        if (req.reviewer === 'claude') res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat)
+        if (req.reviewer === 'claude') {
+          // A normal Claude Code session with a known id, so you can continue the conversation later.
+          info.claudeSession = randomUUID()
+          saveSession(info)
+          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) })
+        }
         else if (req.reviewer === 'codex') res = await reviewWithCodex(root, prompt, req.depth, join(raw, 'codex-last.md'), (c) => r.children.add(c), beat)
         else res = await reviewWithModel(root, info.title, sourceFiles(root), findings, req.focus, req.depth, (l) => set(ai, { detail: l }), () => r.cancelled)
-        for (const f of findings) if (res.verdicts.has(f.id)) f.verdict = res.verdicts.get(f.id)
-        findings = mergeFindings([...findings, ...res.findings])
+        for (const f of findings) {
+          const d = res.details.get(f.id)
+          if (!d) continue
+          f.verdict = d.verdict
+          f.aiNote = d.reason
+          // The reviewer read the code: its severity, with the reason, is the better judgement.
+          if (d.verdict === 'confirmed' && d.severity && d.severity !== f.severity) {
+            f.aiNote = `${d.reason ?? ''} (Scanner said ${f.severity}.)`.trim()
+            f.severity = d.severity
+          }
+        }
+        findings = addEvidence(root, mergeFindings([...findings, ...res.findings]))
         saveAiReport(id, res.report)
         const fp = [...res.verdicts.values()].filter((v) => v === 'false-positive').length
         set(ai, { status: 'done', ms: Date.now() - t, findings: res.findings.length, detail: `${res.findings.length} found${fp ? `, ${fp} scanner alarms judged false` : ''}` })
