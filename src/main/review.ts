@@ -17,20 +17,14 @@ import { countBySeverity, mergeFindings } from './scanners/parse'
 import { installTool, isInstalled, toolDef, toolEnv, toolPath } from './toolbox'
 import { reviewPrompt, reviewWithClaude, reviewWithCodex, reviewWithModel, type AiResult } from './aireview'
 import { log } from './logs'
+import { beginOp, cancelOp, endOp, type Op } from './engine'
 import { getSettings } from './settings'
 
 
-interface Running {
-  children: Set<ChildProcess>
-  cancelled: boolean
-}
-const running = new Map<string, Running>()
+type Running = Op
 
 export function cancelSession(id: string): void {
-  const r = running.get(id)
-  if (!r) return
-  r.cancelled = true
-  for (const c of r.children) c.kill('SIGTERM')
+  cancelOp(id)
 }
 
 function sourceLabel(req: ReviewRequest): { title: string; target: string } {
@@ -118,8 +112,7 @@ export async function startReview(req: ReviewRequest): Promise<SessionInfo> {
 }
 
 async function runReview(id: string, req: ReviewRequest): Promise<void> {
-  const r: Running = { children: new Set(), cancelled: false }
-  running.set(id, r)
+  const r: Running = beginOp(id)
   const info = readSession(id)
   const dir = sessionDir(id)
   const raw = join(dir, 'raw')
@@ -224,7 +217,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
     info.error = (e as Error).message
     log('error', info.error, id)
   } finally {
-    running.delete(id)
+    endOp(id)
     info.finishedAt = new Date().toISOString()
     if (remote) {
       if (req.keepCode && info.status === 'done') info.codeKept = true

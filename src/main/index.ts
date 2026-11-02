@@ -3,20 +3,23 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
-import type { Channels, Events, ReviewRequest } from '../shared/types'
+import type { ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest } from '../shared/types'
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { setSecretsCrypto } from './secrets'
 import { setModelCrypto, detectLlms, testLlm, listServers, saveServer, deleteServer } from './models'
 import { jobs } from './jobs'
 import { log, logEvents, listLogs, clearLogs } from './logs'
-import { installTool, listTools, removeTool, toolDef, updateToolData } from './toolbox'
+import { checkUpdates, checkUpdatesDaily, installTool, listTools, removeTool, toolDef, updateToolData } from './toolbox'
+import { localSites, startWebScan } from './webscan'
+import { loadSpec, startApiScan } from './apiscan'
+import { cancelOp } from './engine'
 import { accounts, azureProjects, connectAzure, connectGitHub, githubRepos, importIntoWww, listLocal } from './projects'
 import { cancelSession, startReview } from './review'
 import { deleteSession, listSessions, readSession, recoverSessions, saveSession, sessionCodeDir, sessionDetail, sessionDir, sessionEvents, discardCode } from './sessions'
 import { sessionHtml } from './report'
 import { projectStats } from './scanners/plan'
-import { findCli, installAgent, listAgents, openTerminal, shellQuote } from './agents'
+import { findApp, findCli, installAgent, listAgents, openBurp, openTerminal, shellQuote } from './agents'
 
 const isMac = process.platform === 'darwin'
 const RENDERER_URL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
@@ -127,6 +130,33 @@ function allowedProject(path: unknown): string {
   return p
 }
 
+const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d)
+const MODES = ['quick', 'standard', 'thorough'] as const
+const REVIEWERS = ['none', 'claude', 'codex', 'model'] as const
+
+function validWeb(req: unknown): WebScanRequest {
+  const r = (req ?? {}) as Partial<WebScanRequest>
+  const t = r.target as WebScanRequest['target'] | undefined
+  let target: WebScanRequest['target']
+  if (t?.kind === 'local' && typeof t.name === 'string') target = { kind: 'local', name: t.name }
+  else if (t?.kind === 'url' && typeof t.url === 'string' && /^https?:\/\/[^\s'"<>]+$/.test(t.url.trim())) target = { kind: 'url', url: new URL(t.url.trim()).href }
+  else throw new ValidationError('Enter the address to scan, starting with http:// or https://.')
+  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, reviewer: pick(r.reviewer, REVIEWERS, 'none') }
+}
+
+function validApi(req: unknown): ApiScanRequest {
+  const r = (req ?? {}) as Partial<ApiScanRequest>
+  const a = (r.auth ?? { kind: 'none' }) as ApiScanRequest['auth']
+  return {
+    spec: String(r.spec ?? ''),
+    baseUrl: typeof r.baseUrl === 'string' ? r.baseUrl.trim() : '',
+    auth: { kind: pick(a.kind, ['none', 'bearer', 'header'] as const, 'none'), value: typeof a.value === 'string' ? a.value.trim() : undefined, header: typeof a.header === 'string' ? a.header.trim() : undefined },
+    mode: pick<ScanMode>(r.mode, MODES, 'standard'),
+    authorized: r.authorized === true,
+    reviewer: pick(r.reviewer, REVIEWERS, 'none')
+  }
+}
+
 function validReview(req: unknown): ReviewRequest {
   const r = (req ?? {}) as Partial<ReviewRequest>
   const s = r.source as ReviewRequest['source'] | undefined
@@ -136,7 +166,6 @@ function validReview(req: unknown): ReviewRequest {
   else if (s.kind === 'github' && typeof s.repo === 'string' && /^[\w.-]+\/[\w.-]+$/.test(s.repo)) source = { kind: 'github', repo: s.repo }
   else if (s.kind === 'azure' && typeof s.url === 'string' && /^https:\/\/[^\s'"]+$/.test(s.url)) source = { kind: 'azure', url: s.url }
   else throw new ValidationError('That source is not valid.')
-  const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d)
   return {
     source,
     reviewer: pick(r.reviewer, ['none', 'claude', 'codex', 'model'] as const, 'claude'),
@@ -209,6 +238,10 @@ function registerIpc(): void {
     return listTools()
   })
   handle('tools:update-data', () => jobs.run('Updating scanner databases', (u) => updateToolData(u)))
+  handle('tools:check-updates', async () => {
+    await checkUpdates()
+    return listTools()
+  })
 
   // Projects
   handle('projects:local', () => listLocal())
@@ -244,7 +277,36 @@ function registerIpc(): void {
     deleteSession(String(id))
     return listSessions()
   })
-  handle('sessions:cancel', (id) => cancelSession(String(id)))
+  handle('sessions:cancel', (id) => {
+    cancelSession(String(id))
+    cancelOp(String(id))
+  })
+  handle('web:sites', () => localSites())
+  handle('web:start', (req) => {
+    try {
+      return startWebScan(validWeb(req))
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
+  handle('burp:open', () => openBurp())
+  handle('api:load-spec', async () => {
+    if (!mainWindow) return null
+    const r = await dialog.showOpenDialog(mainWindow, { title: 'Load an API description', buttonLabel: 'Load', properties: ['openFile'], filters: [{ name: 'Postman, OpenAPI, Swagger or HAR', extensions: ['json', 'yaml', 'yml', 'har'] }] })
+    if (r.canceled || !r.filePaths[0]) return null
+    try {
+      return loadSpec(r.filePaths[0])
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
+  handle('api:start', (req) => {
+    try {
+      return startApiScan(validApi(req))
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
   handle('sessions:pdf', async (id) => {
     const out = await exportPdf(String(id))
     if (out) shell.showItemInFolder(out)
@@ -290,6 +352,11 @@ function registerIpc(): void {
   // AI
   handle('ai:agents', () => listAgents())
   handle('ai:install-agent', (id) => installAgent(id === 'codex' ? 'codex' : 'claude'))
+  handle('ai:open-app', async (id) => {
+    const app = findApp(id === 'claude' ? 'claudeApp' : id === 'codex' ? 'codexApp' : id === 'burp' ? 'burp' : 'lmstudio')
+    if (!app) throw new ValidationError('That app was not found on this Mac.')
+    await shell.openPath(app)
+  })
   handle('ai:detect', () => detectLlms())
   handle('ai:test', (baseUrl, model) => testLlm(String(baseUrl), String(model)))
   handle('ai:servers', () => listServers())
@@ -322,6 +389,8 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   log('info', `MacSec ${app.getVersion()} started`)
+  // Newer scanner versions are looked for once a day and offered on the Tools page.
+  setTimeout(() => void checkUpdatesDaily().then((names) => names.length && send('tools:updates', names)).catch(() => undefined), 6000)
   app.on('activate', () => {
     if (!mainWindow) createWindow()
   })

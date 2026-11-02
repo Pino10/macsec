@@ -1,40 +1,64 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Bot, ChevronDown, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Sparkles, Trash2, XCircle } from 'lucide-react'
-import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type Severity } from '@shared/types'
+import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle } from 'lucide-react'
+import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity } from '@shared/types'
 import { useApp } from '../store'
 import { Answer } from '../components/Answer'
-import { Counts, Empty, PageHead, Sev, SevTiles, StepIcon, ago, duration } from '../ui'
+import { Counts, Empty, KindIcon, PageHead, Sev, StepIcon, ago, duration, kindName } from '../ui'
+
+const reviewerName = (s: SessionInfo): string => (s.reviewer === 'claude' ? 'Claude Code' : s.reviewer === 'codex' ? 'Codex' : s.reviewer === 'model' ? 'Your model' : 'No AI')
 
 export default function Sessions(): React.JSX.Element {
   const { sessions, openSession, showSession } = useApp()
   const [q, setQ] = useState('')
+  const [kind, setKind] = useState<SessionInfo['kind'] | 'all'>('all')
   if (openSession) return <SessionView id={openSession} onBack={() => showSession(null)} />
-  const list = sessions.filter((s) => !q.trim() || `${s.title} ${s.target}`.toLowerCase().includes(q.toLowerCase()))
+  const list = sessions.filter((s) => (kind === 'all' || s.kind === kind) && (!q.trim() || `${s.title} ${s.target}`.toLowerCase().includes(q.toLowerCase())))
   return (
     <>
-      <PageHead title="Sessions" desc="Every test you ran, with its report. Each one lives in its own folder inside MacSec.">
+      <PageHead title="Sessions" desc="Every test you ran, kept with its findings, the AI’s report and each tool’s raw output.">
         <button className="btn" onClick={() => void window.macsec.invoke('app:open-folder', 'sessions')}>
           <FolderOpen size={14} /> Open folder
         </button>
       </PageHead>
       {sessions.length === 0 ? (
-        <Empty title="No sessions yet">Start a code review and it appears here.</Empty>
+        <Empty title="No tests yet">Run a code review, web scan or API review and it appears here.</Empty>
       ) : (
         <>
-          <input className="input" placeholder="Filter by project" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 12 }} aria-label="Filter sessions" />
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+            <div className="chips">
+              {(['all', 'code-review', 'web-scan', 'api-scan'] as const).map((k) => (
+                <button key={k} className="chip" aria-pressed={kind === k} onClick={() => setKind(k)} style={{ textTransform: 'none' }}>
+                  {k === 'all' ? 'All' : kindName(k)} <i>{k === 'all' ? sessions.length : sessions.filter((s) => s.kind === k).length}</i>
+                </button>
+              ))}
+            </div>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: 12, top: 13, color: 'var(--ink-3)' }} />
+              <input className="input" style={{ paddingLeft: 34 }} placeholder="Find a project, site or API" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter" />
+            </div>
+          </div>
           <div className="panel">
             {list.map((s) => (
-              <button key={s.id} className="ms-row" style={{ width: '100%', background: 'none', border: 0, color: 'inherit', font: 'inherit', textAlign: 'left', cursor: 'pointer' }} onClick={() => showSession(s.id)}>
-                <StepIcon status={s.status === 'running' ? 'running' : s.status === 'done' ? 'done' : s.status === 'failed' ? 'failed' : 'skipped'} />
-                <div className="grow">
-                  <div className="row-title">{s.title}</div>
-                  <div className="row-sub">
-                    {s.target} · {ago(s.createdAt)} · {s.reviewer === 'claude' ? 'Claude Code' : s.reviewer === 'codex' ? 'Codex' : s.reviewer === 'model' ? 'Model' : 'Scanners'}
-                    {s.depth ? ` · ${s.depth}` : ''}
-                  </div>
-                </div>
-                {s.status === 'done' ? <Counts counts={s.counts} /> : <span className="hint">{s.status === 'running' ? 'Running' : s.status}</span>}
-                <ChevronRight size={14} style={{ color: 'var(--ink-3)' }} />
+              <button key={s.id} className="row" onClick={() => showSession(s.id)}>
+                <KindIcon kind={s.kind} size={16} />
+                <span className="grow">
+                  <span className="row-title" style={{ display: 'block' }}>
+                    {s.title}
+                  </span>
+                  <span className="row-sub">
+                    {kindName(s.kind)} of {s.target.replace(/^https?:\/\//, '')}, {ago(s.createdAt)}, {reviewerName(s)}
+                  </span>
+                </span>
+                {s.status === 'running' ? (
+                  <span className="tag tag-ion">
+                    <span className="dot" data-s="busy" style={{ width: 6, height: 6 }} /> Running
+                  </span>
+                ) : s.status === 'done' ? (
+                  <Counts counts={s.counts} />
+                ) : (
+                  <span className="tag">{s.status === 'failed' ? 'Failed' : 'Stopped'}</span>
+                )}
+                <ChevronRight size={15} style={{ color: 'var(--ink-3)' }} />
               </button>
             ))}
           </div>
@@ -46,11 +70,13 @@ export default function Sessions(): React.JSX.Element {
 
 const CATS: [FindingCategory | 'all', string][] = [
   ['all', 'All'],
-  ['ai', 'AI review'],
+  ['ai', 'AI'],
   ['code', 'Code'],
   ['secret', 'Keys'],
   ['dependency', 'Packages'],
-  ['config', 'Config']
+  ['config', 'Config'],
+  ['web', 'Web'],
+  ['api', 'API']
 ]
 
 function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.JSX.Element {
@@ -61,10 +87,10 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [cat, setCat] = useState<FindingCategory | 'all'>('all')
   const [showFp, setShowFp] = useState(false)
   const [tab, setTab] = useState<'findings' | 'ai' | 'run'>('findings')
+  const [sel, setSel] = useState<string | null>(null)
   const live = sessions.find((s) => s.id === id)
 
-  // Reload the findings whenever the session moves on.
-  const stamp = `${live?.status}|${live?.steps.map((s) => s.status).join(',')}`
+  const stamp = `${live?.status}|${live?.steps.map((s) => `${s.status}${s.findings ?? ''}`).join(',')}`
   useEffect(() => {
     void api
       .invoke('sessions:get', id)
@@ -73,97 +99,158 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   }, [api, id, stamp])
 
   const findings = useMemo(() => (detail?.findings ?? []).filter((f) => sevs.has(f.severity) && (cat === 'all' || f.category === cat) && (showFp || f.verdict !== 'false-positive')), [detail, sevs, cat, showFp])
-  if (!detail) return <Empty title="Loading…" />
+  useEffect(() => {
+    if (!findings.some((f) => f.id === sel)) setSel(findings[0]?.id ?? null)
+  }, [findings, sel])
+
+  if (!detail) return <Empty title="Opening…" />
   const s = { ...detail, ...(live ?? {}) }
   const fp = detail.findings.filter((f) => f.verdict === 'false-positive').length
   const running = s.status === 'running'
-  const hasCode = !!s.codePath
+  const hasCode = s.kind === 'code-review' && !!s.codePath
+  const current = findings.find((f) => f.id === sel) ?? null
+  const cats = CATS.filter(([k]) => k === 'all' || detail.findings.some((f) => f.category === k))
+  const total = SEVERITIES.reduce((n, k) => n + s.counts[k], 0)
 
   return (
     <>
-      <button className="link hint" onClick={onBack} style={{ marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <ArrowLeft size={13} /> All sessions
+      <button className="link" onClick={onBack} style={{ marginTop: 10 }}>
+        <ArrowLeft size={14} /> All sessions
       </button>
-      <PageHead title={s.title} desc={`${s.target} · ${new Date(s.createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}${s.files ? ` · ${s.files.toLocaleString()} files` : ''}${s.languages?.length ? ` · ${s.languages.slice(0, 3).join(', ')}` : ''}`}>
-        {running ? (
-          <button className="btn" onClick={() => void act('cancel', () => api.invoke('sessions:cancel', id))}>
-            <CircleStop size={14} /> Stop
-          </button>
-        ) : (
-          <>
-            <button className="btn" disabled={busy.has('pdf')} onClick={() => void act('pdf', () => api.invoke('sessions:pdf', id)).then((p) => p && notify({ kind: 'info', text: 'Saved the PDF in the session folder.' }))}>
-              <FileDown size={14} /> {busy.has('pdf') ? 'Making PDF…' : 'PDF'}
+      <div className="session-head">
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', minWidth: 0 }}>
+          <KindIcon kind={s.kind} size={20} />
+          <div style={{ minWidth: 0 }}>
+            <h1 className="page-title" style={{ fontSize: 28 }}>
+              {s.title}
+            </h1>
+            <div className="hint" style={{ marginTop: 4 }}>
+              {kindName(s.kind)} of <span className="mono">{s.target}</span>
+              {', '}
+              {new Date(s.createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
+              {s.mode || s.depth ? `, ${s.mode ?? s.depth}` : ''}, {reviewerName(s)}
+            </div>
+          </div>
+        </div>
+        <div className="end">
+          {running ? (
+            <button className="btn btn-danger" onClick={() => void act('cancel', () => api.invoke('sessions:cancel', id))}>
+              <CircleStop size={14} /> Stop
             </button>
-            {hasCode && (
-              <>
-                <button className="btn" onClick={() => void act('claude', () => api.invoke('sessions:open', id, 'claude'))} data-tip="Opens Claude Code in Terminal, ready to fix the findings with you. Also reachable at claude.ai/code and on your phone.">
-                  <Sparkles size={14} /> Continue in Claude Code
-                </button>
-                <button className="btn" onClick={() => void act('codex', () => api.invoke('sessions:open', id, 'codex'))}>
-                  <Bot size={14} /> Codex
-                </button>
-              </>
-            )}
-          </>
-        )}
-        <button className="icon-btn" data-tip="Open the session folder" aria-label="Open the session folder" onClick={() => void api.invoke('sessions:open', id, 'folder')}>
-          <FolderOpen />
-        </button>
-        {!running && (
-          <button
-            className="icon-btn danger-text"
-            data-tip="Delete this session"
-            aria-label="Delete this session"
-            onClick={async () => {
-              const r = await act('del', () => api.invoke('sessions:delete', id))
-              if (r) {
-                setSessions(r)
-                onBack()
-              }
-            }}
-          >
-            <Trash2 />
+          ) : (
+            <>
+              {hasCode && (
+                <>
+                  <button className="btn btn-primary" onClick={() => void act('claude', () => api.invoke('sessions:open', id, 'claude'))} data-tip="Opens Claude Code in Terminal, ready to fix these findings with you. With Remote Control on, you can also carry on at claude.ai/code or on your phone.">
+                    <Sparkles size={14} /> Fix with Claude Code
+                  </button>
+                  <button className="btn" onClick={() => void act('codex', () => api.invoke('sessions:open', id, 'codex'))}>
+                    <Bot size={14} /> Codex
+                  </button>
+                </>
+              )}
+              <button className="btn" disabled={busy.has('pdf')} onClick={() => void act('pdf', () => api.invoke('sessions:pdf', id)).then((p) => p && notify({ kind: 'info', text: 'Saved the PDF in the session folder.' }))}>
+                <FileDown size={14} /> {busy.has('pdf') ? 'Making PDF…' : 'PDF'}
+              </button>
+            </>
+          )}
+          <button className="icon-btn" data-tip="Open the session folder" aria-label="Open the session folder" onClick={() => void api.invoke('sessions:open', id, 'folder')}>
+            <FolderOpen />
           </button>
-        )}
-      </PageHead>
+          {!running && (
+            <button
+              className="icon-btn danger-text"
+              data-tip="Delete this session"
+              aria-label="Delete this session"
+              onClick={async () => {
+                const r = await act('del', () => api.invoke('sessions:delete', id))
+                if (r) {
+                  setSessions(r)
+                  onBack()
+                }
+              }}
+            >
+              <Trash2 />
+            </button>
+          )}
+        </div>
+      </div>
 
       {s.error && (
-        <div className="notice" style={{ marginBottom: 14, borderColor: 'color-mix(in srgb, var(--bad) 30%, transparent)', background: 'color-mix(in srgb, var(--bad) 8%, transparent)' }}>
-          <XCircle size={16} style={{ color: 'var(--bad)', flexShrink: 0 }} /> {s.error}
+        <div className="notice bad">
+          <XCircle size={17} style={{ color: 'var(--bad)', flexShrink: 0 }} /> {s.error}
         </div>
       )}
 
-      <SevTiles counts={s.counts} />
+      <div className="kpis glass">
+        <div className="kpi">
+          <b>{running ? s.steps.filter((x) => x.status === 'done' || x.status === 'failed').length + '/' + s.steps.length : total}</b>
+          <span>{running ? 'steps done' : 'open findings'}</span>
+        </div>
+        {SEVERITIES.map((k) => (
+          <div key={k} className="kpi" data-zero={s.counts[k] === 0} style={{ ['--c' as string]: `var(--sev-${k})` }}>
+            <b>{s.counts[k]}</b>
+            <span>{k}</span>
+          </div>
+        ))}
+      </div>
       {s.codeKept && (
-        <div className="hint" style={{ margin: '10px 2px 0' }}>
+        <p className="hint" style={{ margin: '-6px 2px 14px' }}>
           The downloaded code is kept in this session so you can fix it.{' '}
           <button className="link" onClick={() => void act('discard', () => api.invoke('sessions:discard-code', id))}>
             Delete it now
           </button>
-        </div>
+        </p>
       )}
 
-      <div className="seg-tabs" role="tablist" style={{ margin: '18px 0 12px' }}>
-        <button role="tab" aria-selected={tab === 'findings'} onClick={() => setTab('findings')}>
-          Findings ({detail.findings.length - fp})
-        </button>
-        <button role="tab" aria-selected={tab === 'ai'} onClick={() => setTab('ai')} disabled={!detail.aiReport}>
-          AI report
-        </button>
-        <button role="tab" aria-selected={tab === 'run'} onClick={() => setTab('run')}>
-          What ran {running && '·'}
-        </button>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+        <div className="tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'findings'} onClick={() => setTab('findings')}>
+            Findings
+          </button>
+          <button role="tab" aria-selected={tab === 'ai'} onClick={() => setTab('ai')} disabled={!detail.aiReport}>
+            AI report
+          </button>
+          <button role="tab" aria-selected={tab === 'run'} onClick={() => setTab('run')}>
+            What ran
+          </button>
+        </div>
+        {tab === 'findings' && (
+          <>
+            <div className="chips">
+              {SEVERITIES.map((k) => (
+                <button key={k} className="chip" aria-pressed={sevs.has(k)} onClick={() => setSevs((x) => (x.has(k) ? new Set([...x].filter((y) => y !== k)) : new Set([...x, k])))}>
+                  {k} <i>{detail.findings.filter((f) => f.severity === k && f.verdict !== 'false-positive').length}</i>
+                </button>
+              ))}
+            </div>
+            {cats.length > 2 && (
+              <select className="input" style={{ width: 130, height: 30, fontSize: 12.5 }} value={cat} onChange={(e) => setCat(e.target.value as FindingCategory | 'all')} aria-label="Kind">
+                {cats.map(([k, l]) => (
+                  <option key={k} value={k}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            )}
+            {fp > 0 && (
+              <label className="check" style={{ fontSize: 12.5 }}>
+                <input type="checkbox" checked={showFp} onChange={(e) => setShowFp(e.target.checked)} /> {fp} ruled out by AI
+              </label>
+            )}
+          </>
+        )}
       </div>
 
-      {(tab === 'run' || (running && detail.findings.length === 0)) && (
-        <div className="panel steps" style={{ padding: 6, marginBottom: 14 }}>
+      {(tab === 'run' || (running && detail.findings.length === 0 && tab === 'findings')) && (
+        <div className="panel timeline" style={{ marginBottom: 14 }}>
           {s.steps.map((st) => (
-            <div key={st.id} className="step" data-status={st.status}>
+            <div key={st.id} className="tl" data-status={st.status}>
               <StepIcon status={st.status} />
               <span>{st.label}</span>
               <span className="detail" title={st.detail}>
-                {st.detail ?? ''}
-                {st.ms ? ` · ${duration(st.ms)}` : ''}
+                {st.detail ?? (st.status === 'waiting' ? 'Waiting' : '')}
+                {st.ms ? `, ${duration(st.ms)}` : ''}
               </span>
             </div>
           ))}
@@ -171,96 +258,83 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
       )}
 
       {tab === 'ai' && detail.aiReport && (
-        <div className="panel" style={{ padding: '6px 22px 18px' }}>
+        <div className="panel">
           <Answer text={detail.aiReport} />
         </div>
       )}
 
-      {tab === 'findings' && (
-        <>
-          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-            <div className="chips" aria-label="Severity">
-              {SEVERITIES.map((k) => (
-                <button key={k} className="chip" aria-pressed={sevs.has(k)} onClick={() => setSevs((x) => (x.has(k) ? new Set([...x].filter((y) => y !== k)) : new Set([...x, k])))}>
-                  {k} {detail.findings.filter((f) => f.severity === k && f.verdict !== 'false-positive').length}
+      {tab === 'findings' &&
+        (findings.length === 0 ? (
+          !running && <Empty title={detail.findings.length ? 'Nothing matches these filters' : 'Nothing found'}>{detail.findings.length ? 'Try turning more severities on.' : 'None of the checks found a problem.'}</Empty>
+        ) : (
+          <div className="split">
+            <div className="panel f-list" role="listbox" aria-label="Findings">
+              {findings.map((f) => (
+                <button key={f.id} className="f-row" role="option" data-sev={f.severity} data-fp={f.verdict === 'false-positive'} aria-selected={f.id === sel} onClick={() => setSel(f.id)}>
+                  <Sev s={f.severity} />
+                  <span className="t">{f.title}</span>
+                  <span className="w">{f.file ? `${f.file}${f.line ? `:${f.line}` : ''}` : (f.advisory ?? f.tool)}</span>
                 </button>
               ))}
             </div>
-            <div className="chips" aria-label="Kind">
-              {CATS.map(([k, l]) => (
-                <button key={k} className="chip" aria-pressed={cat === k} onClick={() => setCat(k)}>
-                  {l}
-                </button>
-              ))}
-            </div>
-            {fp > 0 && (
-              <label style={{ fontSize: 12, color: 'var(--ink-2)', display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input type="checkbox" checked={showFp} onChange={(e) => setShowFp(e.target.checked)} /> Show {fp} ruled out by AI
-              </label>
-            )}
+            {current && <Detail f={current} id={id} canOpen={hasCode} />}
           </div>
-          {findings.length === 0 ? (
-            <Empty title={running ? 'Scanning…' : detail.findings.length ? 'Nothing matches these filters' : 'Nothing found'}>{running ? 'Findings appear here as each scanner finishes.' : ''}</Empty>
-          ) : (
-            findings.map((f) => <FindingRow key={f.id} f={f} id={id} canOpen={hasCode} />)
-          )}
-        </>
-      )}
+        ))}
     </>
   )
 }
 
-function FindingRow({ f, id, canOpen }: { f: Finding; id: string; canOpen: boolean }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+function Detail({ f, id, canOpen }: { f: Finding; id: string; canOpen: boolean }): React.JSX.Element {
+  const api = window.macsec
   return (
-    <div className="finding" data-fp={f.verdict === 'false-positive'}>
-      <button className="finding-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+    <div className="panel f-detail" key={f.id}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Sev s={f.severity} />
-        <span className="t">{f.title}</span>
-        {f.verdict === 'confirmed' && <span className="sev" data-sev="ok">confirmed</span>}
-        {f.verdict === 'false-positive' && <span className="hint">ruled out</span>}
-        <span className="where">{f.file ? `${f.file}${f.line ? `:${f.line}` : ''}` : f.advisory ?? ''}</span>
-      </button>
-      {open && (
-        <div className="finding-body">
-          <div className="hint">
-            {f.tool}
-            {f.cwe && (
-              <>
-                {' · '}
-                <button className="link" onClick={() => void window.macsec.invoke('app:open-external', `https://cwe.mitre.org/data/definitions/${f.cwe!.replace('CWE-', '')}.html`)}>
-                  {f.cwe}
-                </button>
-              </>
-            )}
-            {f.advisory && ` · ${f.advisory}`}
-            {f.url && /^https:/.test(f.url) && (
-              <>
-                {' · '}
-                <button className="link" onClick={() => void window.macsec.invoke('app:open-external', f.url!)}>
-                  Details <ExternalLink size={10} />
-                </button>
-              </>
-            )}
-            {canOpen && f.file && (
-              <>
-                {' · '}
-                <button className="link" onClick={() => void window.macsec.invoke('sessions:open', id, 'file', f.file, f.line)}>
-                  <FileSearch size={11} /> Open in editor
-                </button>
-              </>
-            )}
-          </div>
-          {f.description && <div>{f.description}</div>}
-          {f.snippet && <pre>{f.snippet}</pre>}
-          {f.fix && (
-            <div className="fix">
-              <strong>Fix:</strong> {f.fix}
-            </div>
-          )}
+        {f.verdict === 'confirmed' && <span className="tag tag-ok">Confirmed by AI</span>}
+        {f.verdict === 'false-positive' && <span className="tag tag-warn">Ruled out by AI</span>}
+      </div>
+      <h3>{f.title}</h3>
+      {(f.file || f.url) && <div className="where">{f.file ? `${f.file}${f.line ? `:${f.line}` : ''}` : f.url}</div>}
+      {f.description && <p>{f.description}</p>}
+      {f.snippet && <pre>{f.snippet}</pre>}
+      {f.fix && (
+        <div className="fix">
+          <b>How to fix</b>
+          {f.fix}
         </div>
       )}
+      <dl className="meta-grid">
+        <dt>Found by</dt>
+        <dd>{f.tool}</dd>
+        {f.cwe && (
+          <>
+            <dt>Weakness</dt>
+            <dd>
+              <button className="link" onClick={() => void api.invoke('app:open-external', `https://cwe.mitre.org/data/definitions/${f.cwe!.replace('CWE-', '')}.html`)}>
+                {f.cwe} <ExternalLink size={11} />
+              </button>
+            </dd>
+          </>
+        )}
+        {f.advisory && (
+          <>
+            <dt>Advisory</dt>
+            <dd>{f.advisory}</dd>
+          </>
+        )}
+      </dl>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {canOpen && f.file && (
+          <button className="btn btn-sm" onClick={() => void api.invoke('sessions:open', id, 'file', f.file, f.line)}>
+            <FileSearch size={13} /> Open in editor
+          </button>
+        )}
+        {f.url && /^https:\/\//.test(f.url) && (
+          <button className="btn btn-sm" onClick={() => void api.invoke('app:open-external', f.url!)}>
+            <ExternalLink size={13} /> {f.category === 'web' || f.category === 'api' ? 'Open page' : 'Details'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }

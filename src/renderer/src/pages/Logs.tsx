@@ -34,7 +34,7 @@ export default function Logs(): React.JSX.Element {
           <Trash2 size={14} /> Clear
         </button>
       </PageHead>
-      <div className="panel log-view">
+      <div className="panel terminal">
         {shown.length === 0 && <span className="hint">Nothing yet.</span>}
         {shown.map((l, i) => (
           <div key={i} className={`l-${l.level}`}>

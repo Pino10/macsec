@@ -1,5 +1,5 @@
-import { CheckCircle2, CircleDashed, Loader2, MinusCircle, XCircle } from 'lucide-react'
-import { SEVERITIES, type Severity, type SessionStep } from '@shared/types'
+import { CheckCircle2, CircleDashed, FileSearch, Globe, Loader2, MinusCircle, Plug, XCircle } from 'lucide-react'
+import { SEVERITIES, type SessionInfo, type Severity, type SessionStep } from '@shared/types'
 
 export function PageHead({ title, desc, children }: { title: string; desc?: string; children?: React.ReactNode }): React.JSX.Element {
   return (
@@ -56,21 +56,43 @@ export function Counts({ counts, empty = 'Nothing found' }: { counts: Record<Sev
   )
 }
 
-export function SevTiles({ counts }: { counts: Record<Severity, number> }): React.JSX.Element {
+/** Severity as one proportional bar, with the counts underneath. */
+export function Spectrum({ counts, legend = true }: { counts: Record<Severity, number>; legend?: boolean }): React.JSX.Element {
+  const total = SEVERITIES.reduce((n, k) => n + counts[k], 0)
   return (
-    <div className="sev-tiles">
-      {SEVERITIES.map((k) => (
-        <div key={k} className="sev-tile glass" data-sev={k} data-zero={counts[k] === 0}>
-          <b>{counts[k]}</b>
-          <span>{k}</span>
+    <div>
+      <div className="spectrum" aria-hidden>
+        {SEVERITIES.filter((k) => counts[k] > 0).map((k) => (
+          <span key={k} data-sev={k} style={{ width: `${(counts[k] / total) * 100}%` }} />
+        ))}
+      </div>
+      {legend && (
+        <div className="spectrum-legend">
+          {SEVERITIES.map((k) => (
+            <div key={k} data-sev={k} data-zero={counts[k] === 0}>
+              <b>{counts[k]}</b>
+              <span>{k}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   )
 }
 
+export function KindIcon({ kind, size = 18 }: { kind: SessionInfo['kind']; size?: number }): React.JSX.Element {
+  const g = kind === 'web-scan' ? '#8b6cff' : kind === 'api-scan' ? '#ff3d7f' : '#38e1ff'
+  return (
+    <span className="glyph" style={{ ['--g' as string]: g, width: size + 20, height: size + 20, borderRadius: 11 }}>
+      {kind === 'web-scan' ? <Globe size={size} /> : kind === 'api-scan' ? <Plug size={size} /> : <FileSearch size={size} />}
+    </span>
+  )
+}
+
+export const kindName = (k: SessionInfo['kind']): string => (k === 'web-scan' ? 'Web scan' : k === 'api-scan' ? 'API security' : 'Code review')
+
 export function StepIcon({ status }: { status: SessionStep['status'] }): React.JSX.Element {
-  if (status === 'running') return <Loader2 size={16} className="spin" style={{ color: 'var(--accent-text)' }} />
+  if (status === 'running') return <Loader2 size={16} className="spin" style={{ color: 'var(--pulse)' }} />
   if (status === 'done') return <CheckCircle2 size={16} style={{ color: 'var(--ok)' }} />
   if (status === 'failed') return <XCircle size={16} style={{ color: 'var(--bad)' }} />
   if (status === 'skipped') return <MinusCircle size={16} style={{ color: 'var(--ink-3)' }} />

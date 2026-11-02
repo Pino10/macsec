@@ -16,6 +16,9 @@ export interface ToolInfo {
   homepage: string
   installed: boolean
   version: string | null
+  /** Newest version published, when known. */
+  latest: string | null
+  updateAvailable: boolean
   /** Installed through another tool (uv), or an app you install yourself (Burp, ZAP). */
   method: 'release' | 'python' | 'app'
   /** Languages or stacks it is used for; empty means all. */
@@ -87,6 +90,51 @@ export interface Finding {
 }
 
 export type Reviewer = 'none' | 'claude' | 'codex' | 'model'
+
+/** How much a scan covers. Every mode only reads: nothing is changed, fuzzed or attacked. */
+export type ScanMode = 'quick' | 'standard' | 'thorough'
+
+export interface LocalSite {
+  name: string
+  url: string
+}
+
+export interface WebScanRequest {
+  target: { kind: 'local'; name: string } | { kind: 'url'; url: string }
+  mode: ScanMode
+  /** You own the target or have written permission to test it. */
+  authorized: boolean
+  /** Extra request headers for scanning behind a login, one "Name: value" per line. */
+  headers?: string
+  reviewer: Reviewer
+}
+
+export interface ApiSpecInfo {
+  id: string
+  name: string
+  format: 'postman' | 'openapi' | 'swagger' | 'har'
+  baseUrl: string
+  endpoints: { method: string; url: string; name?: string }[]
+}
+
+export interface ApiAuth {
+  kind: 'none' | 'bearer' | 'header'
+  value?: string
+  /** For kind header: the header name, e.g. X-API-Key. */
+  header?: string
+}
+
+export interface ApiScanRequest {
+  spec: string
+  baseUrl: string
+  auth: ApiAuth
+  mode: ScanMode
+  authorized: boolean
+  reviewer: Reviewer
+}
+
+
+
 export type ReviewDepth = 'quick' | 'standard' | 'deep'
 export type ReviewFocus = 'security' | 'bugs' | 'all'
 
@@ -110,11 +158,12 @@ export interface SessionStep {
   ms?: number
 }
 
-export type SessionKind = 'code-review' | 'web-scan' | 'api-scan' | 'special'
+export type SessionKind = 'code-review' | 'web-scan' | 'api-scan'
 
 export interface SessionInfo {
   id: string
   kind: SessionKind
+  mode?: ScanMode
   title: string
   target: string
   createdAt: string
@@ -188,10 +237,12 @@ export interface ChatMessage {
 }
 
 export interface AgentInfo {
-  id: 'claude' | 'codex' | 'burp' | 'zap' | 'lmstudio'
+  id: 'claude' | 'codex' | 'burp' | 'lmstudio'
   name: string
   installed: boolean
   path: string | null
+  /** The desktop app, when there is one (Claude, Codex, LM Studio, Burp). */
+  app: string | null
   version: string | null
   /** What it is used for in MacSec. */
   role: string
@@ -241,6 +292,7 @@ export interface Channels {
   'tools:install': { args: [string[]]; result: ToolInfo[] }
   'tools:remove': { args: [string]; result: ToolInfo[] }
   'tools:update-data': { args: []; result: void }
+  'tools:check-updates': { args: []; result: ToolInfo[] }
 
   'projects:local': { args: []; result: LocalProject[] }
   'projects:import': { args: []; result: LocalProject[] | null }
@@ -252,6 +304,11 @@ export interface Channels {
   'azure:projects': { args: [string]; result: AzureProject[] }
 
   'review:start': { args: [ReviewRequest]; result: SessionInfo }
+  'web:sites': { args: []; result: LocalSite[] }
+  'web:start': { args: [WebScanRequest]; result: SessionInfo }
+  'burp:open': { args: []; result: void }
+  'api:load-spec': { args: []; result: ApiSpecInfo | null }
+  'api:start': { args: [ApiScanRequest]; result: SessionInfo }
   'sessions:list': { args: []; result: SessionInfo[] }
   'sessions:get': { args: [string]; result: SessionDetail }
   'sessions:delete': { args: [string]; result: SessionInfo[] }
@@ -262,6 +319,7 @@ export interface Channels {
 
   'ai:agents': { args: []; result: AgentInfo[] }
   'ai:install-agent': { args: ['claude' | 'codex']; result: void }
+  'ai:open-app': { args: ['claude' | 'codex' | 'lmstudio' | 'burp']; result: void }
   'ai:detect': { args: []; result: LocalLlm[] }
   'ai:test': { args: [string, string]; result: LlmTest }
   'ai:servers': { args: []; result: ModelServer[] }
@@ -273,6 +331,7 @@ export interface Channels {
 }
 
 export interface Events {
+  'tools:updates': string[]
   'jobs:changed': JobInfo[]
   'sessions:changed': SessionInfo[]
   'session:updated': SessionInfo

@@ -30,12 +30,19 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 | `src/main/sessions.ts` | Session folders in `~/MacSec/sessions`. |
 | `src/main/projects.ts` | www folder, GitHub and Azure DevOps listing, and cloning with a token. |
 | `src/main/report.ts` | The HTML that becomes the PDF. |
+| `src/main/engine.ts` | Runs tools for any session, stops them, and records each step (`SessionRun`). |
+| `src/main/webscan.ts` | Web scan: httpx, header checks, Katana, the exposed-files check and Nuclei (read-only tags only, see `NOT_READ_ONLY`). |
+| `src/main/apispec.ts`, `src/main/apiscan.ts` | Reading Postman, OpenAPI, Swagger and HAR files, and the API review. |
+| `src/main/aisummary.ts` | The AI summary for web and API scans (it reads the findings only). |
+| `src/renderer/src/macsec.css` | The whole design: colours, glass, controls. `components/ThreatCore.tsx` is the posture orb. |
 | `src/shared/types.ts` | Every message between the window and the main process (`Channels`). |
 | `src/renderer/src/pages/` | One file per page. Styles are in `theme.css`. |
 
 **Adding a scanner:** add it to `CATALOG` in `toolbox.ts`, add a parser in `parse.ts` (with a test using real output), and add it to `planScanners` in `plan.ts`. If its release files are named oddly, add a case to the "picking the right download" tests.
 
 **Adding a Semgrep rule set:** add its `p/...` name in `plan.ts`. If a pack ever disappears, Semgrep falls back to `p/default` on its own.
+
+**Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
 ## Tests
 

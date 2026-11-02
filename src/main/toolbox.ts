@@ -8,7 +8,7 @@
  * templates stay inside MacSec too.
  */
 import { execFile } from 'child_process'
-import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, rmSync } from 'fs'
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { ToolCategory, ToolInfo } from '../shared/types'
 import { dirs } from './paths'
@@ -43,13 +43,6 @@ export const CATALOG: ToolDef[] = [
   { id: 'nuclei', name: 'Nuclei', category: 'web', method: 'release', repo: 'projectdiscovery/nuclei', binaries: ['nuclei'], purpose: 'Runs thousands of community checks for known problems against a site.', homepage: 'https://docs.projectdiscovery.io/tools/nuclei', versionArgs: ['-version'] },
   { id: 'katana', name: 'Katana', category: 'web', method: 'release', repo: 'projectdiscovery/katana', binaries: ['katana'], purpose: 'Crawls a site to find every page, form and endpoint before scanning.', homepage: 'https://docs.projectdiscovery.io/tools/katana', versionArgs: ['-version'] },
   { id: 'httpx', name: 'httpx', category: 'web', method: 'release', repo: 'projectdiscovery/httpx', binaries: ['httpx'], purpose: 'Checks which addresses answer and what they run (server, framework, title).', homepage: 'https://docs.projectdiscovery.io/tools/httpx', versionArgs: ['-version'] },
-  { id: 'ffuf', name: 'ffuf', category: 'web', method: 'release', repo: 'ffuf/ffuf', binaries: ['ffuf'], purpose: 'Finds hidden files, folders and parameters by trying common names.', homepage: 'https://github.com/ffuf/ffuf', versionArgs: ['-V'] },
-  { id: 'dalfox', name: 'Dalfox', category: 'web', method: 'release', repo: 'hahwul/dalfox', binaries: ['dalfox'], purpose: 'Looks for cross-site scripting (XSS) in pages and parameters.', homepage: 'https://dalfox.hahwul.com', versionArgs: ['version'] },
-  { id: 'sqlmap', name: 'sqlmap', category: 'web', method: 'python', pkg: 'sqlmap', binaries: ['sqlmap'], purpose: 'Confirms SQL injection in parameters (aggressive mode only).', homepage: 'https://sqlmap.org' },
-
-  // Apps you install yourself
-  { id: 'zap', name: 'ZAP', category: 'web', method: 'app', apps: ['/Applications/ZAP.app', '/Applications/OWASP ZAP.app'], purpose: 'A full web app scanner and proxy from OWASP. MacSec can drive it when it is installed.', homepage: 'https://www.zaproxy.org/download/' },
-  { id: 'burp', name: 'Burp Suite', category: 'web', method: 'app', apps: ['/Applications/Burp Suite Professional.app', '/Applications/Burp Suite Community Edition.app'], purpose: 'Your manual testing proxy. MacSec sends targets and findings to it.', homepage: 'https://portswigger.net/burp' }
 ]
 
 export const toolDef = (id: string): ToolDef | undefined => CATALOG.find((t) => t.id === id)
@@ -172,6 +165,61 @@ function run(cmd: string, args: string[], env: NodeJS.ProcessEnv, timeout = 15 *
   )
 }
 
+// ---------------------------------------------------------------- Versions and updates
+
+const versionsFile = (): string => join(dirs.tools(), 'versions.json')
+function installedTags(): Record<string, string> {
+  try {
+    return JSON.parse(readFileSync(versionsFile(), 'utf8')) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+function recordTag(id: string, tag: string | null): void {
+  const all = installedTags()
+  if (tag) all[id] = tag.replace(/^v/, '')
+  else delete all[id]
+  writeFileSync(versionsFile(), JSON.stringify(all, null, 2))
+}
+
+/** Newest versions seen, so the Tools page can offer updates. Kept in tools/latest.json. */
+const latestFile = (): string => join(dirs.tools(), 'latest.json')
+function latestSeen(): { at: number; v: Record<string, string> } {
+  try {
+    return JSON.parse(readFileSync(latestFile(), 'utf8')) as { at: number; v: Record<string, string> }
+  } catch {
+    return { at: 0, v: {} }
+  }
+}
+
+export function newer(a: string, b: string): boolean {
+  const pa = a.replace(/^v/, '').split(/[.-]/).map((x) => parseInt(x, 10) || 0)
+  const pb = b.replace(/^v/, '').split(/[.-]/).map((x) => parseInt(x, 10) || 0)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0)
+  return false
+}
+
+/** Asks GitHub and PyPI for each installed tool's newest version. */
+export async function checkUpdates(): Promise<void> {
+  const v: Record<string, string> = {}
+  await Promise.allSettled(
+    CATALOG.filter((t) => t.method !== 'app' && isInstalled(t)).map(async (t) => {
+      if (t.method === 'release') v[t.id] = (await latestRelease(t.repo)).tag.replace(/^v/, '')
+      else if (t.method === 'python') {
+        const r = await fetch(`https://pypi.org/pypi/${t.pkg}/json`, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(15000) })
+        if (r.ok) v[t.id] = ((await r.json()) as { info: { version: string } }).info.version
+      }
+    })
+  )
+  writeFileSync(latestFile(), JSON.stringify({ at: Date.now(), v }, null, 2))
+}
+
+/** Checks at most once a day. */
+export async function checkUpdatesDaily(): Promise<string[]> {
+  if (Date.now() - latestSeen().at > 24 * 3600 * 1000) await checkUpdates().catch(() => undefined)
+  return (await listTools()).filter((t) => t.updateAvailable).map((t) => t.name)
+}
+
 async function installRelease(t: Extract<ToolDef, { method: 'release' }>, update: (p: number | null, l?: string) => void): Promise<void> {
   const rel = await latestRelease(t.repo)
   const asset = pickAsset(rel.assets)
@@ -204,13 +252,15 @@ async function installRelease(t: Extract<ToolDef, { method: 'release' }>, update
   }
   rmSync(staging, { recursive: true, force: true })
   rmSync(archive, { force: true })
+  recordTag(t.id, rel.tag)
 }
 
 async function installPython(t: Extract<ToolDef, { method: 'python' }>, update: (p: number | null, l?: string) => void): Promise<void> {
   if (!existsSync(toolPath('uv'))) await installTool('uv', update)
   update(null, `Installing ${t.name}`)
   const spec = t.with?.[0] ?? t.pkg
-  await run(toolPath('uv'), ['tool', 'install', '--force', '--python', '3.12', spec], uvEnv())
+  // --force reinstalls with the newest release, which is also how an update happens.
+  await run(toolPath('uv'), ['tool', 'install', '--force', '--upgrade', '--python', '3.12', spec], uvEnv())
 }
 
 export async function installTool(id: string, update: (p: number | null, l?: string) => void): Promise<void> {
@@ -221,6 +271,7 @@ export async function installTool(id: string, update: (p: number | null, l?: str
   mkdirSync(join(dirs.toolHome(), 'tmp'), { recursive: true })
   if (t.method === 'release') await installRelease(t, update)
   else await installPython(t, update)
+  versions.delete(t.id)
   log('info', `Installed ${t.name}${(await toolVersion(t)) ? ` ${await toolVersion(t)}` : ''}`)
 }
 
@@ -229,6 +280,8 @@ export async function removeTool(id: string): Promise<void> {
   if (!t || t.method === 'app') return
   if (t.method === 'python' && existsSync(toolPath('uv'))) await run(toolPath('uv'), ['tool', 'uninstall', t.pkg], uvEnv()).catch(() => undefined)
   for (const b of t.binaries) rmSync(toolPath(b), { force: true })
+  recordTag(t.id, null)
+  versions.delete(t.id)
   log('info', `Removed ${t.name}`)
 }
 
@@ -250,8 +303,13 @@ export function toolVersion(t: ToolDef): Promise<string | null> {
 }
 
 export async function listTools(): Promise<ToolInfo[]> {
+  const latest = latestSeen().v
+  const tags = installedTags()
   return Promise.all(
-    CATALOG.map(async (t) => ({
+    CATALOG.map(async (t) => {
+      const version = versions.get(t.id) ?? (await toolVersion(t)) ?? tags[t.id] ?? null
+      const have = tags[t.id] ?? version
+      return {
       id: t.id,
       name: t.name,
       category: t.category,
@@ -260,8 +318,11 @@ export async function listTools(): Promise<ToolInfo[]> {
       method: t.method,
       languages: t.languages ?? [],
       installed: isInstalled(t),
-      version: versions.get(t.id) ?? (await toolVersion(t))
-    }))
+      version,
+      latest: latest[t.id] ?? null,
+      updateAvailable: isInstalled(t) && !!have && !!latest[t.id] && newer(latest[t.id], have)
+      }
+    })
   )
 }
 

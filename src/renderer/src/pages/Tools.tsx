@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
+import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
 import type { AgentInfo, LocalLlm, ToolCategory, ToolInfo } from '@shared/types'
 import { useApp } from '../store'
 import { PageHead } from '../ui'
@@ -8,7 +8,7 @@ const GROUPS: { id: ToolCategory; title: string; icon: React.ReactNode }[] = [
   { id: 'code', title: 'Code', icon: <Shield size={18} /> },
   { id: 'secrets', title: 'Keys and passwords', icon: <KeyRound size={18} /> },
   { id: 'deps', title: 'Packages and configuration', icon: <Package size={18} /> },
-  { id: 'web', title: 'Web (for Web scan, coming next)', icon: <Globe2 size={18} /> },
+  { id: 'web', title: 'Web and API', icon: <Globe2 size={18} /> },
   { id: 'runtime', title: 'Helpers', icon: <Wrench size={18} /> }
 ]
 
@@ -31,7 +31,8 @@ export default function Tools(): React.JSX.Element {
     const r = await act(key, () => api.invoke('tools:install', ids))
     if (r) setTools(r)
   }
-  const missing = tools.filter((t) => !t.installed && t.method !== 'app' && t.category !== 'web')
+  const missing = tools.filter((t) => !t.installed && t.method !== 'app')
+  const outdated = tools.filter((t) => t.updateAvailable)
   const allModels = (llms ?? []).flatMap((l) => l.models.map((m) => ({ server: l, model: m })))
   const chosen = settings?.llm
 
@@ -41,35 +42,70 @@ export default function Tools(): React.JSX.Element {
         <button className="btn" onClick={() => void api.invoke('app:open-folder', 'tools')}>
           <FolderOpen size={14} /> Open tools folder
         </button>
-        <button className="btn" disabled={busy.has('data')} onClick={() => void act('data', () => api.invoke('tools:update-data')).then(() => notify({ kind: 'info', text: 'Scanner databases are up to date.' }))}>
-          <RefreshCw size={14} /> Update databases
+        <button
+          className="btn"
+          disabled={busy.has('check')}
+          onClick={async () => {
+            const r = await act('check', () => api.invoke('tools:check-updates'))
+            if (r) {
+              setTools(r)
+              const n = r.filter((t) => t.updateAvailable).length
+              notify({ kind: 'info', text: n ? `${n} ${n === 1 ? 'tool has' : 'tools have'} a newer version.` : 'Every tool is up to date.' })
+            }
+          }}
+        >
+          <RefreshCw size={14} className={busy.has('check') ? 'spin' : undefined} /> Check for updates
         </button>
         <button className="btn btn-primary" disabled={missing.length === 0 || busy.has('all')} onClick={() => install(['uv', ...missing.map((t) => t.id)], 'all')}>
           <Download size={14} /> {missing.length === 0 ? 'All installed' : busy.has('all') ? 'Installing…' : `Install ${missing.length} missing`}
         </button>
       </PageHead>
 
+      {outdated.length > 0 && (
+        <div className="notice info">
+          <ArrowUpCircle size={17} style={{ color: 'var(--ion)', flexShrink: 0 }} />
+          <span className="grow">
+            Newer versions: {outdated.map((t) => `${t.name} ${t.latest}`).join(', ')}. Updating downloads them the same way, checked against their checksums, and refreshes the scanner databases.
+          </span>
+          <button
+            className="btn btn-sm btn-primary"
+            disabled={busy.has('upd')}
+            onClick={async () => {
+              const r = await act('upd', () => api.invoke('tools:install', outdated.map((t) => t.id)))
+              if (r) setTools(r)
+              await act('data', () => api.invoke('tools:update-data'))
+            }}
+          >
+            {busy.has('upd') ? 'Updating…' : `Update ${outdated.length}`}
+          </button>
+        </div>
+      )}
+
       <h2 className="section-title" style={{ marginTop: 6 }}>
-        AI reviewers
+        AI and your apps
       </h2>
       <div className="panel">
         {agents.map((a) => (
-          <div key={a.id} className="tool-card" data-installed={a.installed}>
-            <span className="tool-icon">{a.id === 'claude' ? <Sparkles size={18} /> : a.id === 'codex' ? <Bot size={18} /> : a.id === 'lmstudio' ? <Cpu size={18} /> : <Terminal size={18} />}</span>
+          <div key={a.id} className="arsenal-row" data-on={a.installed || !!a.app}>
+            <span className="glyph" style={{ ['--g' as string]: a.id === 'claude' ? '#38e1ff' : a.id === 'codex' ? '#8b6cff' : a.id === 'burp' ? '#ff8a3d' : '#3ef0a8' }}>{a.id === 'claude' ? <Sparkles size={18} /> : a.id === 'codex' ? <Bot size={18} /> : a.id === 'lmstudio' ? <Cpu size={18} /> : <Terminal size={18} />}</span>
             <div>
               <div className="row-title">
-                {a.name} {a.installed && <span className="tag tag-ok">{a.version ?? 'Installed'}</span>}
+                {a.name} {a.installed && <span className="tag tag-ok">{a.version ? `CLI ${a.version}` : 'Installed'}</span>} {a.app && (a.id === 'claude' || a.id === 'codex') && <span className="tag tag-ion">Desktop app</span>}
               </div>
               <div className="row-sub">{a.role}</div>
             </div>
-            {a.installed ? (
+            {a.installed && a.app ? (
+              <button className="btn btn-sm" onClick={() => void act('open-app', () => api.invoke('ai:open-app', a.id))}>
+                Open
+              </button>
+            ) : a.installed ? (
               <Check size={16} style={{ color: 'var(--ok)' }} />
             ) : a.id === 'claude' || a.id === 'codex' ? (
               <button className="btn btn-sm" onClick={() => void act('agent', () => api.invoke('ai:install-agent', a.id as 'claude' | 'codex')).then(() => notify({ kind: 'info', text: `Terminal is installing ${a.name}. Run it once there to sign in, then come back.` }))}>
-                <Download size={13} /> Install
+                <Download size={13} /> {a.app ? 'Add the CLI' : 'Install'}
               </button>
             ) : (
-              <button className="btn btn-sm" onClick={() => void api.invoke('app:open-external', a.id === 'burp' ? 'https://portswigger.net/burp/releases' : a.id === 'zap' ? 'https://www.zaproxy.org/download/' : 'https://lmstudio.ai')}>
+              <button className="btn btn-sm" onClick={() => void api.invoke('app:open-external', a.id === 'burp' ? 'https://portswigger.net/burp/releases' : 'https://lmstudio.ai')}>
                 Get it <ExternalLink size={12} />
               </button>
             )}
@@ -141,11 +177,11 @@ export default function Tools(): React.JSX.Element {
 
 function ToolRow({ t, icon, onInstall, onRemove, busy }: { t: ToolInfo; icon: React.ReactNode; onInstall: () => void; onRemove: () => void; busy: boolean }): React.JSX.Element {
   return (
-    <div className="tool-card" data-installed={t.installed}>
-      <span className="tool-icon">{icon}</span>
+    <div className="arsenal-row" data-on={t.installed}>
+      <span className="glyph">{icon}</span>
       <div style={{ minWidth: 0 }}>
         <div className="row-title">
-          {t.name} {t.installed && <span className="tag tag-ok">{t.version ?? 'Installed'}</span>}
+          {t.name} {t.installed && <span className="tag tag-ok">{t.version ?? 'Installed'}</span>} {t.updateAvailable && <span className="tag tag-ion">{t.latest} available</span>}
           {t.languages.length > 0 && <span className="hint" style={{ marginLeft: 6 }}>{t.languages.join(', ')}</span>}
         </div>
         <div className="row-sub">{t.purpose}</div>
@@ -160,6 +196,10 @@ function ToolRow({ t, icon, onInstall, onRemove, busy }: { t: ToolInfo; icon: Re
               Get it
             </button>
           )
+        ) : t.installed && t.updateAvailable ? (
+          <button className="btn btn-sm" disabled={busy} onClick={onInstall}>
+            <ArrowUpCircle size={13} /> {busy ? 'Updating…' : 'Update'}
+          </button>
         ) : t.installed ? (
           <button className="icon-btn danger-text" data-tip="Remove" aria-label={`Remove ${t.name}`} onClick={onRemove}>
             <Trash2 />

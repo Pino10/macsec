@@ -6,7 +6,7 @@ export interface Toast {
   text: string
 }
 
-export type Page = 'overview' | 'projects' | 'review' | 'sessions' | 'tools' | 'logs' | 'settings'
+export type Page = 'overview' | 'projects' | 'review' | 'web' | 'api' | 'sessions' | 'tools' | 'logs' | 'settings'
 
 interface AppCtx {
   page: Page
@@ -26,6 +26,8 @@ interface AppCtx {
   tools: ToolInfo[]
   setTools: (t: ToolInfo[]) => void
   jobs: JobInfo[]
+  /** Tool names with a newer version, found by the daily check. */
+  updates: string[]
   toast: Toast | null
   busy: Set<string>
   act: <T>(key: string, fn: () => Promise<T>) => Promise<T | undefined>
@@ -52,6 +54,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [tools, setTools] = useState<ToolInfo[]>([])
   const [jobs, setJobs] = useState<JobInfo[]>([])
+  const [updates, setUpdates] = useState<string[]>([])
   const [toast, setToast] = useState<Toast | null>(null)
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -98,9 +101,15 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     void api().invoke('app:info').then(setAppInfo)
     void api().invoke('settings:get').then(setSettings)
     void api().invoke('sessions:list').then(setSessions)
-    void api().invoke('tools:list').then(setTools)
+    void api()
+      .invoke('tools:list')
+      .then((t) => {
+        setTools(t)
+        setUpdates(t.filter((x) => x.updateAvailable).map((x) => x.name))
+      })
     const offs = [
       api().on('jobs:changed', setJobs),
+      api().on('tools:updates', setUpdates),
       api().on('session:updated', (s) =>
         setSessions((list) => {
           const i = list.findIndex((x) => x.id === s.id)
@@ -121,8 +130,8 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   }, [running])
 
   const value = useMemo<AppCtx>(
-    () => ({ page, setPage, openSession, showSession, preset, setPreset, appInfo, settings, updateSettings, setSettings, sessions, setSessions, tools, setTools, jobs, toast, busy, act, notify }),
-    [page, setPage, openSession, showSession, preset, appInfo, settings, updateSettings, sessions, tools, jobs, toast, busy, act, notify]
+    () => ({ page, setPage, openSession, showSession, preset, setPreset, appInfo, settings, updateSettings, setSettings, sessions, setSessions, tools, setTools, jobs, updates, toast, busy, act, notify }),
+    [page, setPage, openSession, showSession, preset, appInfo, settings, updateSettings, sessions, tools, jobs, updates, toast, busy, act, notify]
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

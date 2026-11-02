@@ -45,15 +45,56 @@ export function findCli(name: string): string | null {
   return shellFound?.map.get(name) ?? null
 }
 
-const APPS: Record<'burp' | 'zap' | 'lmstudio', string[]> = {
-  burp: ['Burp Suite Professional.app', 'Burp Suite Community Edition.app'],
-  zap: ['ZAP.app', 'OWASP ZAP.app'],
-  lmstudio: ['LM Studio.app']
+const APPS = {
+  burp: /^Burp Suite( Professional| Community Edition| Enterprise.*)?\.app$/i,
+  lmstudio: /^LM Studio\.app$/i,
+  claudeApp: /^Claude\.app$/i,
+  codexApp: /^Codex\.app$/i
+}
+const SPOTLIGHT: Record<keyof typeof APPS, string> = {
+  burp: "kMDItemFSName == 'Burp Suite*.app'c",
+  lmstudio: "kMDItemFSName == 'LM Studio.app'",
+  claudeApp: "kMDItemCFBundleIdentifier == 'com.anthropic.claudefordesktop'",
+  codexApp: "kMDItemFSName == 'Codex.app'"
 }
 
+const found = new Map<string, string | null>()
+
+/** Looks in the Applications folders, then asks Spotlight (apps can live anywhere). */
 export function findApp(id: keyof typeof APPS): string | null {
-  for (const dir of ['/Applications', join(homedir(), 'Applications')]) for (const a of APPS[id]) if (existsSync(join(dir, a))) return join(dir, a)
-  return null
+  for (const dir of ['/Applications', join(homedir(), 'Applications'), '/Applications/Utilities']) {
+    try {
+      const hit = readdirSync(dir).find((n) => APPS[id].test(n))
+      if (hit) return join(dir, hit)
+    } catch {
+      /* folder missing */
+    }
+  }
+  return found.get(id) ?? null
+}
+
+export function refreshApps(): Promise<void> {
+  return Promise.all(
+    (Object.keys(APPS) as (keyof typeof APPS)[]).map(
+      (id) =>
+        new Promise<void>((resolve) =>
+          execFile('mdfind', [SPOTLIGHT[id]], { timeout: 5000 }, (_e, out) => {
+            const hit = String(out ?? '')
+              .split('\n')
+              .find((p) => p.endsWith('.app') && !p.includes('/Trash/') && existsSync(p))
+            found.set(id, hit ?? null)
+            resolve()
+          })
+        )
+    )
+  ).then(() => undefined)
+}
+
+/** Opens Burp Suite (or brings it forward). */
+export function openBurp(): Promise<void> {
+  const app = findApp('burp')
+  if (!app) return Promise.reject(new Error('Burp Suite was not found on this Mac.'))
+  return new Promise((resolve, reject) => execFile('open', [app], (e) => (e ? reject(e) : resolve())))
 }
 
 function version(bin: string): Promise<string | null> {
@@ -67,15 +108,36 @@ export function agentEnv(): NodeJS.ProcessEnv {
 }
 
 export async function listAgents(): Promise<AgentInfo[]> {
-  await refreshShellPaths()
+  await Promise.all([refreshShellPaths(), refreshApps()])
   const claude = findCli('claude')
   const codex = findCli('codex')
+  const claudeApp = findApp('claudeApp')
+  const burp = findApp('burp')
   return [
-    { id: 'claude', name: 'Claude Code', installed: !!claude, path: claude, version: claude ? await version(claude) : null, role: 'Reads your whole project in read-only mode and writes the review. Continue any session in Terminal or on the web.' },
-    { id: 'codex', name: 'Codex', installed: !!codex, path: codex, version: codex ? await version(codex) : null, role: 'OpenAI’s coding agent, as a second reviewer in a read-only sandbox.' },
-    { id: 'lmstudio', name: 'LM Studio', installed: !!findApp('lmstudio'), path: findApp('lmstudio'), version: null, role: 'Your own models on this Mac. Nothing leaves your computer.' },
-    { id: 'burp', name: 'Burp Suite', installed: !!findApp('burp'), path: findApp('burp'), version: null, role: 'For hands-on testing: MacSec opens findings and targets in it.' },
-    { id: 'zap', name: 'ZAP', installed: !!findApp('zap'), path: findApp('zap'), version: null, role: 'OWASP’s web scanner. Web scan can use it for a full active scan.' }
+    {
+      id: 'claude',
+      name: 'Claude Code',
+      installed: !!claude,
+      path: claude,
+      version: claude ? await version(claude) : null,
+      app: claudeApp,
+      role: claude
+        ? 'Reviews your whole project in read-only mode. Sessions continue in Terminal, the Claude app, or on the web.'
+        : claudeApp
+          ? 'The Claude desktop app is installed. Reviews also need Claude Code’s command line tool: install it once, and it uses the same account.'
+          : 'Reviews your whole project in read-only mode.'
+    },
+    { id: 'codex', name: 'Codex', installed: !!codex, path: codex, version: codex ? await version(codex) : null, app: findApp('codexApp'), role: 'OpenAI’s coding agent, as a second reviewer in a read-only sandbox.' },
+    { id: 'lmstudio', name: 'LM Studio', installed: !!findApp('lmstudio'), path: findApp('lmstudio'), version: null, app: findApp('lmstudio'), role: 'Your own models on this Mac. Nothing leaves your computer.' },
+    {
+      id: 'burp',
+      name: burp && /Professional/i.test(burp) ? 'Burp Suite Professional' : 'Burp Suite',
+      installed: !!burp,
+      path: burp,
+      version: null,
+      app: burp,
+      role: 'For hands-on testing. Open any web or API finding in Burp to look closer.'
+    }
   ]
 }
 

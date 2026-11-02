@@ -2,9 +2,9 @@
 
 <h1 align="center">MacSec</h1>
 
-<p align="center">A free security workbench for macOS. Deep code review with every free scanner that fits your code, an AI reviewer that checks their work, and a report you can come back to.</p>
+<p align="center">A free security engine for macOS. Deep code review, read-only web and API scans, and an AI reviewer that checks the results, with every test kept as a session you can come back to.</p>
 
-<p align="center"><img src="docs/session.png" width="860" alt="A code review session in MacSec"></p>
+<p align="center"><img src="docs/overview.png" width="860" alt="MacSec Overview with the threat core"></p>
 
 ## What it does
 
@@ -15,8 +15,12 @@
   - **Bandit** (Python) and **gosec** (Go)
   - **Gitleaks** and **TruffleHog** for keys and passwords, in files and (Deep) the whole Git history
   - **OSV-Scanner** and **Trivy** for known flaws in packages, and risky Docker, Kubernetes and Terraform settings
+- **Web scan.** Fingerprints a site, checks its security headers, cookies and HTTPS, maps its pages with Katana, looks for files that should never be public (`.env`, `.git`, backups, phpinfo, logs), and runs every read-only Nuclei check. Quick, Standard and Thorough modes. Scans behind a login with your own cookie or token.
+- **API security.** Load a Postman collection, OpenAPI or Swagger file, or a HAR recording. MacSec reviews what the file says (endpoints with no sign-in, secrets in addresses, real keys saved in examples or the collection, plain HTTP), then makes ordinary GET requests signed in as you to see what comes back: open cross-origin access, sensitive fields, error pages that reveal internals, missing headers.
 - **An AI reviewer.** Claude Code, Codex or your own model in LM Studio reads the code, marks each scanner finding as real or a false alarm, and hunts for what scanners cannot see: missing authorization, IDOR, business logic flaws, unsafe flows across files.
 - **Sessions.** Every review is kept with its findings, the AI's write-up and each scanner's raw output. Export it as a PDF, or **Continue in Claude Code** to fix the findings (with Remote Control on, so you can carry on at claude.ai/code or on your phone).
+- **Tools stay current.** MacSec checks once a day for newer versions of every scanner and updates them with one button, checked against their published checksums. Nuclei's checks and Trivy's database refresh on their own.
+- **Your apps.** It finds Claude Code (command line and desktop app), Codex, LM Studio and Burp Suite Professional wherever they are installed, and opens Burp for hands-on testing.
 - **One folder, nothing scattered.** Everything lives in `~/MacSec`. Scanners run with a private home folder inside it, so their caches, databases and templates never land in `~/.config`, `~/Library/Caches` or anywhere else.
 
 ## Install
@@ -45,6 +49,8 @@ Then open **Tools** and press **Install missing**. Each scanner is downloaded fr
 - TruffleHog runs without verification, so keys it finds are never sent to their providers.
 - Scanners run with telemetry off.
 - Claude Code and Codex run read-only (Claude Code in plan mode with only Read, Grep and Glob; Codex in its read-only sandbox), and Claude Code's review session is not saved.
+
+- Web and API scans only read. Nothing is fuzzed, brute-forced, exploited or changed; Nuclei's intrusive, fuzzing and denial-of-service checks are always left out, and requests are slow. Anything not on your Mac needs your confirmation that you own it or may test it. For hands-on testing, use Burp Suite.
 
 Use MacSec only on code and systems you own or are allowed to test.
 
