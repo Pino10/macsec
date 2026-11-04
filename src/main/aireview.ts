@@ -7,6 +7,7 @@
  * Claude Code and Codex run read-only in the project and are not saved as sessions of their own.
  * A local model (LM Studio) reads the riskiest files in parts.
  */
+import { ensureLmContext } from './seckit/lmstudio'
 import { spawn, type ChildProcess } from 'child_process'
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -85,7 +86,7 @@ export function reviewPrompt(name: string, focus: ReviewFocus, depth: ReviewDept
     depth === 'deep' ? 'This is a deep review: read every entry point and follow the data through the code. Take the time you need.' : depth === 'quick' ? 'This is a quick review: concentrate on the most exposed code (routes, auth, database access, uploads).' : '',
     CHECKLIST,
     scannerBrief(findings),
-    'Use your security-code-review, secrets-triage, dependency-triage and security-report skills if they are available.',
+    'Use your security skills if they are available: start with review-vectors to plan which areas apply, then security-code-review and every vector skill that applies (api-security-review, auth-session-review, injection-catalog, client-side-review, business-logic-review, infra-config-review, supply-chain-review, cloud-baas-review, ai-app-review, electron-review, privacy-data-review), then secrets-triage, dependency-triage and security-report. Say which areas were not applicable.',
     'Do not modify any file. Do not run anything.',
     OUTPUT
   ]
@@ -176,7 +177,11 @@ export async function reviewWithClaude(root: string, prompt: string, depth: Revi
   if (!bin) throw new Error('Claude Code’s command line tool is not installed (the Claude desktop app is separate). Install it on the Tools page.')
   // With a local model, Claude Code talks to LM Studio's Anthropic-compatible API instead of Anthropic.
   const env = local ? localModelEnv(local) : {}
-  const method = local ? `\n\nFollow this method:\n${skillText(['security-code-review', 'local-model-review', 'security-report'])}` : ''
+  const method = local ? `\n\nFollow this method:\n${skillText(['review-vectors', 'security-code-review', 'local-model-review', 'security-report'])}` : ''
+  if (local) {
+    const ctx = await ensureLmContext(local.baseUrl, local.model, local.token)
+    if (!ctx.ok) throw new Error(ctx.note)
+  }
   const base = ['-p', prompt + method, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', ...(local ? ['--model', local.model] : []), ...pluginArgs()]
   const keep = session ? ['--session-id', session.id, '--name', session.name] : ['--no-session-persistence']
   let r = await runCli(bin, [...base, ...keep], root, onChild, (local ? 2 : 1) * TIMEOUT[depth] * 60_000, onActivity, env)
@@ -194,7 +199,7 @@ export async function reviewWithClaude(root: string, prompt: string, depth: Revi
 export async function reviewWithGemini(root: string, prompt: string, depth: ReviewDepth, onChild: (c: ChildProcess) => void, onActivity: () => void): Promise<AiResult> {
   const bin = findCli('gemini')
   if (!bin) throw new Error('Gemini CLI is not installed (npm install -g @google/gemini-cli), then run gemini once to sign in.')
-  const r = await runCli(bin, ['-p', `${prompt}\n\nFollow this method:\n${skillText(['security-code-review', 'secrets-triage', 'security-report'])}`, '--approval-mode', 'plan', '--skip-trust', '--output-format', 'text'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
+  const r = await runCli(bin, ['-p', `${prompt}\n\nFollow this method:\n${skillText(['review-vectors', 'security-code-review', 'api-security-review', 'auth-session-review', 'injection-catalog', 'client-side-review', 'business-logic-review', 'infra-config-review', 'supply-chain-review', 'cloud-baas-review', 'secrets-triage', 'security-report'])}`, '--approval-mode', 'plan', '--skip-trust', '--output-format', 'text'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
   if (!r.out.trim()) throw new Error(explainFailure('gemini', r.err))
   return parseAiOutput(r.out, 'Gemini CLI')
 }

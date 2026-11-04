@@ -6,7 +6,7 @@ import { existsSync, readdirSync, statSync } from 'fs'
 import { extname, join } from 'path'
 import type { Finding, ReviewDepth } from '../../shared/types'
 import { dirs } from '../paths'
-import { parseBandit, parseBearer, parseGitleaks, parseGosec, parseOsv, parseSemgrep, parseTrivy, parseTrufflehog } from './parse'
+import { parseBandit, parseBearer, parseGitleaks, parseGosec, parseHadolint, parseZizmor, parseOsv, parseSemgrep, parseTrivy, parseTrufflehog } from './parse'
 
 export const SKIP_DIRS = new Set(['node_modules', 'vendor', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', 'target', 'bin', 'obj', '.venv', 'venv', '__pycache__', '.idea', '.vscode', 'coverage', 'Pods', 'DerivedData', '.turbo', '.cache', 'storage', 'bower_components'])
 
@@ -61,6 +61,34 @@ export function projectStats(root: string): ProjectStats {
     git: existsSync(join(root, '.git')),
     manifests: [...manifests]
   }
+}
+
+/** Dockerfiles in a project, as paths relative to it (Dockerfile, Containerfile, *.Dockerfile). */
+export function findDockerfiles(root: string): string[] {
+  const out: string[] = []
+  const walk = (dir: string, depth: number): void => {
+    if (depth > 6 || out.length >= 30) return
+    let names: string[] = []
+    try {
+      names = readdirSync(dir)
+    } catch {
+      return
+    }
+    for (const n of names) {
+      const p = join(dir, n)
+      let st
+      try {
+        st = statSync(p)
+      } catch {
+        continue
+      }
+      if (st.isDirectory()) {
+        if (!SKIP_DIRS.has(n) && !n.startsWith('.')) walk(p, depth + 1)
+      } else if (/^(Dockerfile|Containerfile)(\..+)?$|\.(Dockerfile|dockerfile)$/.test(n)) out.push(p.slice(root.length + 1))
+    }
+  }
+  walk(root, 0)
+  return out
 }
 
 export interface ScannerRun {
@@ -122,6 +150,15 @@ export function planScanners(root: string, stats: ProjectStats, depth: ReviewDep
   }
   if (has('Go')) {
     runs.push({ id: 'gosec', tool: 'gosec', label: 'gosec: Go checks', bin: 'gosec', args: ['-fmt', 'json', '-out', join(out, 'gosec.json'), '-no-fail', '-quiet', './...'], output: join(out, 'gosec.json'), parse: parseGosec, timeoutMs: 15 * min })
+  }
+
+  // CI workflows and Dockerfiles: their own checks, offline.
+  if (existsSync(join(root, '.github', 'workflows'))) {
+    runs.push({ id: 'zizmor', tool: 'zizmor', label: 'zizmor: GitHub Actions workflows', bin: 'zizmor', args: ['--offline', '--format', 'json', '--no-exit-codes', '.'], parse: parseZizmor, timeoutMs: 5 * min })
+  }
+  const dockerfiles = findDockerfiles(root)
+  if (dockerfiles.length) {
+    runs.push({ id: 'hadolint', tool: 'Hadolint', label: `Hadolint: ${dockerfiles.length} Dockerfile${dockerfiles.length === 1 ? '' : 's'}`, bin: 'hadolint', args: ['-f', 'json', '--no-fail', ...dockerfiles], parse: parseHadolint, timeoutMs: 5 * min })
   }
 
   // Secrets: the files now, and in Deep, every commit.

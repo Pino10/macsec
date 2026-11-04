@@ -142,6 +142,52 @@ export function parseGosec(text: string, root: string): Finding[] {
   )
 }
 
+// ---------------------------------------------------------------- zizmor (GitHub Actions)
+
+export function parseZizmor(text: string, root: string): Finding[] {
+  type Loc = { symbolic?: { key?: { Local?: { verbatim_path?: string } }; annotation?: string; kind?: string }; concrete?: { location?: { start_point?: { row?: number } }; feature?: string } }
+  type R = { ident: string; desc: string; url?: string; determinations?: { confidence?: string; severity?: string }; locations?: Loc[]; ignored?: boolean }
+  return (json<R[]>(text) ?? [])
+    .filter((r) => !r.ignored)
+    .map((r) => {
+      const primary = r.locations?.find((l) => l.symbolic?.kind === 'Primary') ?? r.locations?.[0]
+      let s = sev(r.determinations?.severity)
+      // Low-confidence results drop a level, like Bandit's.
+      if (r.determinations?.confidence === 'Low' && s !== 'info') s = s === 'critical' ? 'high' : s === 'high' ? 'medium' : s === 'medium' ? 'low' : s
+      const row = primary?.concrete?.location?.start_point?.row
+      return mk('zizmor', 'config', {
+        severity: s,
+        title: `${r.desc} (${r.ident})`,
+        file: rel(root, primary?.symbolic?.key?.Local?.verbatim_path),
+        line: row !== undefined ? row + 1 : undefined,
+        description: primary?.symbolic?.annotation,
+        snippet: primary?.concrete?.feature?.slice(0, 600),
+        url: r.url
+      })
+    })
+}
+
+// ---------------------------------------------------------------- Hadolint (Dockerfiles)
+
+/** Hadolint rules that matter for security, rated higher than its style advice. */
+const HADOLINT_SECURITY: Record<string, Severity> = { DL3002: 'high', DL3004: 'medium', DL3007: 'low', DL3006: 'low', DL3020: 'low', DL4006: 'low', DL3008: 'low', DL3013: 'low', DL3016: 'low', DL3018: 'low', DL3028: 'low' }
+
+export function parseHadolint(text: string, root: string): Finding[] {
+  type R = { code: string; column?: number; file: string; level: string; line: number; message: string }
+  return (json<R[]>(text) ?? [])
+    .filter((r) => r.level !== 'style' && (r.level === 'error' || r.level === 'warning' || HADOLINT_SECURITY[r.code]))
+    .map((r) =>
+      mk('Hadolint', 'config', {
+        severity: HADOLINT_SECURITY[r.code] ?? (r.level === 'error' ? 'medium' : 'low'),
+        title: `${r.message.split('. ')[0].slice(0, 140)} (${r.code})`,
+        file: rel(root, r.file),
+        line: r.line,
+        description: r.message,
+        url: /^DL\d+$/.test(r.code) ? `https://github.com/hadolint/hadolint/wiki/${r.code}` : undefined
+      })
+    )
+}
+
 // ---------------------------------------------------------------- Secrets
 
 /** Which kinds of secret matter most. */

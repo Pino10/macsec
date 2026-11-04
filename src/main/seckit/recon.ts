@@ -117,6 +117,43 @@ export function parseCrtSh(json: string, domain: string): string[] {
   return [...names].sort()
 }
 
+/** More free passive sources. None of them contacts the target; each needs no account. */
+export const PASSIVE_SOURCES: { id: string; name: string; url: (d: string) => string }[] = [
+  { id: 'certspotter', name: 'CertSpotter', url: (d) => `https://api.certspotter.com/v1/issuances?domain=${encodeURIComponent(d)}&include_subdomains=true&expand=dns_names` },
+  { id: 'otx', name: 'AlienVault OTX', url: (d) => `https://otx.alienvault.com/api/v1/indicators/domain/${encodeURIComponent(d)}/passive_dns` },
+  { id: 'hackertarget', name: 'HackerTarget', url: (d) => `https://api.hackertarget.com/hostsearch/?q=${encodeURIComponent(d)}` },
+  { id: 'urlscan', name: 'urlscan.io', url: (d) => `https://urlscan.io/api/v1/search/?q=domain:${encodeURIComponent(d)}&size=200` },
+  { id: 'anubis', name: 'Anubis', url: (d) => `https://jldc.me/anubis/subdomains/${encodeURIComponent(d)}` }
+]
+
+/** Host names from one passive source's answer, only those inside the domain. */
+export function parsePassive(id: string, text: string, domain: string): string[] {
+  const names = new Set<string>()
+  const add = (n: unknown): void => {
+    if (typeof n !== 'string') return
+    const h = n.trim().toLowerCase().replace(/^\*\./, '').replace(/\.$/, '')
+    if (h && inScope(h, domain) && !/[^a-z0-9.-]/.test(h)) names.add(h)
+  }
+  try {
+    if (id === 'hackertarget') {
+      // "host,ip" per line, or an error sentence.
+      for (const line of text.split('\n')) if (line.includes(',')) add(line.split(',')[0])
+    } else {
+      const j = JSON.parse(text) as unknown
+      if (id === 'certspotter' && Array.isArray(j)) for (const r of j as { dns_names?: string[] }[]) (r.dns_names ?? []).forEach(add)
+      if (id === 'otx') for (const r of ((j as { passive_dns?: { hostname?: string }[] }).passive_dns ?? [])) add(r.hostname)
+      if (id === 'urlscan') for (const r of ((j as { results?: { page?: { domain?: string }; task?: { domain?: string } }[] }).results ?? [])) {
+        add(r.page?.domain)
+        add(r.task?.domain)
+      }
+      if (id === 'anubis' && Array.isArray(j)) (j as unknown[]).forEach(add)
+    }
+  } catch {
+    return []
+  }
+  return [...names].sort()
+}
+
 /** Rows from the Wayback Machine's CDX API (JSON output): the first row is the header. */
 export function parseWayback(json: string, domain: string): string[] {
   let rows: string[][] = []
@@ -417,6 +454,25 @@ export async function runRecon(target: string, ctx: ReconContext): Promise<Recon
     const names = parseCrtSh(text, domain)
     names.forEach((n) => addHost(n, 'crt.sh'))
     return `${names.length} names`
+  })
+
+  // 1b. More public sources, side by side. Each one may be busy or limited; the rest still count.
+  await step('passive', 'Subdomains from more public sources (CertSpotter, OTX, HackerTarget, urlscan.io, Anubis)', async () => {
+    const counts: string[] = []
+    await Promise.all(
+      PASSIVE_SOURCES.map(async (src) => {
+        try {
+          const r = await fetch(src.url(domain), { headers: { ...UA, Accept: 'application/json' }, signal: AbortSignal.timeout(45000) })
+          if (!r.ok) return
+          const names = parsePassive(src.id, await r.text(), domain)
+          names.forEach((n) => addHost(n, src.id))
+          counts.push(`${src.name} ${names.length}`)
+        } catch {
+          // This source is busy; the others still count.
+        }
+      })
+    )
+    return counts.length ? counts.join(', ') : 'None answered'
   })
 
   // 2. subfinder's passive sources, when it is installed.

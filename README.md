@@ -15,11 +15,12 @@
   - **Semgrep** with up to 20 rule sets (OWASP Top 10, CWE Top 25, per-language packs, injection, XSS, JWT, insecure transport) plus your own rules
   - **Bearer** for where sensitive data flows
   - **Bandit** (Python) and **gosec** (Go)
+  - **zizmor** for GitHub Actions workflows and **Hadolint** for Dockerfiles
   - **Gitleaks** and **TruffleHog** for keys and passwords, in files and (Deep) the whole Git history
   - **OSV-Scanner** and **Trivy** for known flaws in packages, and risky Docker, Kubernetes and Terraform settings
 - **Web scan.** Fingerprints a site, checks its security headers, cookies and HTTPS, maps its pages with Katana, looks for files that should never be public (`.env`, `.git`, backups, phpinfo, logs), and runs every read-only Nuclei check. Quick, Standard and Thorough modes. Signs in through a private MacSec window (or a pasted cookie) to scan behind your login, and checks that private pages really need it. Also checks the certificate and TLS versions, and looks for keys left in the site's public JavaScript.
 - **API security.** Load a Postman collection, OpenAPI or Swagger file, or a HAR recording. MacSec reviews what the file says (endpoints with no sign-in, secrets in addresses, real keys saved in examples or the collection, plain HTTP), then makes ordinary GET requests signed in as you to see what comes back: open cross-origin access, sensitive fields, error pages that reveal internals, missing headers.
-- **Recon.** Read-only mapping of a domain: subdomains (certificate logs, **subfinder**, Wayback), DNS and takeover hints, live hosts and technologies, archived URLs and parameters, JavaScript source maps, endpoints and keys, and exposed files, with an AI attack surface report.
+- **Recon.** Read-only mapping of a domain: subdomains (certificate logs, CertSpotter, AlienVault OTX, HackerTarget, urlscan.io, Anubis, **subfinder**, Wayback), DNS and takeover hints, live hosts and technologies, archived URLs and parameters, JavaScript source maps, endpoints and keys, and exposed files, with an AI attack surface report.
 - **Mobile apps.** Android and iOS apps from source or a built `.apk` or `.ipa`: **mobsfscan**'s MobSF rules, the Android manifest (decoded with **Androguard** for a built app: debuggable, backups, plain HTTP, parts other apps can open), Info.plist (App Transport Security, file sharing, URL schemes), how the compiled code is hardened (PIE, stack canaries, NX, RELRO, ARC, App Store encryption) and keys left inside. MacSec reads the app; it never runs it.
 - **Special audits.** A full audit (code review and web scan of the same project, with one AI report that connects them), a portfolio sweep of every project for keys and vulnerable packages, a change review with Claude Code's own `/security-review`, a **mobile app** check, a **cloud account** audit (Azure or AWS: **ScoutSuite** against best practice, **CloudFox** for what the account exposes, **PMapper** for AWS users and roles that could raise their own access), and a **server and ports** check (**naabu** for open ports, **Nmap** for the service on each when you have it, and which ones should not be reachable).
 - **WordPress.** Web scans of WordPress sites add **WPScan** (when installed) for the version, plugins and themes, and their known problems. Passive detection only: no password guessing and no user lists.
@@ -46,11 +47,14 @@ Then open **Tools** and press **Install missing**. Each scanner is downloaded fr
 | Semgrep | core rules | + language packs and focused sets | + full security audit |
 | Bearer | | ✓ | ✓ |
 | Bandit, gosec | when the language is there | ✓ | ✓ |
+| zizmor, Hadolint | when there are workflows or Dockerfiles | ✓ | ✓ |
 | Gitleaks | files | files | files and Git history |
 | TruffleHog | | files | files and Git history |
 | OSV-Scanner | ✓ | ✓ | ✓ |
 | Trivy | | ✓ | ✓ |
 | AI reviewer | the most exposed code | the project | every entry point, followed through |
+
+The AI reviewer works through 20 security skills: a review plan, then API security, sign-in and sessions, injection, browser-side issues, business logic, Docker and CI, supply chain, personal data, Supabase and Firebase rules, AI features and Electron apps, as they apply.
 
 ## Privacy and safety
 

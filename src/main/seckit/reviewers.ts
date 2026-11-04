@@ -57,6 +57,8 @@ export function localModelEnv(m: LocalModel): Record<string, string> {
     ANTHROPIC_SMALL_FAST_MODEL: m.model,
     CLAUDE_CODE_SUBAGENT_MODEL: m.model,
     CLAUDE_CODE_ATTRIBUTION_HEADER: '0',
+    // Leave room in a local model's context for the files it reads.
+    CLAUDE_CODE_MAX_OUTPUT_TOKENS: '8192',
     // A local model cannot use Anthropic's web tools or telemetry.
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
     DISABLE_TELEMETRY: '1'
