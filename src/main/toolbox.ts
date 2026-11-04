@@ -34,6 +34,9 @@ export const CATALOG: ToolDef[] = [
   { id: 'gosec', name: 'gosec', category: 'code', method: 'release', repo: 'securego/gosec', binaries: ['gosec'], languages: ['Go'], purpose: 'Go security checks: SQL injection, file paths, TLS settings, unhandled errors.', homepage: 'https://securego.io', versionArgs: ['-version'] },
 
   // Secrets
+  { id: 'syft', name: 'Syft', category: 'deps', method: 'release', repo: 'anchore/syft', binaries: ['syft'], purpose: 'Lists every package the project uses (a software bill of materials, CycloneDX) and their licences.', homepage: 'https://github.com/anchore/syft', versionArgs: ['version'] },
+  { id: 'grype', name: 'Grype', category: 'deps', method: 'release', repo: 'anchore/grype', binaries: ['grype'], purpose: 'A second opinion on known flaws in packages, with the chance each one gets exploited (EPSS).', homepage: 'https://github.com/anchore/grype', versionArgs: ['version'] },
+  { id: 'checkov', name: 'Checkov', category: 'code', method: 'python', pkg: 'checkov', binaries: ['checkov'], purpose: 'Infrastructure as code: Terraform, Bicep, ARM, Kubernetes, Helm, Dockerfiles and CI workflows, against hundreds of best-practice checks.', homepage: 'https://www.checkov.io' },
   { id: 'gitleaks', name: 'Gitleaks', category: 'secrets', method: 'release', repo: 'gitleaks/gitleaks', binaries: ['gitleaks'], purpose: 'Finds passwords and API keys in files and in the whole Git history.', homepage: 'https://gitleaks.io', versionArgs: ['version'] },
   { id: 'trufflehog', name: 'TruffleHog', category: 'secrets', method: 'release', repo: 'trufflesecurity/trufflehog', binaries: ['trufflehog'], purpose: 'Recognises 800+ kinds of keys and tokens, including in Git history.', homepage: 'https://trufflesecurity.com/trufflehog' },
 

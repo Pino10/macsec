@@ -1,7 +1,7 @@
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw } from 'lucide-react'
-import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity } from '@shared/types'
+import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
 import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
@@ -175,6 +175,24 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               <RefreshCw size={14} /> Test again
             </button>
           )}
+          {!running && (
+            <select
+              className="input"
+              style={{ width: 150 }}
+              value=""
+              aria-label="Export findings"
+              onChange={(e) => {
+                const f = e.target.value as 'sarif' | 'defectdojo' | 'cyclonedx' | 'json'
+                if (f) void act('export', () => api.invoke('sessions:export', id, f)).then((p) => p && notify({ kind: 'info', text: 'Exported.' }))
+              }}
+            >
+              <option value="">Export…</option>
+              <option value="sarif">SARIF (GitHub, editors)</option>
+              <option value="defectdojo">DefectDojo</option>
+              <option value="cyclonedx">SBOM (CycloneDX)</option>
+              <option value="json">JSON</option>
+            </select>
+          )}
           <button className="icon-btn" data-tip="Open the session folder" aria-label="Open the session folder" onClick={() => void api.invoke('sessions:open', id, 'folder')}>
             <FolderOpen />
           </button>
@@ -196,6 +214,8 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           )}
         </div>
       </div>
+
+      {!running && <SinceLastTime id={id} />}
 
       {s.error && (
         <div className="notice bad">
@@ -519,6 +539,57 @@ function Surface({ id }: { id: string }): React.JSX.Element {
         <pre className="codeview" style={{ maxHeight: 360, overflow: 'auto', padding: 14 }}>{d.endpoints.join('\n') || 'None found.'}</pre>
         <p className="hint mono" style={{ wordBreak: 'break-word' }}>{d.params.slice(0, 200).join(', ')}</p>
       </div>
+    </div>
+  )
+}
+
+
+/** What is new, fixed or still there since the previous session on the same target. */
+function SinceLastTime({ id }: { id: string }): React.JSX.Element | null {
+  const { showSession } = useApp()
+  const [c, setC] = useState<SessionCompare | null>(null)
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    void window.macsec.invoke('sessions:compare', id).then(setC).catch(() => setC(null))
+  }, [id])
+  if (!c?.previous) return null
+  return (
+    <div className="since glass">
+      <div className="since-head">
+        <strong>Since last time</strong>
+        <span className="hint">compared with {new Date(c.previous.at).toLocaleDateString()}</span>
+        <span className="tag tag-warn">{c.added.length} new</span>
+        <span className="tag tag-ok">{c.fixed.length} fixed</span>
+        <span className="tag">{c.still} still there</span>
+        <button className="link" style={{ marginLeft: 'auto' }} onClick={() => showSession(c.previous!.id)}>
+          Open the earlier session
+        </button>
+        {(c.added.length > 0 || c.fixed.length > 0) && (
+          <button className="link" onClick={() => setOpen(!open)}>
+            {open ? 'Hide' : 'Show'}
+          </button>
+        )}
+      </div>
+      {open && (
+        <div className="since-lists">
+          {c.added.length > 0 && (
+            <div>
+              <div className="row-title">New</div>
+              {c.added.slice(0, 50).map((f) => (
+                <div key={f.id} className="since-line"><span className="sev" data-sev={f.severity}>{f.severity}</span> {f.title}{f.file ? <span className="hint mono"> {f.file}{f.line ? `:${f.line}` : ''}</span> : null}</div>
+              ))}
+            </div>
+          )}
+          {c.fixed.length > 0 && (
+            <div>
+              <div className="row-title">Fixed</div>
+              {c.fixed.slice(0, 50).map((f) => (
+                <div key={f.id} className="since-line"><span className="sev" data-sev={f.severity}>{f.severity}</span> <s>{f.title}</s></div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

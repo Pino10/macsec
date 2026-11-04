@@ -35,6 +35,8 @@ export interface LocalProject {
   /** Main languages, most files first. */
   languages: string[]
   git: boolean
+  /** Its Laramac address, such as http://shop.test. */
+  url?: string
 }
 
 export interface RemoteRepo {
@@ -312,6 +314,49 @@ export interface AppSettings {
   notifications: boolean
   /** How Claude Code signs in: your normal account, or an Anthropic API key from the Keychain. */
   claudeAuth: 'account' | 'key'
+  /** Let AI tools use MacSec through its MCP server on 127.0.0.1. Off by default. */
+  mcpEnabled?: boolean
+  /** Slack, Teams, Discord or other webhook. The address is in the Keychain. */
+  webhook?: { kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all' }
+}
+
+export interface IntegrationsInfo {
+  webhook: { kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all'; saved: boolean } | null
+  raycastDir: string
+  raycastInstalled: boolean
+  cli: string
+  shortcuts: { title: string; command: string }[]
+  mcp: { enabled: boolean; running: boolean; url: string; command: string; error: string | null }
+}
+
+export interface SkillPackInfo {
+  id: string
+  name: string
+  repo: string
+  license: string
+  about: string
+  installed: boolean
+  commit: string | null
+  at: string | null
+  loaded: string[]
+}
+
+export interface CheckupResult {
+  at: string
+  macos: string
+  score: number
+  checks: { id: string; title: string; status: 'ok' | 'warn' | 'bad' | 'info'; detail: string; fix?: string }[]
+  loginItems: { plist: string; label: string; program: string | null; where: string; signer: string | null; status: 'ok' | 'warn' | 'bad' | 'info'; note: string }[]
+  ports: { command: string; pid: number; address: string; port: number; everyone: boolean }[]
+  sshKeys: { file: string; kind: string; protectedByPassphrase: boolean | null; permissionsOk: boolean }[]
+  extensions: { browser: string; id: string; name: string; version: string; risky: string[] }[]
+}
+
+export interface SessionCompare {
+  previous: { id: string; at: string } | null
+  added: Finding[]
+  fixed: Finding[]
+  still: number
 }
 
 export interface UpdateInfo {
@@ -392,6 +437,22 @@ export interface Channels {
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
   'sessions:list': { args: []; result: SessionInfo[] }
   'sessions:get': { args: [string]; result: SessionDetail }
+  'sessions:compare': { args: [string]; result: SessionCompare }
+  'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json']; result: string | null }
+  'projects:save-hook': { args: [string]; result: string | null }
+  'projects:save-ci': { args: [string, 'github' | 'azure']; result: string | null }
+  'checkup:run': { args: []; result: CheckupResult }
+  'checkup:last': { args: []; result: CheckupResult | null }
+  'docker:images': { args: []; result: { running: boolean; images: { ref: string; size: string; created: string }[] } }
+  'docker:scan': { args: [string]; result: Finding[] }
+  'packs:list': { args: []; result: SkillPackInfo[] }
+  'packs:install': { args: [string]; result: SkillPackInfo[] }
+  'packs:remove': { args: [string]; result: SkillPackInfo[] }
+  'integrations:get': { args: []; result: IntegrationsInfo }
+  'webhook:set': { args: [{ kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all' } | null, string | null]; result: IntegrationsInfo }
+  'webhook:test': { args: []; result: void }
+  'raycast:install': { args: []; result: IntegrationsInfo }
+  'mcp:enable': { args: [boolean]; result: IntegrationsInfo }
   'sessions:delete': { args: [string]; result: SessionInfo[] }
   'sessions:cancel': { args: [string]; result: void }
   'sessions:pdf': { args: [string]; result: string | null }

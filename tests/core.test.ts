@@ -104,7 +104,7 @@ describe('planning a review', () => {
     const quick = planScanners(root, stats, 'quick', '/out').map((r) => r.id)
     const deep = planScanners(root, { ...stats, git: true }, 'deep', '/out')
     expect(quick).toEqual(['semgrep', 'bandit', 'gitleaks', 'osv-scanner'])
-    expect(deep.map((r) => r.id)).toEqual(['semgrep', 'bearer', 'bandit', 'gitleaks', 'trufflehog', 'osv-scanner', 'trivy'])
+    expect(deep.map((r) => r.id)).toEqual(['semgrep', 'bearer', 'bandit', 'syft', 'grype', 'gitleaks', 'trufflehog', 'osv-scanner', 'trivy'])
     expect(deep.find((r) => r.id === 'gitleaks')!.args[0]).toBe('git')
     expect(deep.find((r) => r.id === 'trufflehog')!.args).toContain('--no-verification')
     expect(deep.find((r) => r.id === 'semgrep')!.args).toContain('p/phpcs-security-audit')

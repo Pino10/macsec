@@ -21,6 +21,8 @@ const LIST: (Omit<OptionalTool, 'installed'> & { paths: string[] })[] = [
   { name: 'Frida', what: 'Hooks into running mobile and desktop apps to change what they do.', homepage: 'https://frida.re', paths: brew('frida') },
   { name: 'objection', what: 'Frida-based toolkit for bypassing mobile app protections.', homepage: 'https://github.com/sensepost/objection', paths: brew('objection') },
   { name: 'drozer', what: 'Attacks Android apps through their exported parts.', homepage: 'https://github.com/WithSecureLabs/drozer', paths: brew('drozer') },
+  { name: 'garak', what: 'Sends jailbreak and prompt-injection attempts to a language model to see what gets through. Run it yourself, only against your own model (for example in LM Studio).', homepage: 'https://github.com/NVIDIA/garak', paths: brew('garak') },
+  { name: 'promptfoo red team', what: 'Attacks an AI app with adversarial prompts to find prompt injection and data leaks. Run it yourself, only against your own app.', homepage: 'https://www.promptfoo.dev/docs/red-team/', paths: brew('promptfoo') },
   { name: 'GDB with pwndbg', what: 'Debugger set up for exploit development.', homepage: 'https://github.com/pwndbg/pwndbg', paths: brew('gdb') }
 ]
 

@@ -1,5 +1,5 @@
 import Logo from './Logo'
-import { FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Wrench, Smartphone, Radar } from 'lucide-react'
+import { Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Wrench, Smartphone, Radar } from 'lucide-react'
 import { useApp, type Page } from '../store'
 
 type Item = { id: Page; label: string; icon: React.ReactNode }
@@ -14,7 +14,8 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
       { id: 'api', label: 'API security', icon: <Plug size={I} /> },
       { id: 'recon', label: 'Recon', icon: <Radar size={I} /> },
       { id: 'mobile', label: 'Mobile apps', icon: <Smartphone size={I} /> },
-      { id: 'audit', label: 'Special audits', icon: <ShieldHalf size={I} /> }
+      { id: 'audit', label: 'Special audits', icon: <ShieldHalf size={I} /> },
+      { id: 'mac', label: 'This Mac', icon: <Laptop size={I} /> }
     ]
   },
   { label: 'Results', items: [{ id: 'sessions', label: 'Sessions', icon: <History size={I} /> }, { id: 'logs', label: 'Logs', icon: <ScrollText size={I} /> }] }

@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 /**
  * The engine every test runs on: starts tools, tracks them so a session can be stopped, and
  * records each step of a session as it happens.
@@ -72,6 +73,9 @@ export function friendly(line: string): string {
   }
   return line.slice(0, 160)
 }
+
+/** Tells the app (webhooks, notifications) when a session ends. */
+export const finishEvents = new EventEmitter()
 
 export function runTool(run: ToolRun, op: Op, rawDir: string, onLine?: (l: string) => void): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -186,5 +190,6 @@ export class SessionRun {
     this.info.counts = countBySeverity(this.findings.filter((f) => f.verdict !== 'false-positive'))
     saveFindings(this.info.id, this.findings)
     saveSession(this.info)
+    finishEvents.emit('finished', this.info)
   }
 }

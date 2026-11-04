@@ -4,11 +4,114 @@
  * --plugin-dir; "Install for Claude" copies them into ~/.claude/skills so Claude Code in Terminal and
  * in the Claude desktop app can use them too.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 
 export const SKILLS: Record<string, { description: string; body: string }> = {
+  'audit-context': {
+    description: 'Build a real understanding of a codebase before hunting bugs: modules, data flows, invariants and assumptions, written down as you go. Use at the start of a deep review.',
+    body: `# Audit context
+
+Bugs hide in the gap between what code assumes and what callers do. Before reporting anything:
+
+1. **Inventory:** list the modules, what each owns (data, side effects) and who calls it.
+2. **Per important function:** what it expects of its inputs (types, ranges, who is signed in), what it changes, what it returns on failure, and which invariants it relies on (a record belongs to a tenant; a balance never goes negative).
+3. **Data flow:** for each kind of user input, the path to storage and back out (to HTML, to other services, to files).
+4. **Trust:** where the code trusts something it should verify (client values, headers, third-party responses, internal callers).
+5. Keep notes short and concrete (file:function, one line each). Later findings must point back to a broken assumption from these notes.`
+  },
+  'entry-points': {
+    description: 'List every way into an application, with who can reach it and what it changes. Use to scope any review: routes, jobs, webhooks, commands, listeners and handlers.',
+    body: `# Entry points
+
+Make a table: entry point, how it is reached (HTTP route, queue job, cron, CLI command, webhook, message listener, file watcher, IPC handler, GraphQL resolver), who can reach it (anyone, signed-in user, admin, internal), and what it changes.
+
+- Read the router and the framework's registration code, not only controllers: middleware groups, route prefixes, \`withoutMiddleware\`, catch-all routes, file-based routes (app/, pages/api/), serverless functions.
+- Include the non-HTTP ones: scheduled jobs, queue consumers, Artisan and npm scripts that run in production, Electron IPC, WebSocket events.
+- Mark the ones that change state without being signed in: they are reviewed first.`
+  },
+  'variant-analysis': {
+    description: 'After one bug is found, find all its siblings: the same mistake elsewhere in the code. Use whenever a finding is confirmed.',
+    body: `# Variant analysis
+
+1. State the bug as a pattern: the source (where bad data or a missing check comes from), the sink (where it hurts) and the missing guard.
+2. Search for the same sink everywhere (Grep for the function, the query builder call, the template filter), then check each one for the guard.
+3. Search for the same shape with different names: other controllers built from the same template, copy-pasted handlers, other models with the same mass-assignment setting.
+4. Report each variant as its own finding, or group them with a list of every location. Say which ones are safe and why.`
+  },
+  'false-positive-check': {
+    description: 'Check a suspected vulnerability properly before reporting it, so reports contain real problems only. Use for every finding from a scanner or from reading code.',
+    body: `# False-positive check
+
+Before keeping a finding, answer all of these with evidence from the code:
+
+1. **Reachable?** Is there a real entry point that leads here? Who can call it?
+2. **Controllable?** Can an outsider influence the value that matters, or is it fixed, typed, allowlisted or from the server?
+3. **Unprotected?** Is there a guard on the way: validation, a cast, an ORM binding, escaping, a policy, middleware, a framework default?
+4. **Impactful?** What actually happens if it is exploited, for this application?
+5. **Not test or example code?** Tests, fixtures, docs and seeders rarely matter.
+
+Keep the finding only if 1 to 4 are yes. Otherwise drop it or mark it "to check by hand" with the open question.`
+  },
+  'change-review': {
+    description: 'Security review of a change (a pull request, a branch or the last commits) rather than the whole project. Use when asked to review a diff, a PR or recent changes.',
+    body: `# Reviewing a change
+
+1. Read the diff and the code around it: a safe-looking change can remove a check two files away.
+2. Ask what the change makes newly reachable: new routes, new parameters, new fields serialised, new permissions, new dependencies.
+3. Look for removed guards: deleted middleware, loosened validation, \`$fillable\` grown, CORS widened, a check moved after the action.
+4. Follow new inputs to their sinks with injection-catalog.
+5. Check tests: do they cover the security behaviour (a user cannot see another user's data)?
+6. Report only what the change introduces or exposes, with the line in the diff.`
+  },
+  'insecure-defaults': {
+    description: 'Find settings that are unsafe because nobody changed the default: debug modes, default keys, open CORS, permissive cookies, disabled verification. Use in every review.',
+    body: `# Insecure defaults
+
+Search configuration and bootstrap code for:
+- Debug and verbose errors on (APP_DEBUG, DEBUG=True, NODE_ENV not production, stack traces returned).
+- Example or default secrets still in use (APP_KEY from the example, JWT secret "secret", default admin accounts, "changeme").
+- TLS verification turned off (\`verify=False\`, \`rejectUnauthorized: false\`, \`CURLOPT_SSL_VERIFYPEER => false\`).
+- Permissive CORS, cookies without Secure/HttpOnly/SameSite, sessions that never expire.
+- Fallbacks that fail open: \`if (!config) allow\`, \`catch { return true }\`, feature flags defaulting to on for admin features.
+- Rate limits, CSRF or auth middleware switched off "for now".
+For each, show the line and the safe value.`
+  },
+  'sharp-edges': {
+    description: 'APIs and language features that are easy to misuse and often turn into vulnerabilities: loose comparisons, regex anchors, path joins, time and randomness. Use when reading code in any language.',
+    body: `# Sharp edges
+
+- **Comparisons:** PHP \`==\` with strings and numbers, \`in_array\` without strict, JavaScript \`==\`, comparing secrets without constant-time functions.
+- **Regex:** missing \`^\`/\`$\` anchors in allowlists, \`.\` unescaped in host names, multiline flags letting a second line through.
+- **Paths:** \`path.join\` with an absolute second argument, \`os.path.join\` dropping the base, checking a path before normalising it.
+- **URLs:** parsing with string functions, \`startsWith('https://example.com')\` matching \`https://example.com.evil.net\`.
+- **Randomness:** \`Math.random\`, \`rand()\`, \`uniqid\` for tokens; use the platform's secure generator.
+- **Time:** comparing time zones, tokens that never expire, TOCTOU between a check and its use.
+- **Numbers:** integer overflow and float money, negative values, parseInt without a radix.
+- **Encoding:** double decoding, Unicode normalisation making two names equal, case-insensitive email matching.`
+  },
+  'threat-model': {
+    description: 'A short, practical threat model of an application with STRIDE: what is valuable, who would attack it, how, and what stops them. Use at the start of an assessment or when asked for a threat model.',
+    body: `# Threat model
+
+1. **What we protect:** data and actions that matter (accounts, payments, personal data, admin functions, secrets).
+2. **Who might attack:** anonymous internet users, signed-in users of another tenant, malicious insiders, compromised dependencies.
+3. **Diagram in words:** the components, trust boundaries and data flows (browser, API, workers, database, third parties).
+4. **STRIDE per boundary:** Spoofing (identity), Tampering (data in transit or storage), Repudiation (missing audit logs), Information disclosure, Denial of service, Elevation of privilege.
+5. For each threat: likelihood, impact, the control that exists (with file references) and the gap.
+6. End with the five most important gaps, in order.`
+  },
+  'fix-verification': {
+    description: 'Check that a security fix really fixes the problem, everywhere, without breaking anything or leaving a bypass. Use after a finding has been fixed.',
+    body: `# Fix verification
+
+1. Re-read the original finding: source, sink and missing guard.
+2. Does the fix put the guard at the right place (server side, before the action), for every path to the sink, including variants?
+3. Try the bypasses in your head: other encodings, other HTTP methods, other routes to the same function, arrays instead of strings, case changes.
+4. Is there a test that would fail if the fix were removed? If not, describe the test to add.
+5. Did the fix change behaviour for normal users? Say what to re-test.`
+  },
   'review-vectors': {
     description: 'The index of every security review vector, by area, so nothing is skipped. Use at the start of any code review to plan which vector skills apply to this stack.',
     body: `# Review vectors: the plan
@@ -30,6 +133,10 @@ Pick the areas this project has, then work through the matching skill for each. 
 | AI features | ai-app-review | calls to an LLM, RAG, agents, tools |
 | Desktop apps | electron-review | Electron, Tauri |
 | Secrets | secrets-triage | any key, token or password in files or history |
+| Understanding first | audit-context, entry-points, threat-model | deep reviews and assessments |
+| Defaults and gotchas | insecure-defaults, sharp-edges | always |
+| After a finding | false-positive-check, variant-analysis, fix-verification | every confirmed finding |
+| A change, not the whole project | change-review | pull requests, branches, recent commits |
 | Packages with advisories | dependency-triage | scanner results for packages |
 
 Every finding needs a file and line. Rank by what an attacker can reach without signing in first.`
@@ -410,3 +517,24 @@ export function skillText(names: string[], extraDirs: string[] = []): string {
   return parts.join('\n\n---\n\n')
 }
 
+
+/** Copies skill folders from installed packs into ~/.claude/skills as <prefix>-pack-<name>. */
+export function installPackSkillsForClaude(prefix: string, folders: { name: string; dir: string }[]): void {
+  const dir = claudeSkillsDir()
+  mkdirSync(dir, { recursive: true })
+  for (const f of folders) {
+    if (!/^[a-z0-9-]{1,64}$/.test(f.name)) continue
+    const target = join(dir, `${prefix}-pack-${f.name}`)
+    rmSync(target, { recursive: true, force: true })
+    cpSync(f.dir, target, { recursive: true })
+  }
+}
+
+export function removePackSkillsFromClaude(prefix: string): void {
+  const dir = claudeSkillsDir()
+  try {
+    for (const n of readdirSync(dir)) if (n.startsWith(`${prefix}-pack-`)) rmSync(join(dir, n), { recursive: true, force: true })
+  } catch {
+    // No skills folder yet.
+  }
+}

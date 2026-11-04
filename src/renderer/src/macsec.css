@@ -1987,3 +1987,19 @@ div + .pick-item {
 @keyframes logospin { to { transform: rotate(-360deg); } }
 .triage { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .update-bar { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-radius: 18px; margin-bottom: 14px; }
+
+/* ---------- This Mac ---------- */
+.mac-score { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+.mac-score strong { display: block; font-size: 22px; }
+.mac-row { display: flex; gap: 12px; align-items: flex-start; }
+.mac-row > svg { margin-top: 2px; flex: none; }
+.fix-line { color: var(--ion, #7dd3fc); margin-top: 4px; }
+.pad { padding: 12px 18px; }
+.since { margin: 12px 0; padding: 12px 16px; border-radius: 14px; }
+.since-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.since-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
+.since-line { font-size: 12.5px; padding: 4px 0; display: flex; gap: 8px; align-items: center; }
+.proj-row { display: flex; align-items: center; gap: 8px; }
+.int-form { display: grid; grid-template-columns: auto 160px 1fr; gap: 8px; align-items: center; margin-top: 8px; }
+.int-cmd { display: grid; grid-template-columns: 170px 1fr auto; gap: 10px; align-items: center; font-size: 12px; margin-top: 6px; }
+.int-cmd code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }

@@ -11,6 +11,7 @@ import { getSettings } from './settings'
 import { getPlain, getSecret, setPlain, setSecret } from './secrets'
 import { projectStats } from './scanners/plan'
 import { USER_AGENT } from './download'
+import { localSites } from './webscan'
 
 export function listLocal(): LocalProject[] {
   const www = getSettings().wwwPath
@@ -27,7 +28,7 @@ export function listLocal(): LocalProject[] {
     })
     .map((p) => {
       const s = projectStats(p)
-      return { name: basename(p), path: p, languages: s.languages.slice(0, 3), git: s.git }
+      return { name: basename(p), path: p, languages: s.languages.slice(0, 3), git: s.git, url: localSites().find((x) => x.name === basename(p))?.url }
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 }

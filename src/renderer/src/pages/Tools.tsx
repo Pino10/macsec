@@ -3,6 +3,7 @@ import { Cloud, Microscope, Server, Smartphone, Swords } from 'lucide-react'
 import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
 import type { AgentInfo, LocalLlm, OptionalTool, ToolCategory, ToolInfo } from '@shared/types'
 import { useApp } from '../store'
+import { Integrations, SkillPacks } from '../components/Extras'
 import { PageHead, Seg } from '../ui'
 
 const GROUPS: { id: ToolCategory; title: string; icon: React.ReactNode }[] = [
@@ -215,6 +216,12 @@ export default function Tools(): React.JSX.Element {
           </button>
         </div>
       </div>
+
+      <h2 className="section-title">Skills from security teams</h2>
+      <SkillPacks />
+
+      <h2 className="section-title">Use MacSec from everywhere</h2>
+      <Integrations />
 
       <h2 className="section-title">Your model</h2>
       <div className="ms-form glass">

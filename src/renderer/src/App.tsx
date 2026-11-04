@@ -3,6 +3,7 @@ import { Download, Plus } from 'lucide-react'
 import type { UpdateInfo } from '@shared/types'
 import { AppProvider, useApp } from './store'
 import Rail, { PAGE_ORDER } from './components/Rail'
+import ThisMac from './pages/ThisMac'
 import JobsBar from './components/JobsBar'
 import { overall } from './components/LiveRun'
 import Overview from './pages/Overview'
@@ -111,6 +112,7 @@ function Shell(): React.JSX.Element {
               {page === 'mobile' && <Mobile />}
               {page === 'recon' && <Recon />}
               {page === 'audit' && <Audits />}
+              {page === 'mac' && <ThisMac />}
               {page === 'sessions' && <Sessions />}
               {page === 'tools' && <Tools />}
               {page === 'logs' && <Logs />}

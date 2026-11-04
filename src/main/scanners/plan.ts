@@ -6,7 +6,7 @@ import { existsSync, readdirSync, statSync } from 'fs'
 import { extname, join } from 'path'
 import type { Finding, ReviewDepth } from '../../shared/types'
 import { dirs } from '../paths'
-import { parseBandit, parseBearer, parseGitleaks, parseGosec, parseHadolint, parseZizmor, parseOsv, parseSemgrep, parseTrivy, parseTrufflehog } from './parse'
+import { parseBandit, parseBearer, parseGitleaks, parseGosec, parseHadolint, parseZizmor, parseGrype, parseSyftLicences, parseCheckov, parseOsv, parseSemgrep, parseTrivy, parseTrufflehog } from './parse'
 
 export const SKIP_DIRS = new Set(['node_modules', 'vendor', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', 'target', 'bin', 'obj', '.venv', 'venv', '__pycache__', '.idea', '.vscode', 'coverage', 'Pods', 'DerivedData', '.turbo', '.cache', 'storage', 'bower_components'])
 
@@ -61,6 +61,13 @@ export function projectStats(root: string): ProjectStats {
     git: existsSync(join(root, '.git')),
     manifests: [...manifests]
   }
+}
+
+/** Whether a project holds infrastructure as code worth Checkov's time. */
+export function hasIac(root: string, stats: ProjectStats): boolean {
+  if (stats.languages.includes('Terraform') || stats.manifests.some((m) => /Dockerfile|docker-compose/.test(m))) return true
+  for (const p of ['.github/workflows', 'azure-pipelines.yml', 'k8s', 'kubernetes', 'helm', 'charts', 'infra', 'bicep', 'deploy']) if (existsSync(join(root, p))) return true
+  return false
 }
 
 /** Dockerfiles in a project, as paths relative to it (Dockerfile, Containerfile, *.Dockerfile). */
@@ -150,6 +157,17 @@ export function planScanners(root: string, stats: ProjectStats, depth: ReviewDep
   }
   if (has('Go')) {
     runs.push({ id: 'gosec', tool: 'gosec', label: 'gosec: Go checks', bin: 'gosec', args: ['-fmt', 'json', '-out', join(out, 'gosec.json'), '-no-fail', '-quiet', './...'], output: join(out, 'gosec.json'), parse: parseGosec, timeoutMs: 15 * min })
+  }
+
+  // What the project is made of (SBOM, kept with the session for export), and licences worth knowing.
+  if (depth !== 'quick') {
+    runs.push({ id: 'syft', tool: 'Syft', label: 'Syft: every package and its licence (SBOM)', bin: 'syft', args: ['scan', 'dir:.', '-o', `cyclonedx-json=${join(out, 'sbom.cdx.json')}`, '-q'], output: join(out, 'sbom.cdx.json'), parse: parseSyftLicences, timeoutMs: 15 * min })
+  }
+  if (depth === 'deep') {
+    runs.push({ id: 'grype', tool: 'Grype', label: 'Grype: a second opinion on package flaws', bin: 'grype', args: ['dir:.', '-o', 'json', '--file', join(out, 'grype.json'), '-q'], output: join(out, 'grype.json'), parse: parseGrype, timeoutMs: 20 * min })
+  }
+  if (hasIac(root, stats)) {
+    runs.push({ id: 'checkov', tool: 'Checkov', label: 'Checkov: infrastructure as code', bin: 'checkov', args: ['-d', '.', '-o', 'json', '--quiet', '--compact', '--skip-download', '--framework', 'terraform', 'bicep', 'arm', 'kubernetes', 'helm', 'cloudformation', 'dockerfile', 'github_actions', 'azure_pipelines'], parse: parseCheckov, timeoutMs: 15 * min })
   }
 
   // CI workflows and Dockerfiles: their own checks, offline.

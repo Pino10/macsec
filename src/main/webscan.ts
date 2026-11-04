@@ -16,7 +16,8 @@ import type { Finding, ScanMode, SessionInfo, WebScanRequest } from '../shared/t
 import { beginOp, endOp, runTool, SessionRun } from './engine'
 import { createSession, saveAiReport } from './sessions'
 import { checkHeaders, parseHttpx, parseKatana, parseNuclei, pathSeverity, SENSITIVE_PATHS, type Fingerprint } from './scanners/web'
-import { fid } from './scanners/parse'
+import { fid, parseZap } from './scanners/parse'
+import { execFileSync } from 'child_process'
 import { appPath, installTool, isInstalled, nucleiTemplatesDir, toolDef } from './toolbox'
 import { parseWpscan } from './scanners/infra'
 import { dirs } from './paths'
@@ -38,6 +39,26 @@ export function localSites(): { name: string; url: string }[] {
   return readdirSync(www)
     .filter((n) => !n.startsWith('.') && statSync(join(www, n)).isDirectory())
     .map((n) => ({ name: n, url: `http://${n.toLowerCase().replace(/[^a-z0-9-]+/g, '-')}.${tld}` }))
+}
+
+/** Docker's command, when OrbStack, Docker Desktop or Colima is installed and running. */
+export function dockerPath(): string | null {
+  for (const p of ['/usr/local/bin/docker', '/opt/homebrew/bin/docker', join(homedir(), '.orbstack', 'bin', 'docker'), '/Applications/Docker.app/Contents/Resources/bin/docker']) if (existsSync(p)) return dockerUp(p) ? p : null
+  return null
+}
+
+let dockerChecked: { at: number; ok: boolean } | null = null
+function dockerUp(bin: string): boolean {
+  if (dockerChecked && Date.now() - dockerChecked.at < 60_000) return dockerChecked.ok
+  let ok = false
+  try {
+    execFileSync(bin, ['info', '--format', '{{.ServerVersion}}'], { timeout: 8000, stdio: 'ignore' })
+    ok = true
+  } catch {
+    ok = false
+  }
+  dockerChecked = { at: Date.now(), ok }
+  return ok
 }
 
 /** Addresses on this Mac (and Laramac's domains) need no confirmation. */
@@ -165,6 +186,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     access: m.depth && Object.keys(headers).length ? s.step('access', 'Compare private pages signed in and signed out') : null,
     wp: s.step('wpscan', 'WordPress: version, plugins and themes (when the site uses it)'),
     templates: s.step('templates', 'Update Nuclei’s community checks'),
+    zap: req.mode === 'thorough' && dockerPath() ? s.step('zap', 'ZAP baseline: passive checks while it browses (it never attacks)') : null,
     nuclei: s.step('nuclei', m.everyPage ? 'Nuclei read-only checks on every page' : req.mode === 'quick' ? 'Nuclei checks for serious known problems' : 'Every read-only Nuclei check'),
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what matters most and how to fix it') : null
   }
@@ -251,6 +273,19 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       })
       return existsSync(out) ? parseNuclei(readFileSync(out, 'utf8')) : []
     })
+
+    if (st.zap)
+      await s.run(st.zap, async (_n, line) => {
+        const out = join(s.raw, 'zap.json')
+        const local = isLocalTarget(url)
+        // The baseline scan spiders for a few minutes and only reads responses: no attacks.
+        const args = ['run', '--rm', '-v', `${s.raw}:/zap/wrk:rw`, ...(local ? ['--add-host', `${new URL(url).hostname}:host-gateway`] : []), 'ghcr.io/zaproxy/zaproxy:stable', 'zap-baseline.py', '-t', local ? url.replace('://localhost', '://host.docker.internal').replace('://127.0.0.1', '://host.docker.internal') : url, '-J', 'zap.json', '-I', '-m', req.mode === 'thorough' ? '5' : '2']
+        await runTool({ name: 'zap', bin: dockerPath()!, absolute: true, args, timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
+          if (!existsSync(out)) throw new Error(`ZAP did not run: ${(e as Error).message}. Docker (OrbStack, Docker Desktop or Colima) must be running.`)
+          return ''
+        })
+        return existsSync(out) ? parseZap(readFileSync(out, 'utf8')) : []
+      })
 
     if (st.ai)
       await s.run(st.ai, async () => {

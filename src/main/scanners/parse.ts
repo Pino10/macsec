@@ -188,6 +188,146 @@ export function parseHadolint(text: string, root: string): Finding[] {
     )
 }
 
+// ---------------------------------------------------------------- Grype
+
+export function parseGrype(text: string, root: string): Finding[] {
+  type M = {
+    vulnerability: { id: string; severity: string; description?: string; urls?: string[]; fix?: { versions?: string[]; state?: string }; epss?: { epss: number }[] }
+    relatedVulnerabilities?: { id: string; description?: string; cwes?: unknown }[]
+    artifact: { name: string; version: string; type: string; locations?: { path?: string; accessPath?: string }[] }
+  }
+  const d = json<{ matches?: M[] }>(text)
+  return (d?.matches ?? []).map((m) => {
+    const v = m.vulnerability
+    const fixes = v.fix?.state === 'fixed' ? v.fix.versions ?? [] : []
+    const epss = v.epss?.[0]?.epss
+    return mk('Grype', 'dependency', {
+      severity: sev(v.severity === 'Negligible' ? 'info' : v.severity),
+      title: `${m.artifact.name} ${m.artifact.version}: ${v.id}`,
+      file: rel(root, m.artifact.locations?.[0]?.accessPath ?? m.artifact.locations?.[0]?.path),
+      advisory: v.id,
+      description: (v.description ?? m.relatedVulnerabilities?.find((r) => r.description)?.description ?? '').slice(0, 1200) + (epss !== undefined ? ` Chance of being exploited in the next 30 days (EPSS): ${(epss * 100).toFixed(1)}%.` : ''),
+      fix: fixes.length ? `Update ${m.artifact.name} to ${fixes.find((f) => newerOrEqual(f, m.artifact.version)) ?? fixes[0]}.` : 'No fixed version yet.',
+      url: v.urls?.[0]
+    })
+  })
+}
+
+const newerOrEqual = (a: string, b: string): boolean => {
+  const pa = a.split(/[.-]/).map((x) => parseInt(x, 10) || 0)
+  const pb = b.split(/[.-]/).map((x) => parseInt(x, 10) || 0)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0)
+  return true
+}
+
+// ---------------------------------------------------------------- Syft (SBOM and licences)
+
+export interface SbomSummary {
+  components: number
+  byType: Record<string, number>
+  licences: Record<string, number>
+}
+
+/** CycloneDX JSON from Syft: what the project is made of. */
+export function sbomSummary(text: string): SbomSummary {
+  type C = { type?: string; name: string; licenses?: { license?: { id?: string; name?: string }; expression?: string }[]; properties?: { name: string; value: string }[] }
+  const d = json<{ components?: C[] }>(text)
+  const out: SbomSummary = { components: 0, byType: {}, licences: {} }
+  for (const c of d?.components ?? []) {
+    if (c.type === 'file' || c.type === 'operating-system') continue
+    out.components++
+    const t = c.properties?.find((p) => p.name === 'syft:package:type')?.value ?? c.type ?? 'other'
+    out.byType[t] = (out.byType[t] ?? 0) + 1
+    for (const l of c.licenses ?? []) {
+      const id = l.license?.id ?? l.license?.name ?? l.expression ?? 'unknown'
+      out.licences[id] = (out.licences[id] ?? 0) + 1
+    }
+  }
+  return out
+}
+
+/** Strong copyleft licences in dependencies: worth knowing before shipping closed-source software. */
+export function parseSyftLicences(text: string, root: string): Finding[] {
+  type C = { name: string; version?: string; licenses?: { license?: { id?: string; name?: string }; expression?: string }[]; properties?: { name: string; value: string }[] }
+  const d = json<{ components?: C[] }>(text)
+  const out: Finding[] = []
+  for (const c of d?.components ?? []) {
+    const ids = (c.licenses ?? []).map((l) => l.license?.id ?? l.license?.name ?? l.expression ?? '').filter(Boolean)
+    const strong = ids.find((id) => /\b(AGPL|GPL|SSPL|EUPL|OSL)\b/i.test(id) && !/LGPL/i.test(id))
+    if (!strong) continue
+    out.push(
+      mk('Syft', 'dependency', {
+        severity: /AGPL|SSPL/i.test(strong) ? 'medium' : 'low',
+        title: `${c.name}${c.version ? ` ${c.version}` : ''} is licensed ${strong}`,
+        file: rel(root, c.properties?.find((p) => p.name === 'syft:location:0:path')?.value),
+        description: /AGPL|SSPL/i.test(strong) ? 'Network copyleft: offering this software as a service can oblige you to publish your source code.' : 'Copyleft: distributing software that includes it can oblige you to publish your source code under the same licence.',
+        fix: 'Check the licence fits how you ship the software, or choose a package with a permissive licence.'
+      })
+    )
+  }
+  return out
+}
+
+// ---------------------------------------------------------------- Checkov (infrastructure as code)
+
+/** Checkov's open-source checks carry no severity, so it is judged from what the check is about. */
+export function checkovSeverity(id: string, name: string): Severity {
+  const t = `${id} ${name}`.toLowerCase()
+  if (/0\.0\.0\.0|public|anonymous|wildcard|\*|admin|root|privileged|secret|password|credential|hardcoded/.test(t)) return 'high'
+  if (/encrypt|tls|ssl|https|logging|mfa|kms|versioning|backup/.test(t)) return 'medium'
+  return 'low'
+}
+
+export function parseCheckov(text: string, root: string): Finding[] {
+  type F = { check_id: string; check_name: string; file_path: string; file_line_range?: number[]; resource?: string; severity?: string | null; guideline?: string | null }
+  type R = { check_type?: string; results?: { failed_checks?: F[] } }
+  const d = json<R | R[]>(text)
+  const list = Array.isArray(d) ? d : d ? [d] : []
+  const out: Finding[] = []
+  for (const r of list)
+    for (const f of r.results?.failed_checks ?? [])
+      out.push(
+        mk('Checkov', 'config', {
+          severity: f.severity ? sev(f.severity) : checkovSeverity(f.check_id, f.check_name),
+          title: `${f.check_name} (${f.check_id})`,
+          file: rel(root, f.file_path.replace(/^\//, '')),
+          line: f.file_line_range?.[0],
+          description: f.resource ? `In ${f.resource}${r.check_type ? ` (${r.check_type})` : ''}.` : undefined,
+          url: f.guideline ?? undefined
+        })
+      )
+  return out
+}
+
+// ---------------------------------------------------------------- ZAP baseline (passive)
+
+export function parseZap(text: string): Finding[] {
+  type I = { uri: string; method?: string; param?: string; evidence?: string }
+  type A = { pluginid: string; name: string; riskcode: string; confidence?: string; desc?: string; solution?: string; reference?: string; cweid?: string; instances?: I[]; count?: string }
+  const d = json<{ site?: { '@name': string; alerts?: A[] }[] }>(text)
+  const strip = (h?: string): string => (h ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const out: Finding[] = []
+  for (const site of d?.site ?? [])
+    for (const a of site.alerts ?? []) {
+      const risk = Number(a.riskcode)
+      let s: Severity = risk >= 3 ? 'high' : risk === 2 ? 'medium' : risk === 1 ? 'low' : 'info'
+      if (a.confidence === '1' && s !== 'info') s = s === 'high' ? 'medium' : 'low'
+      const inst = a.instances?.[0]
+      out.push(
+        mk('ZAP', 'web', {
+          severity: s,
+          title: `${a.name}${a.instances && a.instances.length > 1 ? ` (${a.instances.length} places)` : ''}`,
+          url: inst?.uri ?? site['@name'],
+          cwe: a.cweid && a.cweid !== '-1' && a.cweid !== '0' ? `CWE-${a.cweid}` : undefined,
+          description: strip(a.desc).slice(0, 1000) + (inst?.param ? ` Parameter: ${inst.param}.` : ''),
+          fix: strip(a.solution).slice(0, 600) || undefined,
+          advisory: `ZAP-${a.pluginid}`
+        })
+      )
+    }
+  return out
+}
+
 // ---------------------------------------------------------------- Secrets
 
 /** Which kinds of secret matter most. */

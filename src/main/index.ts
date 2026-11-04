@@ -1,9 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell, type IpcMainInvokeEvent } from 'electron'
-import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, session, shell, type IpcMainInvokeEvent } from 'electron'
+import { execFile } from 'child_process'
+import type { Server } from 'http'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
-import type { ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest, SessionInfo } from '../shared/types'
+import type { IntegrationsInfo, SkillPackInfo, ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest, SessionInfo } from '../shared/types'
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { getSecret, setSecret, setSecretsCrypto } from './secrets'
@@ -11,8 +13,15 @@ import { ensureSkills, listSkills } from './skills'
 import { setModelCrypto, detectLlms, testLlm, listServers, saveServer, deleteServer } from './models'
 import { jobs } from './jobs'
 import { log, logEvents, listLogs, clearLogs } from './logs'
-import { checkUpdates, checkUpdatesDaily, installTool, listTools, removeTool, toolDef, updateToolData } from './toolbox'
-import { localSites, startWebScan } from './webscan'
+import { checkUpdates, checkUpdatesDaily, installTool, listTools, removeTool, toolDef, toolEnv, toolPath, updateToolData } from './toolbox'
+import { dockerPath, localSites, startWebScan } from './webscan'
+import { ciWorkflow, compareFindings, preCommitHook, previousSession, toDefectDojo, toSarif } from './exports'
+import { runCheckup } from './checkup'
+import { parseTrivy } from './scanners/parse'
+import { installPack, packState, removePack, SKILL_PACKS } from './seckit/skillpacks'
+import { checkHookUrl, hookBody, raycastScripts, sendHook, type HookKind } from './webhooks'
+import { MCP_PORT, mcpToken, mcpUrl, startMcpServer } from './mcp'
+import { macsecCli, macsecTools } from './mcptools'
 import { loadSpec, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
 import { reconData, startRecon } from './reconscan'
@@ -22,7 +31,7 @@ import { installForClaude, installedForClaude, removeFromClaude } from './seckit
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
 import { optionalTools } from './optional'
 import { startAudit } from './audit'
-import { cancelOp } from './engine'
+import { cancelOp, finishEvents } from './engine'
 import { accounts, azureProjects, connectAzure, connectGitHub, githubRepos, importIntoWww, listLocal } from './projects'
 import { cancelSession, startReview } from './review'
 import { deleteSession, listSessions, readSession, recoverSessions, saveSession, sessionCodeDir, sessionDetail, sessionDir, sessionEvents, discardCode } from './sessions'
@@ -373,6 +382,210 @@ function registerIpc(): void {
     const triage = t === 'fixed' || t === 'accepted' || t === 'not-a-problem' ? t : null
     return triageFinding(String(sid), String(fidv), triage)
   })
+  // ---- Findings over time and exports
+  handle('sessions:compare', (id) => {
+    const s = readSession(String(id))
+    const prev = previousSession(listSessions(), s)
+    if (!prev) return { previous: null, added: [], fixed: [], still: 0 }
+    const c = compareFindings(sessionDetail(s.id).findings, sessionDetail(prev.id).findings)
+    return { previous: { id: prev.id, at: prev.createdAt }, ...c }
+  })
+  handle('sessions:export', async (id, format) => {
+    const d = sessionDetail(String(id))
+    if (!mainWindow) return null
+    const ext = format === 'sarif' ? 'sarif' : format === 'cyclonedx' ? 'cdx.json' : 'json'
+    let text: string
+    if (format === 'sarif') text = JSON.stringify(toSarif(d.findings, app.getVersion()), null, 2)
+    else if (format === 'defectdojo') text = JSON.stringify(toDefectDojo(d.findings, d), null, 2)
+    else if (format === 'cyclonedx') {
+      const sbom = join(sessionDir(d.id), 'raw', 'sbom.cdx.json')
+      if (!existsSync(sbom)) throw new ValidationError('This session has no SBOM. Run a Standard or Deep code review (Syft makes it).')
+      text = readFileSync(sbom, 'utf8')
+    } else if (format === 'json') text = JSON.stringify({ session: { ...d, findings: undefined }, findings: d.findings }, null, 2)
+    else throw new ValidationError('Choose SARIF, DefectDojo, CycloneDX or JSON.')
+    const r = await dialog.showSaveDialog(mainWindow, { title: 'Export findings', defaultPath: join(app.getPath('downloads'), `macsec-${d.id}.${ext}`) })
+    if (r.canceled || !r.filePath) return null
+    writeFileSync(r.filePath, text)
+    shell.showItemInFolder(r.filePath)
+    return r.filePath
+  })
+  // Pre-commit hook and CI workflow: saved where you choose, never written into a project on its own.
+  const saveInto = async (title: string, defaultPath: string, text: string, mode = 0o644): Promise<string | null> => {
+    if (!mainWindow) return null
+    const r = await dialog.showSaveDialog(mainWindow, { title, defaultPath })
+    if (r.canceled || !r.filePath) return null
+    writeFileSync(r.filePath, text, { mode })
+    shell.showItemInFolder(r.filePath)
+    return r.filePath
+  }
+  handle('projects:save-hook', (path) => {
+    const p = allowedProject(path)
+    const hooks = join(p, '.git', 'hooks')
+    return saveInto('Save the pre-commit hook (choose .git/hooks/pre-commit to turn it on)', existsSync(hooks) ? join(hooks, 'pre-commit') : join(p, 'pre-commit'), preCommitHook(join(dirs.bin(), 'gitleaks')), 0o755)
+  })
+  handle('projects:save-ci', (path, kind) => {
+    const p = allowedProject(path)
+    const k = kind === 'azure' ? 'azure' : 'github'
+    return saveInto(k === 'github' ? 'Save the GitHub Actions workflow' : 'Save the Azure Pipelines file', k === 'github' ? join(p, '.github', 'workflows', 'security.yml') : join(p, 'azure-pipelines-security.yml'), ciWorkflow(k))
+  })
+  // Mac check-up
+  const checkupFile = (): string => join(dirs.config(), 'checkup.json')
+  handle('checkup:run', async () => {
+    const r = await jobs.run('Checking this Mac', () => runCheckup())
+    writeFileSync(checkupFile(), JSON.stringify(r, null, 2), { mode: 0o600 })
+    log('info', `Mac check-up: ${r.score} of 100`)
+    return r
+  })
+  handle('checkup:last', () => {
+    try {
+      return JSON.parse(readFileSync(checkupFile(), 'utf8'))
+    } catch {
+      return null
+    }
+  })
+  // Local Docker images, scanned with Trivy
+  handle('docker:images', async () => {
+    const docker = dockerPath()
+    if (!docker) return { running: false, images: [] }
+    const out = await new Promise<string>((res) => execFile(docker, ['images', '--format', '{{json .}}'], { timeout: 20000, maxBuffer: 8 * 1024 * 1024 }, (_e, o) => res(String(o))))
+    const images = out.split('\n').filter(Boolean).map((l) => {
+      try {
+        const j = JSON.parse(l) as { Repository: string; Tag: string; Size: string; CreatedSince: string }
+        return { ref: `${j.Repository}:${j.Tag}`, size: j.Size, created: j.CreatedSince }
+      } catch {
+        return null
+      }
+    }).filter((x): x is { ref: string; size: string; created: string } => !!x && !x.ref.includes('<none>'))
+    return { running: true, images }
+  })
+  handle('docker:scan', async (ref) => {
+    if (typeof ref !== 'string' || !/^[a-z0-9][a-z0-9._/:@-]{0,250}$/i.test(ref) || ref.startsWith('-')) throw new ValidationError('That is not an image name.')
+    const docker = dockerPath()
+    if (!docker) throw new ValidationError('Docker is not running.')
+    const def = toolDef('trivy')
+    if (def && !(await listTools()).find((t) => t.id === 'trivy')?.installed) await installTool('trivy', () => undefined)
+    const out = join(dirs.logs(), `trivy-image-${Date.now()}.json`)
+    await jobs.run(`Scanning ${ref}`, () => new Promise<void>((res, rej) => execFile(toolPath('trivy'), ['image', '--quiet', '--scanners', 'vuln,secret,misconfig', '--format', 'json', '--output', out, ref], { timeout: 30 * 60_000, env: toolEnv() }, (e, _o, err) => (e && !existsSync(out) ? rej(new Error(String(err).trim().split('\n').pop())) : res()))))
+    const findings = parseTrivy(readFileSync(out, 'utf8'), '/')
+    rmSync(out, { force: true })
+    log('info', `Scanned image ${ref}: ${findings.length} findings`)
+    return findings
+  })
+  // Skill packs
+  const packsRoot = (): string => join(dirs.tools(), 'skill-packs')
+  const packList = (): SkillPackInfo[] => SKILL_PACKS.map((p) => ({ name: p.name, repo: p.repo, license: p.license, about: p.about, ...packState(packsRoot(), p.id), id: p.id }))
+  handle('packs:list', () => packList())
+  handle('packs:install', async (id) => {
+    if (!SKILL_PACKS.some((p) => p.id === id)) throw new ValidationError('That skill pack is not on the list.')
+    const st = await jobs.run(`Getting the ${SKILL_PACKS.find((p) => p.id === id)!.name} skills`, () => installPack(packsRoot(), String(id)))
+    log('info', `${st.loaded.length} skills from ${id}, commit ${st.commit}`)
+    return packList()
+  })
+  handle('packs:remove', (id) => {
+    removePack(packsRoot(), String(id))
+    return packList()
+  })
+  // Integrations: MCP, CLI, webhooks, Raycast, Apple Shortcuts
+  const cliPath = (): string => join(dirs.bin(), 'macsec')
+  const raycastDir = (): string => join(dirs.root(), 'raycast')
+  let mcpServer: Server | null = null
+  let mcpError: string | null = null
+  const startMcp = async (): Promise<void> => {
+    if (mcpServer) return
+    try {
+      mcpServer = await startMcpServer({ tools: macsecTools({
+        sessions: () => listSessions(),
+        session: (id) => sessionDetail(id),
+        compare: (id) => {
+          const cur = readSession(id)
+          const prev = previousSession(listSessions(), cur)
+          return prev ? { previous: prev.id, ...compareFindings(sessionDetail(cur.id).findings, sessionDetail(prev.id).findings) } : { previous: null }
+        },
+        projects: () => listLocal(),
+        review: (path, depth) => startReview(validReview({ source: { kind: 'local', path }, reviewer: getSettings().reviewer, depth, focus: 'security', keepCode: false })),
+        checkup: () => runCheckup()
+      }), version: app.getVersion(), onCall: (name) => log('info', `AI tool used ${name}`) })
+      mcpError = null
+    } catch (e) {
+      mcpError = `Could not listen on port ${MCP_PORT}: ${(e as Error).message}`
+    }
+  }
+  const integrations = (): IntegrationsInfo => {
+    const w = getSettings().webhook
+    return {
+      webhook: w ? { ...w, saved: !!getSecret('webhook-url') } : null,
+      raycastDir: raycastDir(),
+      raycastInstalled: existsSync(join(raycastDir(), 'macsec-sessions.sh')),
+      cli: cliPath(),
+      shortcuts: [
+        { title: 'Mac check-up', command: `"${cliPath()}" checkup` },
+        { title: 'Latest sessions as JSON', command: `"${cliPath()}" sessions --json` },
+        { title: 'Review a folder in www', command: `"${cliPath()}" review shop` }
+      ],
+      mcp: { enabled: !!getSettings().mcpEnabled, running: !!mcpServer, url: mcpUrl(MCP_PORT), command: `claude mcp add --transport http --scope user macsec ${mcpUrl(MCP_PORT)} --header "Authorization: Bearer ${mcpToken()}"`, error: mcpError }
+    }
+  }
+  handle('integrations:get', () => integrations())
+  handle('mcp:enable', async (on) => {
+    setSettings({ mcpEnabled: on === true })
+    if (on === true) {
+      await startMcp()
+      writeCli()
+    } else {
+      mcpServer?.close()
+      mcpServer = null
+    }
+    return integrations()
+  })
+  const writeCli = (): void => {
+    writeFileSync(cliPath(), macsecCli(join(dirs.config(), 'mcp-token'), MCP_PORT), { mode: 0o755 })
+  }
+  handle('webhook:set', (cfg, url) => {
+    if (cfg === null) {
+      setSettings({ webhook: undefined })
+      setSecret('webhook-url', null)
+      return integrations()
+    }
+    const c = cfg as { kind: HookKind; events: 'errors' | 'all' }
+    if (!['slack', 'teams', 'discord', 'generic'].includes(c.kind)) throw new ValidationError('Choose Slack, Teams, Discord or another address.')
+    if (typeof url === 'string' && url.trim()) {
+      try {
+        setSecret('webhook-url', checkHookUrl(c.kind, url))
+      } catch (e) {
+        throw new ValidationError((e as Error).message)
+      }
+    }
+    if (!getSecret('webhook-url')) throw new ValidationError('Paste the webhook address.')
+    setSettings({ webhook: { kind: c.kind, events: c.events === 'all' ? 'all' : 'errors' } })
+    return integrations()
+  })
+  handle('webhook:test', async () => {
+    const w = getSettings().webhook
+    const url = getSecret('webhook-url')
+    if (!w || !url) throw new ValidationError('Save a webhook first.')
+    await sendHook(w.kind, url, hookBody(w.kind, 'MacSec', 'info', 'Test message', 'MacSec can post here.')).catch((e) => {
+      throw new ValidationError((e as Error).message)
+    })
+  })
+  handle('raycast:install', () => {
+    writeCli()
+    mkdirSync(raycastDir(), { recursive: true })
+    for (const f of raycastScripts(cliPath(), 'MacSec')) writeFileSync(join(raycastDir(), f.file), f.text, { mode: 0o755 })
+    void shell.openPath(raycastDir())
+    return integrations()
+  })
+  if (getSettings().mcpEnabled) void startMcp().then(writeCli)
+  // When a session ends: a webhook message and, when MacSec is in the background, a notification.
+  finishEvents.on('finished', (info: SessionInfo) => {
+    const bad = info.counts.critical + info.counts.high
+    const title = info.status === 'failed' ? `${info.title} failed` : `${info.title}: ${bad ? `${info.counts.critical} critical, ${info.counts.high} high` : 'nothing serious'}`
+    const body = info.status === 'failed' ? info.error : `${Object.values(info.counts).reduce((a, b) => a + b, 0)} findings. Target: ${info.target}`
+    const w = getSettings().webhook
+    const url = getSecret('webhook-url')
+    if (w && url && (info.status === 'failed' || bad > 0 || w.events === 'all')) void sendHook(w.kind, url, hookBody(w.kind, 'MacSec', info.status === 'failed' || bad ? 'error' : 'success', title, body)).catch(() => undefined)
+    if (getSettings().notifications && Notification.isSupported() && !mainWindow?.isFocused()) new Notification({ title, body: body?.slice(0, 180), silent: !bad }).show()
+  })
+
   handle('app:check-update', () => checkForUpdate())
   handle('app:install-update', () => installUpdate((p, l) => log('info', `${l ?? 'Updating'}${p !== null ? ` ${Math.round(p)}%` : ''}`)))
   handle('sessions:get', (id) => sessionDetail(String(id)))

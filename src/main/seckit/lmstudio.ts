@@ -4,7 +4,7 @@
  *
  * Claude Code sends a long system prompt and tool list with every request, so a model loaded
  * with LM Studio's default context (often 4,096 tokens) fails with "context too small". Before a
- * review or a claude-lm session, this asks LM Studio which context the model was loaded with and,
+ * review or a claudelm session, this asks LM Studio which context the model was loaded with and,
  * when it is too small, loads it again with enough (capped at what the model supports).
  *
  * It only talks to LM Studio's own REST API on this Mac: GET /api/v1/models,

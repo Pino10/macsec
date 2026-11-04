@@ -1,0 +1,4 @@
+COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+environme  82 root   10u  IPv4    206      0t0  TCP 127.0.0.1:44687 (LISTEN)
+claude    111 root   13u  IPv4   1811      0t0  TCP 127.0.0.1:36761 (LISTEN)
+claude    111 root   20u  IPv4   1818      0t0  TCP 127.0.0.1:28471 (LISTEN)

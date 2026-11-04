@@ -6,7 +6,7 @@ export interface Toast {
   text: string
 }
 
-export type Page = 'overview' | 'projects' | 'review' | 'web' | 'api' | 'mobile' | 'recon' | 'audit' | 'sessions' | 'tools' | 'logs' | 'settings'
+export type Page = 'overview' | 'projects' | 'review' | 'web' | 'api' | 'mobile' | 'recon' | 'audit' | 'mac' | 'sessions' | 'tools' | 'logs' | 'settings'
 
 interface AppCtx {
   page: Page
