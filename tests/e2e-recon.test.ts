@@ -9,6 +9,8 @@ const run = existsSync('/tmp/lm/myapp/package.json') ? describe : describe.skip
 
 run('a real recon session', () => {
   it('runs every step, keeps the map and finds the source maps', async () => {
+    // Needs the site actually answering; otherwise there is nothing to test against.
+    if (!(await fetch('http://myapp.test/', { signal: AbortSignal.timeout(3000) }).then(() => true).catch(() => false))) return console.log('myapp.test is not running: skipped')
     setRoot(mkdtempSync(join(tmpdir(), 'ms-recon-')))
     ensureDirs()
     const { startRecon, reconData } = await import('../src/main/reconscan')
