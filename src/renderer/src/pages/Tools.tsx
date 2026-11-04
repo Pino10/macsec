@@ -25,9 +25,11 @@ export default function Tools(): React.JSX.Element {
   const [hasKey, setHasKey] = useState(false)
   const [key, setKey] = useState('')
   const [skills, setSkills] = useState<{ name: string; mine: boolean }[]>([])
+  const [claudeSkills, setClaudeSkills] = useState(false)
   useEffect(() => {
     void api.invoke('ai:key-status').then((r) => setHasKey(r.hasKey))
     void api.invoke('ai:skills').then(setSkills)
+    void api.invoke('ai:claude-skills', null).then((r) => setClaudeSkills(r.installed))
   }, [api])
 
   const refreshAi = (): void => {
@@ -107,7 +109,7 @@ export default function Tools(): React.JSX.Element {
               <div className="row-sub">{a.role}</div>
             </div>
             {a.installed && a.app ? (
-              <button className="btn btn-sm" onClick={() => void act('open-app', () => api.invoke('ai:open-app', a.id))}>
+              <button className="btn btn-sm" onClick={() => void act('open-app', () => api.invoke('ai:open-app', a.id as 'claude'))}>
                 Open
               </button>
             ) : a.installed ? (
@@ -192,6 +194,24 @@ export default function Tools(): React.JSX.Element {
           </div>
           <button className="btn btn-sm" onClick={() => void api.invoke('app:open-folder', 'extensions')}>
             Open folder
+          </button>
+        </div>
+        <div className="arsenal-row" data-on={claudeSkills}>
+          <span className="glyph" style={{ ['--g' as string]: '#38e1ff' }}>
+            <Sparkles size={18} />
+          </span>
+          <div>
+            <div className="row-title">Use them everywhere in Claude</div>
+            <div className="row-sub">Copies MacSec’s skills into ~/.claude/skills, so Claude Code in Terminal and in the Claude desktop app can use them in any session.</div>
+          </div>
+          <button
+            className="btn btn-sm"
+            onClick={async () => {
+              const r = await act('cskills', () => api.invoke('ai:claude-skills', !claudeSkills))
+              if (r) setClaudeSkills(r.installed)
+            }}
+          >
+            {claudeSkills ? 'Remove from Claude' : 'Install for Claude'}
           </button>
         </div>
       </div>

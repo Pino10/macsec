@@ -39,6 +39,8 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 | `src/main/audit.ts` | Special audits: full audit, portfolio sweep, change review. |
 | `src/main/mobilescan.ts`, `src/main/scanners/mobile.ts` | Mobile app checks: mobsfscan, the Android manifest and Info.plist checks, and binary hardening (`hardening()` reads Mach-O and ELF headers). |
 | `src/main/infraaudit.ts`, `src/main/scanners/infra.ts` | Cloud account audits (ScoutSuite, CloudFox, PMapper) and server checks (naabu, Nmap); also the WPScan parser. |
+| `src/main/seckit/` | Shared with Laramac: the recon engine, the reviewers' command lines and the skills. Change one copy, then copy it to the other app. |
+| `src/main/reconscan.ts` | Recon as a session. |
 | `src/main/optional.ts` | The attack tools from the T3MP3ST pack, listed only. Never add an install or run for these. |
 | `components/LiveRun.tsx` | The live progress panel. Tools' output reaches it through `SessionRun.line()` (redacted, then `friendly()`), and `percentOf()` reads percentages. |
 | `src/main/aisummary.ts` | The AI summary for web and API scans (it reads the findings only). |

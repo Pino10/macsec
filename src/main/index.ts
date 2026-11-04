@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
-import type { ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest } from '../shared/types'
+import type { ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest } from '../shared/types'
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { getSecret, setSecret, setSecretsCrypto } from './secrets'
@@ -15,6 +15,8 @@ import { checkUpdates, checkUpdatesDaily, installTool, listTools, removeTool, to
 import { localSites, startWebScan } from './webscan'
 import { loadSpec, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
+import { reconData, startRecon } from './reconscan'
+import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
 import { optionalTools } from './optional'
 import { startAudit } from './audit'
@@ -142,7 +144,7 @@ function allowedProject(path: unknown): string {
 
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d)
 const MODES = ['quick', 'standard', 'thorough'] as const
-const REVIEWERS = ['none', 'claude', 'codex', 'model'] as const
+const REVIEWERS = ['none', 'claude', 'claude-local', 'codex', 'gemini', 'model'] as const
 
 function validWeb(req: unknown): WebScanRequest {
   const r = (req ?? {}) as Partial<WebScanRequest>
@@ -405,6 +407,21 @@ function registerIpc(): void {
     return cloudStatus()
   })
   handle('tools:optional', () => optionalTools())
+  handle('recon:start', (req) => {
+    const r = (req ?? {}) as Partial<ReconRequest>
+    if (typeof r.target !== 'string') throw new ValidationError('Enter a domain, such as example.com.')
+    try {
+      return startRecon({ target: r.target, depth: pick(r.depth, ['passive', 'standard', 'deep'] as const, 'standard'), reviewer: pick(r.reviewer, REVIEWERS, 'none'), authorized: r.authorized === true })
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
+  handle('recon:data', (id) => reconData(String(id)) as never)
+  handle('ai:claude-skills', (on) => {
+    if (on === true) installForClaude('macsec')
+    else if (on === false) removeFromClaude('macsec')
+    return { installed: installedForClaude('macsec') }
+  })
   handle('api:start', (req) => {
     try {
       return startApiScan(validApi(req))

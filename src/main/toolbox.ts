@@ -43,6 +43,7 @@ export const CATALOG: ToolDef[] = [
   { id: 'nuclei', name: 'Nuclei', category: 'web', method: 'release', repo: 'projectdiscovery/nuclei', binaries: ['nuclei'], purpose: 'Runs thousands of community checks for known problems against a site.', homepage: 'https://docs.projectdiscovery.io/tools/nuclei', versionArgs: ['-version'] },
   { id: 'katana', name: 'Katana', category: 'web', method: 'release', repo: 'projectdiscovery/katana', binaries: ['katana'], purpose: 'Crawls a site to find every page, form and endpoint before scanning.', homepage: 'https://docs.projectdiscovery.io/tools/katana', versionArgs: ['-version'] },
   { id: 'wpscan', name: 'WPScan', category: 'web', method: 'app', apps: brew('wpscan'), purpose: 'WordPress: the version, plugins and themes, and known problems in them. Used in web scans of WordPress sites when installed (brew install wpscanteam/tap/wpscan).', homepage: 'https://wpscan.com' },
+  { id: 'subfinder', name: 'subfinder', category: 'web', method: 'release', repo: 'projectdiscovery/subfinder', binaries: ['subfinder'], purpose: 'Finds subdomains from public sources, for recon. Passive: it never contacts the target.', homepage: 'https://docs.projectdiscovery.io/tools/subfinder', versionArgs: ['-version'] },
   { id: 'httpx', name: 'httpx', category: 'web', method: 'release', repo: 'projectdiscovery/httpx', binaries: ['httpx'], purpose: 'Checks which addresses answer and what they run (server, framework, title).', homepage: 'https://docs.projectdiscovery.io/tools/httpx', versionArgs: ['-version'] },
 
   // Mobile apps

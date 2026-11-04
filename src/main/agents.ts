@@ -136,6 +136,7 @@ export async function listAgents(): Promise<AgentInfo[]> {
           : 'Reviews your whole project in read-only mode.'
     },
     { id: 'codex', name: 'Codex', installed: !!codex, path: codex, version: codex ? await version(codex) : null, app: findApp('codexApp'), role: 'OpenAI’s coding agent, as a second reviewer in a read-only sandbox.' },
+    { id: 'gemini', name: 'Gemini CLI', installed: !!findCli('gemini'), path: findCli('gemini'), version: findCli('gemini') ? await version(findCli('gemini')!) : null, app: null, role: 'Google’s coding agent, as another reviewer, in read-only plan mode. Install with npm install -g @google/gemini-cli.' },
     { id: 'lmstudio', name: 'LM Studio', installed: !!findApp('lmstudio'), path: findApp('lmstudio'), version: null, app: findApp('lmstudio'), role: 'Your own models on this Mac. Nothing leaves your computer.' },
     {
       id: 'burp',

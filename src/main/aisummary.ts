@@ -8,6 +8,8 @@ import { agentEnv, findCli } from './agents'
 import { chatWithLlm } from './models'
 import { parseAiOutput, type Verdict } from './aireview'
 import { pluginArgs } from './skills'
+import { localModelEnv } from './seckit/reviewers'
+import { getSettings } from './settings'
 import type { Op } from './engine'
 
 const WHAT = { web: ['web', 'site'], api: ['API', 'API'], mobile: ['mobile app', 'app'], cloud: ['cloud account', 'cloud account'], server: ['server and open ports', 'server'] } as const
@@ -41,12 +43,20 @@ export async function summarizeWithAi(reviewer: Reviewer, prompt: string, op: Op
   let text: string
   if (reviewer === 'model') text = await chatWithLlm([{ role: 'user', content: prompt }], 20 * 60_000)
   else {
-    const bin = findCli(reviewer === 'codex' ? 'codex' : 'claude')
-    if (!bin) throw new Error(`${reviewer === 'codex' ? 'Codex' : 'Claude Code'} is not installed. Set it up on Tools.`)
+    const cli = reviewer === 'codex' ? 'codex' : reviewer === 'gemini' ? 'gemini' : 'claude'
+    const bin = findCli(cli)
+    if (!bin) throw new Error(`${reviewer === 'codex' ? 'Codex' : reviewer === 'gemini' ? 'Gemini CLI' : 'Claude Code'} is not installed. Set it up on Tools.`)
+    const st = getSettings()
+    const localEnv = reviewer === 'claude-local' ? localModelEnv({ baseUrl: st.llm.baseUrl, model: st.llm.model }) : {}
     // The AI only reads the findings in the prompt: no tools, no session saved.
-    const args = reviewer === 'codex' ? ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', prompt] : ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--disallowedTools', 'Bash,Edit,Write,WebFetch,WebSearch,NotebookEdit', '--no-session-persistence', ...pluginArgs()]
+    const args =
+      reviewer === 'codex'
+        ? ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', prompt]
+        : reviewer === 'gemini'
+          ? ['-p', prompt, '--approval-mode', 'plan', '--skip-trust', '--output-format', 'text']
+          : ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--disallowedTools', 'Bash,Edit,Write,WebFetch,WebSearch,NotebookEdit', '--no-session-persistence', ...(reviewer === 'claude-local' ? ['--model', st.llm.model] : []), ...pluginArgs()]
     text = await new Promise<string>((resolve, reject) => {
-      const child = spawn(bin, args, { cwd, env: agentEnv(), stdio: ['ignore', 'pipe', 'pipe'] })
+      const child = spawn(bin, args, { cwd, env: { ...agentEnv(), ...localEnv }, stdio: ['ignore', 'pipe', 'pipe'] })
       op.children.add(child)
       let out = ''
       let err = ''

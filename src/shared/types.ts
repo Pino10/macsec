@@ -67,7 +67,7 @@ export type ReviewSource =
 
 // ---------------------------------------------------------------- Sessions and findings
 
-export type FindingCategory = 'code' | 'secret' | 'dependency' | 'config' | 'ai' | 'web' | 'api' | 'mobile' | 'cloud' | 'network' | 'binary'
+export type FindingCategory = 'code' | 'secret' | 'dependency' | 'config' | 'ai' | 'web' | 'api' | 'mobile' | 'cloud' | 'network' | 'binary' | 'recon'
 
 export interface Finding {
   id: string
@@ -101,7 +101,7 @@ export interface Finding {
   aiNote?: string
 }
 
-export type Reviewer = 'none' | 'claude' | 'codex' | 'model'
+export type Reviewer = 'none' | 'claude' | 'claude-local' | 'codex' | 'gemini' | 'model'
 
 /** How much a scan covers. Every mode only reads: nothing is changed, fuzzed or attacked. */
 export type ScanMode = 'quick' | 'standard' | 'thorough'
@@ -176,7 +176,7 @@ export interface SessionStep {
   lastLine?: string
 }
 
-export type SessionKind = 'code-review' | 'web-scan' | 'api-scan' | 'mobile-scan' | 'audit'
+export type SessionKind = 'code-review' | 'web-scan' | 'api-scan' | 'mobile-scan' | 'recon' | 'audit'
 
 export type AuditRequest =
   | { kind: 'full'; path: string; site: string; reviewer: Reviewer; depth: ReviewDepth; authorized: boolean }
@@ -186,6 +186,13 @@ export type AuditRequest =
   | { kind: 'server'; host: string; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean }
 
 /** A mobile app: its source folder, or a built .apk or .ipa file. */
+export interface ReconRequest {
+  target: string
+  depth: 'passive' | 'standard' | 'deep'
+  reviewer: Reviewer
+  authorized: boolean
+}
+
 export interface MobileScanRequest {
   path: string
   reviewer: Reviewer
@@ -280,7 +287,7 @@ export interface ChatMessage {
 }
 
 export interface AgentInfo {
-  id: 'claude' | 'codex' | 'burp' | 'lmstudio'
+  id: 'claude' | 'codex' | 'gemini' | 'burp' | 'lmstudio'
   name: string
   installed: boolean
   path: string | null
@@ -364,6 +371,9 @@ export interface Channels {
   'cloud:status': { args: []; result: { azure: string | null; aws: string | null } }
   'cloud:azure-login': { args: []; result: { azure: string | null; aws: string | null } }
   'tools:optional': { args: []; result: OptionalTool[] }
+  'recon:start': { args: [ReconRequest]; result: SessionInfo }
+  'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number } | null }
+  'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
   'sessions:list': { args: []; result: SessionInfo[] }
   'sessions:get': { args: [string]; result: SessionDetail }
   'sessions:delete': { args: [string]; result: SessionInfo[] }

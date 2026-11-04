@@ -1,3 +1,23 @@
+## MacSec 0.5
+
+### Recon (new)
+Map what a domain exposes before you test it:
+- subdomains from certificate logs, subfinder and the Wayback Machine
+- DNS, with possible subdomain takeovers
+- which hosts answer and what they run
+- old URLs and their parameters
+- every script checked for **source maps** (indexed maps too), endpoints and keys (masked)
+- a few files that should never be public
+
+Choose Passive (nothing is sent to the site), Standard or Deep. The AI write-up is an attack surface map with leads for manual testing. A **Hosts and scripts** tab keeps the whole map. Read-only, and domains that are not on your Mac need your confirmation.
+
+### More reviewers
+- **Claude Code on your own model:** Claude Code with all its tools and MacSec's skills, talking to your LM Studio model through its Anthropic-compatible API (LM Studio 0.4.1 or newer). Nothing leaves your Mac.
+- **Gemini CLI**, in read-only plan mode.
+
+### Skills everywhere
+The skills now include recon, JavaScript recon, attack surface reports and reviewing with local models. They are shared with Laramac. **Install for Claude** on Tools copies them into ~/.claude/skills, so Claude Code in Terminal and in the Claude desktop app can use them in any session.
+
 ## MacSec 0.4
 
 ### Watch every test as it runs

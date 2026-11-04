@@ -1,0 +1,8 @@
+[["original"],
+["http://example.com:80/"],
+["https://example.com/login?next=/account&lang=en"],
+["https://www.example.com/search?q=shoes&page=2"],
+["https://example.com/backup/site.zip"],
+["https://example.com/api/v1/users?id=42"],
+["https://example.com/assets/app.3f9a.js"],
+["https://cdn.other.com/x.js"]]

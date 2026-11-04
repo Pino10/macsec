@@ -11,6 +11,7 @@ import WebScan from './pages/WebScan'
 import ApiSecurity from './pages/ApiSecurity'
 import Audits from './pages/Audits'
 import Mobile from './pages/Mobile'
+import Recon from './pages/Recon'
 import Sessions from './pages/Sessions'
 import Tools from './pages/Tools'
 import Logs from './pages/Logs'
@@ -77,6 +78,7 @@ function Shell(): React.JSX.Element {
               {page === 'web' && <WebScan />}
               {page === 'api' && <ApiSecurity />}
               {page === 'mobile' && <Mobile />}
+              {page === 'recon' && <Recon />}
               {page === 'audit' && <Audits />}
               {page === 'sessions' && <Sessions />}
               {page === 'tools' && <Tools />}

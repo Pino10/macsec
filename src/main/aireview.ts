@@ -13,6 +13,8 @@ import { join } from 'path'
 import type { Finding, ReviewDepth, ReviewFocus, Severity } from '../shared/types'
 import { agentEnv, findCli } from './agents'
 import { pluginArgs } from './skills'
+import { explainFailure, localModelEnv, type LocalModel } from './seckit/reviewers'
+import { skillText } from './seckit/skills'
 import { chatWithLlm } from './models'
 import { fid } from './scanners/parse'
 
@@ -138,9 +140,9 @@ export function parseAiOutput(text: string, tool: string): AiResult {
   return { report, findings, verdicts, details }
 }
 
-function runCli(bin: string, args: string[], cwd: string, onChild: (c: ChildProcess) => void, timeoutMs: number, onActivity: () => void): Promise<{ code: number | null; out: string; err: string }> {
+function runCli(bin: string, args: string[], cwd: string, onChild: (c: ChildProcess) => void, timeoutMs: number, onActivity: () => void, extraEnv: Record<string, string> = {}): Promise<{ code: number | null; out: string; err: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { cwd, env: agentEnv(), stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(bin, args, { cwd, env: { ...agentEnv(), ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] })
     onChild(child)
     let out = ''
     let err = ''
@@ -169,12 +171,16 @@ const TIMEOUT: Record<ReviewDepth, number> = { quick: 15, standard: 40, deep: 12
  * "Continue in Claude Code" picks up the same conversation. Read-only: plan mode, and only the
  * Read, Grep and Glob tools.
  */
-export async function reviewWithClaude(root: string, prompt: string, depth: ReviewDepth, onChild: (c: ChildProcess) => void, onActivity: () => void, session?: { id: string; name: string }): Promise<AiResult> {
+export async function reviewWithClaude(root: string, prompt: string, depth: ReviewDepth, onChild: (c: ChildProcess) => void, onActivity: () => void, session?: { id: string; name: string }, local?: LocalModel): Promise<AiResult> {
   const bin = findCli('claude')
   if (!bin) throw new Error('Claude Code’s command line tool is not installed (the Claude desktop app is separate). Install it on the Tools page.')
-  const base = ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', ...pluginArgs()]
+  // With a local model, Claude Code talks to LM Studio's Anthropic-compatible API instead of Anthropic.
+  const env = local ? localModelEnv(local) : {}
+  const method = local ? `\n\nFollow this method:\n${skillText(['security-code-review', 'local-model-review', 'security-report'])}` : ''
+  const base = ['-p', prompt + method, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', ...(local ? ['--model', local.model] : []), ...pluginArgs()]
   const keep = session ? ['--session-id', session.id, '--name', session.name] : ['--no-session-persistence']
-  let r = await runCli(bin, [...base, ...keep], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
+  let r = await runCli(bin, [...base, ...keep], root, onChild, (local ? 2 : 1) * TIMEOUT[depth] * 60_000, onActivity, env)
+  if (local && r.code !== 0) throw new Error(explainFailure('claude-local', r.err))
   // Older Claude Code versions: without the newer options.
   if (r.code !== 0 && /unknown option/i.test(r.err)) r = await runCli(bin, ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
   if (r.code !== 0 || !r.out.trim()) {
@@ -182,6 +188,15 @@ export async function reviewWithClaude(root: string, prompt: string, depth: Revi
     throw new Error(`Claude Code stopped without a report. ${r.err.trim().split('\n').slice(-2).join(' ')}`.trim())
   }
   return parseAiOutput(r.out, 'Claude Code')
+}
+
+/** Google's Gemini CLI in plan mode: it reads the project, it cannot change files or run commands. */
+export async function reviewWithGemini(root: string, prompt: string, depth: ReviewDepth, onChild: (c: ChildProcess) => void, onActivity: () => void): Promise<AiResult> {
+  const bin = findCli('gemini')
+  if (!bin) throw new Error('Gemini CLI is not installed (npm install -g @google/gemini-cli), then run gemini once to sign in.')
+  const r = await runCli(bin, ['-p', `${prompt}\n\nFollow this method:\n${skillText(['security-code-review', 'secrets-triage', 'security-report'])}`, '--approval-mode', 'plan', '--skip-trust', '--output-format', 'text'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
+  if (!r.out.trim()) throw new Error(explainFailure('gemini', r.err))
+  return parseAiOutput(r.out, 'Gemini CLI')
 }
 
 export async function reviewWithCodex(root: string, prompt: string, depth: ReviewDepth, outFile: string, onChild: (c: ChildProcess) => void, onActivity: () => void): Promise<AiResult> {

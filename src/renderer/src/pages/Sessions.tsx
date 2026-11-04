@@ -7,7 +7,7 @@ import Markdown from '../components/Markdown'
 import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
 import { CodeView, Counts, Empty, KindIcon, PageHead, Sev, Spectrum, StepIcon, ago, duration, kindName } from '../ui'
 
-const reviewerName = (s: SessionInfo): string => (s.reviewer === 'claude' ? 'Claude Code' : s.reviewer === 'codex' ? 'Codex' : s.reviewer === 'model' ? 'Your model' : 'No AI')
+const reviewerName = (s: SessionInfo): string => ({ claude: 'Claude Code', 'claude-local': 'Claude Code on your model', codex: 'Codex', gemini: 'Gemini CLI', model: 'Your model', none: 'No AI' } as const)[s.reviewer ?? 'none'] ?? 'No AI'
 
 export default function Sessions(): React.JSX.Element {
   const { sessions, openSession, showSession } = useApp()
@@ -28,7 +28,7 @@ export default function Sessions(): React.JSX.Element {
         <>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
             <div className="chips">
-              {(['all', 'code-review', 'web-scan', 'api-scan', 'mobile-scan', 'audit'] as const).map((k) => (
+              {(['all', 'code-review', 'web-scan', 'api-scan', 'mobile-scan', 'recon', 'audit'] as const).map((k) => (
                 <button key={k} className="chip" aria-pressed={kind === k} onClick={() => setKind(k)} style={{ textTransform: 'none' }}>
                   {k === 'all' ? 'All' : kindName(k)} <i>{k === 'all' ? sessions.length : sessions.filter((s) => s.kind === k).length}</i>
                 </button>
@@ -82,7 +82,8 @@ const CATS: [FindingCategory | 'all', string][] = [
   ['mobile', 'Mobile'],
   ['binary', 'Binary'],
   ['cloud', 'Cloud'],
-  ['network', 'Ports']
+  ['network', 'Ports'],
+  ['recon', 'Recon']
 ]
 
 function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.JSX.Element {
@@ -92,7 +93,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [sevs, setSevs] = useState<Set<Severity>>(new Set(['critical', 'high', 'medium', 'low']))
   const [cat, setCat] = useState<FindingCategory | 'all'>('all')
   const [showFp, setShowFp] = useState(false)
-  const [tab, setTab] = useState<'findings' | 'report' | 'run'>('findings')
+  const [tab, setTab] = useState<'findings' | 'report' | 'run' | 'surface'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const live = sessions.find((s) => s.id === id)
   const now = useNow(live?.status === 'running')
@@ -223,6 +224,11 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <button role="tab" aria-selected={tab === 'run'} onClick={() => setTab('run')}>
             What ran
           </button>
+          {s.kind === 'recon' && (
+            <button role="tab" aria-selected={tab === 'surface'} onClick={() => setTab('surface')}>
+              Hosts and scripts
+            </button>
+          )}
         </div>
         {tab === 'findings' && (
           <>
@@ -270,6 +276,8 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           ))}
         </div>
       )}
+
+      {tab === 'surface' && <Surface id={id} />}
 
       {tab === 'report' && (
         <>
@@ -402,6 +410,72 @@ function Detail({ f, id, canOpen }: { f: Finding; id: string; canOpen: boolean }
             <ExternalLink size={13} /> {f.category === 'web' || f.category === 'api' ? 'Open page' : 'Details'}
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+type SurfaceData = NonNullable<Awaited<ReturnType<typeof window.macsec.invoke<'recon:data'>>>>
+
+/** A recon's hosts, scripts, endpoints and parameters. */
+function Surface({ id }: { id: string }): React.JSX.Element {
+  const [d, setD] = useState<SurfaceData | null>(null)
+  useEffect(() => {
+    void window.macsec.invoke('recon:data', id).then(setD)
+  }, [id])
+  if (!d) return <div className="panel" style={{ padding: 20 }}><span className="hint">The map appears when the recon has collected it.</span></div>
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div className="panel">
+        <div style={{ padding: '14px 18px 4px' }} className="section-title">
+          {d.hosts.length} hosts, {d.hosts.filter((h) => h.live).length} answer
+        </div>
+        {d.hosts.map((h) => (
+          <div key={h.host} className="row" style={{ cursor: 'default' }}>
+            <span className="grow">
+              <span className="row-title mono" style={{ display: 'block' }}>
+                {h.host}
+              </span>
+              <span className="row-sub">
+                {h.ips.join(', ') || (h.cname ? `CNAME ${h.cname}` : 'does not resolve')} · {h.sources.join(', ')}
+              </span>
+            </span>
+            {h.live && (
+              <span className="hint" style={{ textAlign: 'right' }}>
+                {h.live.status} {h.live.title?.slice(0, 40)}
+                <br />
+                {h.live.tech.slice(0, 4).join(', ')}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="panel">
+        <div style={{ padding: '14px 18px 4px' }} className="section-title">
+          {d.js.length} scripts, {d.js.filter((j) => j.sourceMap).length} with a public source map
+        </div>
+        {d.js
+          .slice()
+          .sort((a, b) => Number(!!b.sourceMap) - Number(!!a.sourceMap))
+          .map((j) => (
+            <div key={j.url} className="row" style={{ cursor: 'default' }}>
+              <span className="grow">
+                <span className="row-title mono" style={{ display: 'block', wordBreak: 'break-all' }}>
+                  {j.url.replace(/^https?:\/\//, '')}
+                </span>
+                <span className="row-sub">
+                  {Math.round(j.bytes / 1024)} KB · {j.endpoints.length} endpoints
+                  {j.sourceMap ? ` · source map, ${j.sourceMap.files} files: ${j.sourceMap.sample.slice(0, 4).join(', ')}` : ''}
+                  {j.secrets.length ? ` · keys: ${j.secrets.map((k) => `${k.kind} ${k.masked}`).join(', ')}` : ''}
+                </span>
+              </span>
+            </div>
+          ))}
+      </div>
+      <div className="panel" style={{ padding: 18 }}>
+        <div className="section-title">Endpoints in the JavaScript, and parameters from {d.urls} archived URLs</div>
+        <pre className="codeview" style={{ maxHeight: 360, overflow: 'auto', padding: 14 }}>{d.endpoints.join('\n') || 'None found.'}</pre>
+        <p className="hint mono" style={{ wordBreak: 'break-word' }}>{d.params.slice(0, 200).join(', ')}</p>
       </div>
     </div>
   )
