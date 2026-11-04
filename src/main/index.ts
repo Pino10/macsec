@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
-import type { ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest } from '../shared/types'
+import type { ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest, SessionInfo } from '../shared/types'
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { getSecret, setSecret, setSecretsCrypto } from './secrets'
@@ -16,6 +16,8 @@ import { localSites, startWebScan } from './webscan'
 import { loadSpec, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
 import { reconData, startRecon } from './reconscan'
+import { readRequest, saveRequest, stripSecrets, triageFinding } from './sessions'
+import { checkForUpdate, installUpdate } from './updater'
 import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
 import { optionalTools } from './optional'
@@ -130,6 +132,32 @@ function handle<K extends ChannelName>(channel: K, fn: (...args: Channels[K]['ar
       throw new Error(msg)
     }
   })
+}
+
+/**
+ * Tests that can be run again: each start handler is kept, and the request it got is saved with
+ * the session (without cookies, tokens or sign-in headers), so "Test again" repeats it exactly.
+ */
+type StartChannel = 'review:start' | 'web:start' | 'api:start' | 'mobile:start' | 'audit:start' | 'recon:start'
+const starters = new Map<StartChannel, (req: unknown) => SessionInfo | Promise<SessionInfo>>()
+function handleStart(channel: StartChannel, fn: (req: never) => SessionInfo | Promise<SessionInfo>): void {
+  const run = async (req: unknown): Promise<SessionInfo> => {
+    const info = await fn(req as never)
+    saveRequest(info.id, channel, stripSecrets(req))
+    return info
+  }
+  starters.set(channel, run)
+  handle(channel, run as never)
+}
+export async function rerunSession(id: string): Promise<SessionInfo> {
+  const saved = readRequest(id)
+  if (!saved) throw new ValidationError('This test was made by an older MacSec and cannot be repeated. Start it again from its page.')
+  const fn = starters.get(saved.channel as StartChannel)
+  if (!fn) throw new ValidationError('This kind of test cannot be repeated.')
+  // A folder you picked in a dialog for the first run may be used again.
+  const p = (saved.req as { path?: unknown; source?: { path?: unknown } } | null)
+  for (const x of [p?.path, p?.source?.path]) if (typeof x === 'string' && existsSync(x)) picked.add(resolve(x))
+  return fn(saved.req)
 }
 
 /** A folder the window names must be inside the www folder, or one you picked in a dialog. */
@@ -325,8 +353,28 @@ function registerIpc(): void {
   handle('azure:projects', (path) => azureProjects(String(path ?? '')).catch((e) => Promise.reject(new ValidationError((e as Error).message))))
 
   // Reviews and sessions
-  handle('review:start', (req) => startReview(validReview(req)))
+  handleStart('review:start', (req) => startReview(validReview(req)))
   handle('sessions:list', () => listSessions())
+  handle('sessions:rerun', (id) => rerunSession(String(id)))
+  handle('sessions:rerun-latest', async () => {
+    // The newest finished test of each target, run again.
+    const seen = new Set<string>()
+    const out: SessionInfo[] = []
+    for (const s of listSessions()) {
+      const key = `${s.kind}|${s.target}`
+      if (s.status === 'running' || seen.has(key)) continue
+      seen.add(key)
+      if (!readRequest(s.id)) continue
+      out.push(await rerunSession(s.id).catch(() => null as never))
+    }
+    return out.filter(Boolean)
+  })
+  handle('findings:triage', (sid, fidv, t) => {
+    const triage = t === 'fixed' || t === 'accepted' || t === 'not-a-problem' ? t : null
+    return triageFinding(String(sid), String(fidv), triage)
+  })
+  handle('app:check-update', () => checkForUpdate())
+  handle('app:install-update', () => installUpdate((p, l) => log('info', `${l ?? 'Updating'}${p !== null ? ` ${Math.round(p)}%` : ''}`)))
   handle('sessions:get', (id) => sessionDetail(String(id)))
   handle('sessions:delete', (id) => {
     cancelSession(String(id))
@@ -338,7 +386,7 @@ function registerIpc(): void {
     cancelOp(String(id))
   })
   handle('web:sites', () => localSites())
-  handle('web:start', (req) => {
+  handleStart('web:start', (req) => {
     try {
       return startWebScan(validWeb(req))
     } catch (e) {
@@ -346,7 +394,7 @@ function registerIpc(): void {
     }
   })
   handle('burp:open', () => openBurp())
-  handle('audit:start', (req) => {
+  handleStart('audit:start', (req) => {
     const r = (req ?? {}) as { kind?: string; path?: unknown; site?: unknown; reviewer?: unknown; depth?: unknown; authorized?: unknown }
     try {
       if (r.kind === 'portfolio') return startAudit({ kind: 'portfolio' })
@@ -391,7 +439,7 @@ function registerIpc(): void {
     picked.add(p)
     return p
   })
-  handle('mobile:start', (req) => {
+  handleStart('mobile:start', (req) => {
     const r = (req ?? {}) as { path?: unknown; reviewer?: unknown }
     try {
       return startMobileScan({ path: allowedProject(r.path), reviewer: pick(r.reviewer, REVIEWERS, 'none') })
@@ -407,7 +455,7 @@ function registerIpc(): void {
     return cloudStatus()
   })
   handle('tools:optional', () => optionalTools())
-  handle('recon:start', (req) => {
+  handleStart('recon:start', (req) => {
     const r = (req ?? {}) as Partial<ReconRequest>
     if (typeof r.target !== 'string') throw new ValidationError('Enter a domain, such as example.com.')
     try {
@@ -422,7 +470,7 @@ function registerIpc(): void {
     else if (on === false) removeFromClaude('macsec')
     return { installed: installedForClaude('macsec') }
   })
-  handle('api:start', (req) => {
+  handleStart('api:start', (req) => {
     try {
       return startApiScan(validApi(req))
     } catch (e) {
@@ -526,6 +574,10 @@ app.whenReady().then(() => {
   createWindow()
   log('info', `MacSec ${app.getVersion()} started`)
   // Newer scanner versions are looked for once a day and offered on the Tools page.
+  // MacSec's own update: checked at start and every six hours; the window offers it.
+  const appUpdate = (): void => void checkForUpdate().then((u) => u && send('app:update', u)).catch(() => undefined)
+  setTimeout(appUpdate, 8000)
+  setInterval(appUpdate, 6 * 3600_000)
   setTimeout(() => void checkUpdatesDaily().then((names) => names.length && send('tools:updates', names)).catch(() => undefined), 6000)
   app.on('activate', () => {
     if (!mainWindow) createWindow()

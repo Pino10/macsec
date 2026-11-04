@@ -9,6 +9,15 @@ export function postureScore(c: Record<Severity, number>): number {
   return Math.max(0, Math.round(100 - 100 * (1 - Math.exp(-cost / 60))))
 }
 
+/**
+ * Posture across targets: the average of each target's own score, so fixing one project moves the
+ * core even when another still has problems, and one large result cannot pin it at zero.
+ */
+export function postureOf(list: Record<Severity, number>[]): number {
+  if (!list.length) return 100
+  return Math.round(list.reduce((n, c) => n + postureScore(c), 0) / list.length)
+}
+
 export function postureWord(score: number, hasData: boolean): string {
   if (!hasData) return 'No results yet'
   return score >= 90 ? 'Strong' : score >= 70 ? 'Guarded' : score >= 45 ? 'Exposed' : 'Critical'
@@ -18,8 +27,8 @@ export function postureWord(score: number, hasData: boolean): string {
  * The threat core: severity as rings of light around a glass sphere, with the posture score in
  * the middle. A sweep turns while tests are running.
  */
-export default function ThreatCore({ counts, size = 300, running = false, label = true, hasData = true }: { counts: Record<Severity, number>; size?: number; running?: boolean; label?: boolean; hasData?: boolean }): React.JSX.Element {
-  const score = postureScore(counts)
+export default function ThreatCore({ counts, size = 300, running = false, label = true, hasData = true, score: given }: { counts: Record<Severity, number>; size?: number; running?: boolean; label?: boolean; hasData?: boolean; score?: number }): React.JSX.Element {
+  const score = given ?? postureScore(counts)
   const total = SEVERITIES.filter((k) => k !== 'info').reduce((n, k) => n + counts[k], 0)
   const c = size / 2
   const r = size * 0.42

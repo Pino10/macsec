@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import type { Reviewer } from '@shared/types'
 import { useApp } from '../store'
@@ -5,6 +6,7 @@ import { PageHead, Seg, Switch } from '../ui'
 
 export default function Settings(): React.JSX.Element {
   const { settings, updateSettings, setSettings, act, appInfo } = useApp()
+  const [check, setCheck] = useState<string | null>(null)
   const api = window.macsec
   if (!settings) return <></>
   return (
@@ -70,7 +72,17 @@ export default function Settings(): React.JSX.Element {
         </div>
       </div>
       <p className="hint" style={{ marginTop: 14 }}>
-        MacSec {appInfo?.version}. Use it only on code and systems you own or are allowed to test.
+        MacSec {appInfo?.version}. Use it only on code and systems you own or are allowed to test.{' '}
+        <button
+          className="link"
+          onClick={async () => {
+            const u = await act('chk', () => window.macsec.invoke('app:check-update'))
+            setCheck(u === undefined ? null : u ? `MacSec ${u.version} is ready: use the bar at the top to update.` : 'You have the newest MacSec.')
+          }}
+        >
+          Check for updates
+        </button>
+        {check && <span> {check}</span>}
       </p>
     </>
   )

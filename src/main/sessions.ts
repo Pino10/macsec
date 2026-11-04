@@ -14,6 +14,7 @@ import { randomBytes } from 'crypto'
 import { join, sep } from 'path'
 import type { Finding, SessionDetail, SessionInfo, SessionKind } from '../shared/types'
 import { dirs } from './paths'
+import { countBySeverity } from './scanners/parse'
 
 export const sessionEvents = new EventEmitter()
 
@@ -106,4 +107,49 @@ export function recoverSessions(): void {
       saveSession(s)
     }
   }
+}
+
+/** The request that started a session, kept so the same test can be run again. */
+export function saveRequest(id: string, channel: string, req: unknown): void {
+  if (!existsSync(sessionDir(id))) return
+  writeFileSync(join(sessionDir(id), 'request.json'), JSON.stringify({ channel, req }, null, 2), { mode: 0o600 })
+}
+
+export function readRequest(id: string): { channel: string; req: unknown } | null {
+  const f = join(sessionDir(id), 'request.json')
+  try {
+    return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as { channel: string; req: unknown }) : null
+  } catch {
+    return null
+  }
+}
+
+/** Marks a finding fixed, accepted or not a problem (or open again); the counts follow. */
+export function triageFinding(id: string, findingId: string, triage: Finding['triage'] | null): SessionDetail {
+  const info = readSession(id)
+  const f = join(sessionDir(id), 'findings.json')
+  const list = existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as Finding[]) : []
+  const item = list.find((x) => x.id === findingId)
+  if (!item) throw new Error('That finding is not in this session.')
+  if (triage) {
+    item.triage = triage
+    item.triagedAt = new Date().toISOString()
+  } else {
+    delete item.triage
+    delete item.triagedAt
+  }
+  writeFileSync(f, JSON.stringify(list, null, 2))
+  info.counts = countBySeverity(list.filter((x) => x.verdict !== 'false-positive'))
+  saveSession(info)
+  return sessionDetail(id)
+}
+
+/** A request without cookies, sign-in headers or API keys: those are never written to disk. */
+export function stripSecrets(req: unknown): unknown {
+  if (!req || typeof req !== 'object') return req
+  const r = { ...(req as Record<string, unknown>) }
+  delete r.headers
+  delete r.token
+  if (r.auth && typeof r.auth === 'object') r.auth = { kind: 'none' }
+  return r
 }

@@ -1,3 +1,13 @@
+## MacSec 0.5.1
+
+### Updates inside MacSec
+MacSec now checks for new versions itself. When one is ready, a bar at the top offers **Update and restart**. It downloads the DMG for your Mac, checks it against the published checksum and its signature, swaps it in, and restarts. Your sessions, tools and settings stay as they are. Settings has **Check for updates** too. Install 0.5.1 from the DMG once; after that you never need to.
+
+### A posture core that moves
+- The score is now the average of each target's own score. Fixing one project moves it, even while another still has problems, and one large result can no longer pin it near zero.
+- **Mark findings** as Fixed, Accept the risk, or Not a problem. They stop counting straight away and can be opened again.
+- **Test again** on any session runs the same test once more, as a new session. **Test everything again** under the core reruns the newest test of every project, site and API. Sign-in cookies and API keys are never saved for this: a scan that used them runs signed out unless you start it from its page.
+
 ## MacSec 0.5
 
 ### Recon (new)

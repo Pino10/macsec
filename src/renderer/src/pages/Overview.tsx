@@ -1,8 +1,8 @@
-import { ChevronRight, Download, FileSearch, Globe, Plug, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { ChevronRight, Download, FileSearch, Globe, Plug, ShieldAlert, ShieldCheck, RefreshCw } from 'lucide-react'
 import { SEVERITIES, type Severity } from '@shared/types'
 import { useApp, type Page } from '../store'
 import { Counts, KindIcon, Spectrum, ago, kindName } from '../ui'
-import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
+import ThreatCore, { postureOf, postureWord } from '../components/ThreatCore'
 
 const LAUNCH: { page: Page; icon: React.ReactNode; g: string; title: string; text: string }[] = [
   { page: 'review', icon: <FileSearch size={20} />, g: '#38e1ff', title: 'Review code', text: 'Every scanner that fits, then an AI reviewer that checks their work.' },
@@ -11,14 +11,14 @@ const LAUNCH: { page: Page; icon: React.ReactNode; g: string; title: string; tex
 ]
 
 export default function Overview(): React.JSX.Element {
-  const { sessions, tools, setPage, showSession, act, setTools, busy } = useApp()
+  const { sessions, tools, setPage, showSession, act, setTools, busy, notify } = useApp()
   const latest = new Map<string, (typeof sessions)[number]>()
   for (const s of sessions) if (s.status === 'done' && !latest.has(`${s.kind}|${s.target}`)) latest.set(`${s.kind}|${s.target}`, s)
   const totals = SEVERITIES.reduce((acc, k) => ({ ...acc, [k]: [...latest.values()].reduce((n, s) => n + s.counts[k], 0) }), {} as Record<Severity, number>)
   const running = sessions.filter((s) => s.status === 'running')
   const worst = [...latest.values()].filter((s) => s.counts.critical + s.counts.high > 0).sort((a, b) => b.counts.critical - a.counts.critical || b.counts.high - a.counts.high).slice(0, 5)
   const missing = tools.filter((t) => !t.installed && t.method !== 'app')
-  const score = postureScore(totals)
+  const score = postureOf([...latest.values()].map((s) => s.counts))
   const has = latest.size > 0
 
   return (
@@ -26,7 +26,7 @@ export default function Overview(): React.JSX.Element {
       <div className="page-head">
         <div>
           <h1 className="page-title">Overview</h1>
-          <p className="page-desc">Your security posture, from the latest test of each project, site and API.</p>
+          <p className="page-desc">Your security posture, from the latest test of each project, site and API. It changes when you test again or mark findings fixed, accepted or not a problem.</p>
         </div>
       </div>
 
@@ -50,7 +50,22 @@ export default function Overview(): React.JSX.Element {
       )}
 
       <section className="hero glass">
-        <ThreatCore counts={totals} size={300} running={running.length > 0} hasData={has} />
+        <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
+          <ThreatCore counts={totals} size={300} running={running.length > 0} hasData={has} score={score} />
+          {has && (
+            <button
+              className="btn btn-sm"
+              disabled={busy.has('retest') || running.length > 0}
+              title="Runs the newest test of each project, site and API again, so the core shows how things stand now"
+              onClick={async () => {
+                const r = await act('retest', () => window.macsec.invoke('sessions:rerun-latest'))
+                if (r) notify({ kind: 'info', text: `${r.length} ${r.length === 1 ? 'test' : 'tests'} started again. The core updates as they finish.` })
+              }}
+            >
+              <RefreshCw size={13} /> {running.length ? 'Testing…' : busy.has('retest') ? 'Starting…' : 'Test everything again'}
+            </button>
+          )}
+        </div>
         <div style={{ display: 'grid', gap: 20 }}>
           <div>
             <h2>{has ? `Posture: ${postureWord(score, true).toLowerCase()}` : 'Run your first test'}</h2>

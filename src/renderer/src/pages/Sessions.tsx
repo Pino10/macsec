@@ -1,6 +1,6 @@
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle } from 'lucide-react'
+import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw } from 'lucide-react'
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
@@ -161,6 +161,19 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
                 <FileDown size={14} /> {busy.has('pdf') ? 'Making PDF…' : 'PDF'}
               </button>
             </>
+          )}
+          {!running && (
+            <button
+              className="btn"
+              disabled={busy.has('rerun')}
+              title="Runs the same test again, as a new session"
+              onClick={async () => {
+                const r = await act('rerun', () => api.invoke('sessions:rerun', id))
+                if (r) showSessionById(r.id)
+              }}
+            >
+              <RefreshCw size={14} /> Test again
+            </button>
           )}
           <button className="icon-btn" data-tip="Open the session folder" aria-label="Open the session folder" onClick={() => void api.invoke('sessions:open', id, 'folder')}>
             <FolderOpen />
@@ -330,22 +343,27 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <div className="split">
             <div className="panel f-list" role="listbox" aria-label="Findings">
               {findings.map((f) => (
-                <button key={f.id} className="f-row" role="option" data-sev={f.severity} data-fp={f.verdict === 'false-positive'} aria-selected={f.id === sel} onClick={() => setSel(f.id)}>
+                <button key={f.id} className="f-row" role="option" data-sev={f.severity} data-fp={f.verdict === 'false-positive' || !!f.triage} aria-selected={f.id === sel} onClick={() => setSel(f.id)}>
                   <Sev s={f.severity} />
                   <span className="t">{f.title}</span>
                   <span className="w">{f.file ? `${f.file}${f.line ? `:${f.line}` : ''}` : (f.advisory ?? f.tool)}</span>
                 </button>
               ))}
             </div>
-            {current && <Detail f={current} id={id} canOpen={hasCode} />}
+            {current && <Detail f={current} id={id} canOpen={hasCode} onChange={setDetail} />}
           </div>
         ))}
     </>
   )
 }
 
-function Detail({ f, id, canOpen }: { f: Finding; id: string; canOpen: boolean }): React.JSX.Element {
+function Detail({ f, id, canOpen, onChange }: { f: Finding; id: string; canOpen: boolean; onChange: (d: SessionDetail) => void }): React.JSX.Element {
   const api = window.macsec
+  const { act } = useApp()
+  const triage = async (t: Finding['triage'] | null): Promise<void> => {
+    const d = await act('triage', () => api.invoke('findings:triage', id, f.id, t ?? null))
+    if (d) onChange(d)
+  }
   return (
     <div className="panel f-detail" key={f.id}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -409,6 +427,30 @@ function Detail({ f, id, canOpen }: { f: Finding; id: string; canOpen: boolean }
           <button className="btn btn-sm" onClick={() => void api.invoke('app:open-external', f.url!)}>
             <ExternalLink size={13} /> {f.category === 'web' || f.category === 'api' ? 'Open page' : 'Details'}
           </button>
+        )}
+      </div>
+      <div className="triage">
+        {f.triage ? (
+          <>
+            <span className="tag tag-ok">{f.triage === 'fixed' ? 'Marked fixed' : f.triage === 'accepted' ? 'Risk accepted' : 'Not a problem'}</span>
+            <span className="hint">It no longer counts towards the posture.</span>
+            <button className="link" onClick={() => void triage(null)}>
+              Open it again
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="hint">When you have dealt with it:</span>
+            <button className="btn btn-sm" onClick={() => void triage('fixed')}>
+              Fixed
+            </button>
+            <button className="btn btn-sm" onClick={() => void triage('accepted')}>
+              Accept the risk
+            </button>
+            <button className="btn btn-sm" onClick={() => void triage('not-a-problem')}>
+              Not a problem
+            </button>
+          </>
         )}
       </div>
     </div>

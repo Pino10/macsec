@@ -290,6 +290,7 @@ export function mergeFindings(list: Finding[]): Finding[] {
 
 export function countBySeverity(list: Finding[]): Record<Severity, number> {
   const c: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
-  for (const f of list) c[f.severity]++
+  // Findings you marked fixed, accepted or not a problem no longer count.
+  for (const f of list) if (!f.triage) c[f.severity]++
   return c
 }

@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
-import { Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Download, Plus } from 'lucide-react'
+import type { UpdateInfo } from '@shared/types'
 import { AppProvider, useApp } from './store'
 import Rail, { PAGE_ORDER } from './components/Rail'
 import JobsBar from './components/JobsBar'
@@ -48,6 +49,35 @@ function EngineBar(): React.JSX.Element {
   )
 }
 
+/** MacSec's own update: offered here, installed in place, then MacSec restarts. */
+function UpdateBar(): React.JSX.Element | null {
+  const { act, busy } = useApp()
+  const [u, setU] = useState<UpdateInfo | null>(null)
+  const [later, setLater] = useState(false)
+  useEffect(() => {
+    void window.macsec.invoke('app:check-update').then(setU).catch(() => undefined)
+    return window.macsec.on('app:update', setU)
+  }, [])
+  if (!u || later) return null
+  return (
+    <div className="update-bar glass">
+      <Download size={16} style={{ color: 'var(--ion)' }} />
+      <span className="grow">
+        <b>MacSec {u.version}</b> is ready (you have {u.current}). Your sessions, tools and settings stay as they are.
+      </span>
+      <button className="link" onClick={() => void window.macsec.invoke('app:open-external', u.url)}>
+        What’s new
+      </button>
+      <button className="btn btn-sm" onClick={() => setLater(true)}>
+        Later
+      </button>
+      <button className="btn btn-sm btn-primary" disabled={busy.has('app-update')} onClick={() => void act('app-update', () => window.macsec.invoke('app:install-update'))}>
+        {busy.has('app-update') ? 'Updating…' : 'Update and restart'}
+      </button>
+    </div>
+  )
+}
+
 function Shell(): React.JSX.Element {
   const { page, setPage, toast } = useApp()
   useEffect(() => {
@@ -72,6 +102,7 @@ function Shell(): React.JSX.Element {
           <EngineBar />
           <div className="scroll">
             <div className="page" key={page}>
+              <UpdateBar />
               {page === 'overview' && <Overview />}
               {page === 'projects' && <Projects />}
               {page === 'review' && <CodeReview />}

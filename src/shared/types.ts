@@ -99,6 +99,9 @@ export interface Finding {
   verify?: string
   /** The AI's reason for its verdict on a scanner finding. */
   aiNote?: string
+  /** What you decided: fixed, accepted risk, or not a problem. It then stops counting. */
+  triage?: 'fixed' | 'accepted' | 'not-a-problem'
+  triagedAt?: string
 }
 
 export type Reviewer = 'none' | 'claude' | 'claude-local' | 'codex' | 'gemini' | 'model'
@@ -311,6 +314,14 @@ export interface AppSettings {
   claudeAuth: 'account' | 'key'
 }
 
+export interface UpdateInfo {
+  version: string
+  current: string
+  notes: string
+  publishedAt: string
+  url: string
+}
+
 export interface AppInfo {
   version: string
   root: string
@@ -371,6 +382,11 @@ export interface Channels {
   'cloud:status': { args: []; result: { azure: string | null; aws: string | null } }
   'cloud:azure-login': { args: []; result: { azure: string | null; aws: string | null } }
   'tools:optional': { args: []; result: OptionalTool[] }
+  'sessions:rerun': { args: [string]; result: SessionInfo }
+  'sessions:rerun-latest': { args: []; result: SessionInfo[] }
+  'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null]; result: SessionDetail }
+  'app:check-update': { args: []; result: UpdateInfo | null }
+  'app:install-update': { args: []; result: void }
   'recon:start': { args: [ReconRequest]; result: SessionInfo }
   'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number } | null }
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
@@ -404,6 +420,7 @@ export interface Events {
   'sessions:changed': SessionInfo[]
   'session:updated': SessionInfo
   'logs:line': LogLine
+  'app:update': UpdateInfo
 }
 
 export interface MacSecApi {
