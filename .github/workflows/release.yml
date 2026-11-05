@@ -82,10 +82,12 @@ jobs:
           REPO: ${{ vars.RELEASES_REPO || github.repository }}
           TAG: ${{ inputs.tag }}
         run: |
+          # Only this release's notes: the top section of RELEASE_NOTES.md.
+          awk '/^## /{n++} n==1' RELEASE_NOTES.md > notes.md
           target=""
           [ "$REPO" = "$GITHUB_REPOSITORY" ] && target="--target $GITHUB_SHA"
           gh release create "$TAG" dist/*.dmg dist/SHA256SUMS.txt --repo "$REPO" $target \
-            --title "MacSec $TAG" --notes-file RELEASE_NOTES.md --prerelease
+            --title "MacSec $TAG" --notes-file notes.md --latest
           echo "Published $TAG to $REPO"
 
       - name: Also publish in this repository
@@ -94,5 +96,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: |
+          awk '/^## /{n++} n==1' RELEASE_NOTES.md > notes.md
           gh release create "$TAG" dist/*.dmg dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "MacSec $TAG" --notes-file RELEASE_NOTES.md --prerelease
+            --title "MacSec $TAG" --notes-file notes.md --latest

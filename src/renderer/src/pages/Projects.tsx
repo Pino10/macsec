@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { GitBranch, Globe, ShieldCheck, Workflow } from 'lucide-react'
+import { GitBranch, Globe, Layers3, ShieldCheck, Workflow } from 'lucide-react'
 import type { LocalProject } from '@shared/types'
 import { useApp } from '../store'
 import { PageHead } from '../ui'
 import SourcePicker from '../components/SourcePicker'
 
 export default function Projects(): React.JSX.Element {
-  const { setPreset, setPage, act, notify } = useApp()
+  const { setPreset, setPage, act, notify, busy, showSession } = useApp()
   const api = window.macsec
   const [local, setLocal] = useState<LocalProject[]>([])
   useEffect(() => {
@@ -17,7 +17,19 @@ export default function Projects(): React.JSX.Element {
   }
   return (
     <>
-      <PageHead title="Projects" desc="Everything you can test: your www folder (shared with Laramac), your GitHub repositories and your Azure DevOps organization." />
+      <PageHead title="Projects" desc="Everything you can test: your www folder (shared with Laramac), your GitHub repositories and your Azure DevOps organization.">
+        <button
+          className="btn"
+          disabled={busy.has('sweep')}
+          title="Keys and passwords in files and Git history, and packages with known flaws, in every project at once"
+          onClick={async () => {
+            const s = await act('sweep', () => window.macsec.invoke('audit:start', { kind: 'portfolio' } as never))
+            if (s) showSession(s.id)
+          }}
+        >
+          <Layers3 size={15} /> {busy.has('sweep') ? 'Starting…' : 'Check every project'}
+        </button>
+      </PageHead>
       <div className="ms-form glass">
         <SourcePicker
           action="Review"

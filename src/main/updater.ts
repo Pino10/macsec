@@ -3,13 +3,13 @@
  * checks it against the release's SHA256SUMS.txt and its code signature, swaps it in place of the
  * running copy and restarts. Sessions, tools and settings live in ~/MacSec and are untouched.
  */
-import { releasesWithFallback } from './seckit/ghapi'
+import { ownNotes, releasesWithFallback } from './seckit/ghapi'
 import { app } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, mkdtempSync, renameSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { dirname, join, resolve } from 'path'
-import type { UpdateInfo } from '../shared/types'
+import type { ReleaseNote, UpdateInfo, UpdateStatus } from '../shared/types'
 import { downloadFile, sha256File, USER_AGENT } from './download'
 import { dirs } from './paths'
 import { hashFor, newer } from './toolbox'
@@ -32,7 +32,8 @@ export const dmgArch = (): string => (process.arch === 'arm64' ? 'arm64' : 'x64'
 export function pickUpdate(releases: Release[], current: string, arch = dmgArch()): { info: UpdateInfo; dmg: string; sums: string } | null {
   let best: Release | null = null
   for (const r of releases) {
-    if (r.draft || r.prerelease || !/^v\d+\.\d+\.\d+$/.test(r.tag_name)) continue
+    // MacSec's releases up to 0.8.1 were published as pre-releases: they count too.
+    if (r.draft || !/^v\d+\.\d+\.\d+$/.test(r.tag_name)) continue
     if (!newer(r.tag_name, current)) continue
     if (!best || newer(r.tag_name, best.tag_name)) best = r
   }
@@ -42,7 +43,7 @@ export function pickUpdate(releases: Release[], current: string, arch = dmgArch(
   const sums = best.assets.find((a) => a.name === 'SHA256SUMS.txt')
   // Without a checksum list the download cannot be verified, so it is not offered.
   if (!dmg || !sums) return null
-  return { info: { version, current, notes: best.body ?? '', publishedAt: best.published_at, url: best.html_url }, dmg: dmg.browser_download_url, sums: sums.browser_download_url }
+  return { info: { version, current, notes: ownNotes(best.body), publishedAt: best.published_at, url: best.html_url }, dmg: dmg.browser_download_url, sums: sums.browser_download_url }
 }
 
 function run(cmd: string, args: string[]): Promise<string> {
@@ -51,11 +52,37 @@ function run(cmd: string, args: string[]): Promise<string> {
 
 let pending: { info: UpdateInfo; dmg: string; sums: string } | null = null
 
+let lastReleases: Release[] = []
+let checkedAt: number | null = null
+let lastError: string | null = null
+
+/** What the Updates page shows: the version you have, what is newer, when it was checked. */
+export function updateStatus(): UpdateStatus {
+  return { current: app.getVersion(), update: pending?.info ?? null, checkedAt, error: lastError }
+}
+
+/** Every MacSec release, newest first, each with its own notes. */
+export async function releaseNotes(): Promise<ReleaseNote[]> {
+  if (!lastReleases.length) await checkForUpdate().catch(() => undefined)
+  return lastReleases
+    .filter((r) => !r.draft && /^v\d+\.\d+\.\d+$/.test(r.tag_name))
+    .map((r) => ({ version: r.tag_name.slice(1), notes: ownNotes(r.body), publishedAt: r.published_at, url: r.html_url }))
+    .sort((a, b) => (newer(`v${a.version}`, `v${b.version}`) ? -1 : 1))
+}
+
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   // Through the shared GitHub client: your sign-in when there is one, answers kept for a while, and
   // GitHub's release feed when its hourly limit is used up.
-  const releases = await releasesWithFallback(REPO, (v) => [`MacSec-${v}-arm64.dmg`, `MacSec-${v}-x64.dmg`, 'SHA256SUMS.txt'])
-  pending = pickUpdate(releases as Release[], app.getVersion())
+  try {
+    lastReleases = (await releasesWithFallback(REPO, (v) => [`MacSec-${v}-arm64.dmg`, `MacSec-${v}-x64.dmg`, 'SHA256SUMS.txt'])) as Release[]
+    lastError = null
+  } catch (e) {
+    lastError = (e as Error).message
+    throw e
+  } finally {
+    checkedAt = Date.now()
+  }
+  pending = pickUpdate(lastReleases, app.getVersion())
   return pending?.info ?? null
 }
 

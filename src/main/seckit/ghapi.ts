@@ -213,3 +213,15 @@ export async function releasesWithFallback(repo: string, files: (version: string
     }))
   }
 }
+
+/**
+ * One release's own notes. Releases up to Laramac 0.23 and MacSec 0.8 carried the whole
+ * RELEASE_NOTES.md; this keeps the top section (up to the next "## " heading).
+ */
+export function ownNotes(body: string | null | undefined): string {
+  const text = String(body ?? '').replace(/\r/g, '').trim()
+  const lines = text.split('\n')
+  const starts = lines.flatMap((l, i) => (/^## /.test(l) ? [i] : []))
+  if (starts.length < 2) return text
+  return lines.slice(starts[0], starts[1]).join('\n').trim()
+}

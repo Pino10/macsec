@@ -89,7 +89,7 @@ export function reviewerRun(id: ReviewerId, bin: string, prompt: string, o: { pl
 export function explainFailure(id: ReviewerId, err: string): string {
   if (id === 'claude-free') {
     if (/ECONNREFUSED|fetch failed|connect/i.test(err)) return 'Claude Code could not reach Free LLM API. Open Free LLM API and make sure its server is running, then try again.'
-    if (/401|403|unauthori[sz]ed|invalid.*key/i.test(err)) return 'Free LLM API did not accept the key. Paste the unified key again on the Tools page.'
+    if (/401|403|unauthori[sz]ed|invalid.*key/i.test(err)) return 'Free LLM API did not accept the key. Paste the unified key again where you connected Free LLM API (AI tools in Laramac, Tools in MacSec).'
     if (/429|rate.?limit|quota/i.test(err)) return 'Every model in your Free LLM API chain is at its free limit right now. Add more keys in Free LLM API, or try again later.'
   }
   if (id === 'claude-local' && /ECONNREFUSED|connect|fetch failed|404/i.test(err)) return 'Claude Code could not reach your model. In LM Studio, load the model and start the server (Developer, Start server), then try again. LM Studio 0.4.1 or newer is needed.'

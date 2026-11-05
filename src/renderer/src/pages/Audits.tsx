@@ -1,27 +1,32 @@
 import { useEffect, useState } from 'react'
-import { Cloud, GitCompareArrows, Layers3, LogIn, Radar, Server, ShieldHalf, Smartphone } from 'lucide-react'
-import { MobileFlow } from './Mobile'
+import { Cloud, GitCompareArrows, Layers3, LogIn, Radar, Server, ShieldHalf } from 'lucide-react'
 import type { LocalProject, LocalSite, ReviewDepth, Reviewer } from '@shared/types'
 import { useApp } from '../store'
 import { FlowStep, PageHead } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
 import { isLocal } from './WebScan'
 
-type Kind = 'full' | 'portfolio' | 'changes' | 'mobile' | 'cloud' | 'server'
+export type AuditKind = 'full' | 'portfolio' | 'changes' | 'cloud' | 'server'
+type Kind = AuditKind
 
 const AUDITS: { id: Kind; g: string; icon: React.ReactNode; title: string; text: string }[] = [
   { id: 'full', g: '#3ef0a8', icon: <ShieldHalf size={24} />, title: 'Full audit', text: 'A code review and a web scan of the same project, then one AI report that connects them: the route the code leaves open and the page that shows it.' },
   { id: 'portfolio', g: '#38e1ff', icon: <Layers3 size={24} />, title: 'Portfolio sweep', text: 'Every project in your www folder at once: keys and passwords in files and Git history, and packages with known flaws.' },
   { id: 'changes', g: '#8b6cff', icon: <GitCompareArrows size={24} />, title: 'Change review', text: 'Claude Code’s own /security-review of the changes on a project’s current branch, before you merge or deploy.' },
-  { id: 'mobile', g: '#ffc94a', icon: <Smartphone size={24} />, title: 'Mobile app', text: 'An Android or iOS app, from source or a built .apk or .ipa: risky settings, weak code hardening and keys left inside.' },
   { id: 'cloud', g: '#ff8a3d', icon: <Cloud size={24} />, title: 'Cloud account', text: 'Your Azure or AWS account against best practice (ScoutSuite), what it exposes (CloudFox) and, on AWS, who could raise their own access (PMapper). Only reads.' },
   { id: 'server', g: '#ff3d7f', icon: <Server size={24} />, title: 'Server and ports', text: 'The open ports on a server you own and the service behind each one, with the ones that should not be reachable from the internet.' }
 ]
 
-export default function Audits(): React.JSX.Element {
+/**
+ * The bigger jobs, each shown where it belongs: Cloud and servers is its own page, and Code review
+ * offers "Just my changes" and "Code and its live site". `kinds` limits what this shows; with one
+ * kind there is no picker.
+ */
+export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: string }): React.JSX.Element {
   const { settings, act, busy, showSession } = useApp()
   const api = window.macsec
-  const [kind, setKind] = useState<Kind>('full')
+  const [kind, setKind] = useState<Kind>(kinds[0])
+  useEffect(() => setKind(kinds[0]), [kinds])
   const [projects, setProjects] = useState<LocalProject[]>([])
   const [sites, setSites] = useState<LocalSite[]>([])
   const [path, setPath] = useState('')
@@ -67,9 +72,9 @@ export default function Audits(): React.JSX.Element {
 
   return (
     <>
-      <PageHead title="Special audits" desc="Bigger jobs built from MacSec’s tests. Each one is kept as a session with its own report." />
-      <div className="audit-grid" role="radiogroup" aria-label="Audit" style={{ marginBottom: 18 }}>
-        {AUDITS.map((a) => (
+      {kinds.length > 1 && (
+      <div className="audit-grid" role="radiogroup" aria-label="What to check" style={{ marginBottom: 18 }}>
+        {AUDITS.filter((a) => kinds.includes(a.id)).map((a) => (
           <button key={a.id} className="audit-card glass" role="radio" aria-checked={kind === a.id} onClick={() => setKind(a.id)}>
             <span className="glyph" style={{ ['--g' as string]: a.g }}>
               {a.icon}
@@ -79,10 +84,8 @@ export default function Audits(): React.JSX.Element {
           </button>
         ))}
       </div>
+      )}
 
-      {kind === 'mobile' ? (
-        <MobileFlow />
-      ) : (
       <div className="flow">
         {kind === 'cloud' && (
           <>
@@ -211,11 +214,21 @@ export default function Audits(): React.JSX.Element {
               if (s) showSession(s.id)
             }}
           >
-            <Radar size={17} /> Start audit
+            <Radar size={17} /> {start}
           </button>
         </div>
       </div>
-      )}
     </>
   )
 }
+
+/** Cloud and servers: a cloud account or a server you own, read-only. */
+export default function Audits(): React.JSX.Element {
+  return (
+    <>
+      <PageHead title="Cloud and servers" desc="Check a cloud account against best practice, or the open ports of a server you own. Both only read: nothing is signed into, guessed or changed." />
+      <AuditFlow kinds={CLOUD_KINDS} start="Start check" />
+    </>
+  )
+}
+const CLOUD_KINDS: Kind[] = ['cloud', 'server']

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AuditFlow, type AuditKind } from './Audits'
 import { FileSearch, Gauge, Microscope, Radar, Zap } from 'lucide-react'
 import type { ReviewDepth, ReviewFocus, Reviewer } from '@shared/types'
 import { useApp, type PresetSource } from '../store'
@@ -20,6 +21,7 @@ export default function CodeReview(): React.JSX.Element {
   const [depth, setDepth] = useState<ReviewDepth>('standard')
   const [focus, setFocus] = useState<ReviewFocus>('security')
   const [keep, setKeep] = useState(false)
+  const [mode, setMode] = useState<'project' | 'changes' | 'full'>('project')
 
   useEffect(() => {
     if (preset) {
@@ -34,6 +36,27 @@ export default function CodeReview(): React.JSX.Element {
   return (
     <>
       <PageHead title="Code review" desc="Every free scanner that fits your code, then an AI reviewer that checks their findings and looks for what scanners miss: broken access checks, logic flaws, unsafe flows across files." />
+
+      <div className="mode-pick">
+        <Seg
+          label="What to review"
+          value={mode}
+          onChange={setMode}
+          options={[
+            ['project', 'Whole project'],
+            ['changes', 'Just my changes'],
+            ['full', 'Code and its live site']
+          ]}
+        />
+        <span className="hint">
+          {mode === 'project' ? 'Every file, every scanner, then the AI reviewer.' : mode === 'changes' ? 'Only what changed on the current Git branch, with Claude Code’s own /security-review. Good before you merge.' : 'A code review and a web scan of the same project, joined in one AI report.'}
+        </span>
+      </div>
+
+      {mode !== 'project' ? (
+        <AuditFlow kinds={mode === 'changes' ? CHANGES : FULL} start="Start review" />
+      ) : (
+      <>
 
       {missing > 0 && (
         <div className="notice">
@@ -125,6 +148,10 @@ export default function CodeReview(): React.JSX.Element {
           </button>
         </div>
       </div>
+      </>
+      )}
     </>
   )
 }
+const CHANGES: AuditKind[] = ['changes']
+const FULL: AuditKind[] = ['full']

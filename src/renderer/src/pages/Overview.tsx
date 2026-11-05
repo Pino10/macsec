@@ -1,4 +1,5 @@
 import { ChevronRight, Download, FileSearch, Globe, Plug, ShieldAlert, ShieldCheck, RefreshCw } from 'lucide-react'
+import { latestPerTarget } from '@shared/latest'
 import { SEVERITIES, type Severity } from '@shared/types'
 import { useApp, type Page } from '../store'
 import { Counts, KindIcon, Spectrum, ago, kindName } from '../ui'
@@ -12,8 +13,8 @@ const LAUNCH: { page: Page; icon: React.ReactNode; g: string; title: string; tex
 
 export default function Overview(): React.JSX.Element {
   const { sessions, tools, setPage, showSession, act, setTools, busy, notify } = useApp()
-  const latest = new Map<string, (typeof sessions)[number]>()
-  for (const s of sessions) if (s.status === 'done' && !latest.has(`${s.kind}|${s.target}`)) latest.set(`${s.kind}|${s.target}`, s)
+  // One entry per target; an audit's own code review and web scan are counted inside the audit, not twice.
+  const latest = new Map(latestPerTarget(sessions).map((s) => [`${s.kind}|${s.target}`, s] as const))
   const totals = SEVERITIES.reduce((acc, k) => ({ ...acc, [k]: [...latest.values()].reduce((n, s) => n + s.counts[k], 0) }), {} as Record<Severity, number>)
   const running = sessions.filter((s) => s.status === 'running')
   const worst = [...latest.values()].filter((s) => s.counts.critical + s.counts.high > 0).sort((a, b) => b.counts.critical - a.counts.critical || b.counts.high - a.counts.high).slice(0, 5)

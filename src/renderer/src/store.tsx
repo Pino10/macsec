@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import type { AppInfo, AppSettings, JobInfo, SessionInfo, ToolInfo } from '@shared/types'
+import type { AppInfo, AppSettings, JobInfo, SessionInfo, ToolInfo, UpdateInfo } from '@shared/types'
 
 export interface Toast {
   kind: 'error' | 'info'
   text: string
 }
 
-export type Page = 'overview' | 'projects' | 'review' | 'web' | 'api' | 'mobile' | 'recon' | 'audit' | 'mac' | 'sessions' | 'tools' | 'logs' | 'settings'
+export type Page = 'overview' | 'projects' | 'review' | 'web' | 'api' | 'mobile' | 'recon' | 'audit' | 'mac' | 'sessions' | 'tools' | 'logs' | 'settings' | 'updates'
 
 interface AppCtx {
   page: Page
@@ -28,6 +28,8 @@ interface AppCtx {
   jobs: JobInfo[]
   /** Tool names with a newer version, found by the daily check. */
   updates: string[]
+  /** A newer MacSec, when there is one. */
+  appUpdate: UpdateInfo | null
   toast: Toast | null
   busy: Set<string>
   act: <T>(key: string, fn: () => Promise<T>) => Promise<T | undefined>
@@ -55,6 +57,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   const [tools, setTools] = useState<ToolInfo[]>([])
   const [jobs, setJobs] = useState<JobInfo[]>([])
   const [updates, setUpdates] = useState<string[]>([])
+  const [appUpdate, setAppUpdate] = useState<UpdateInfo | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -101,6 +104,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     void api().invoke('app:info').then(setAppInfo)
     void api().invoke('settings:get').then(setSettings)
     void api().invoke('sessions:list').then(setSessions)
+    void api().invoke('app:update-status').then((st) => setAppUpdate(st.update)).catch(() => undefined)
     void api()
       .invoke('tools:list')
       .then((t) => {
@@ -110,6 +114,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
     const offs = [
       api().on('jobs:changed', setJobs),
       api().on('tools:updates', setUpdates),
+      api().on('app:update', setAppUpdate),
       api().on('session:updated', (s) =>
         setSessions((list) => {
           const i = list.findIndex((x) => x.id === s.id)
@@ -130,8 +135,8 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   }, [running])
 
   const value = useMemo<AppCtx>(
-    () => ({ page, setPage, openSession, showSession, preset, setPreset, appInfo, settings, updateSettings, setSettings, sessions, setSessions, tools, setTools, jobs, updates, toast, busy, act, notify }),
-    [page, setPage, openSession, showSession, preset, appInfo, settings, updateSettings, sessions, tools, jobs, updates, toast, busy, act, notify]
+    () => ({ page, setPage, openSession, showSession, preset, setPreset, appInfo, settings, updateSettings, setSettings, sessions, setSessions, tools, setTools, jobs, updates, appUpdate, toast, busy, act, notify }),
+    [page, setPage, openSession, showSession, preset, appInfo, settings, updateSettings, sessions, tools, jobs, updates, appUpdate, toast, busy, act, notify]
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

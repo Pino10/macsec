@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, session, shell, type IpcMainInvokeEvent } from 'electron'
+import { installedEditors, isAppBundle, isEditorChoice, openInEditorOf, pickEditor } from './seckit/editors'
 import { execFile } from 'child_process'
 import type { Server } from 'http'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
@@ -10,6 +11,7 @@ import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { getSecret, setSecret, setSecretsCrypto } from './secrets'
 import { configureGitHub } from './seckit/ghapi'
+import { latestPerTarget } from '../shared/latest'
 import { USER_AGENT } from './download'
 import { FREE_KEY, freeConfig } from './freellm'
 import { checkFreeLlm, checkFreeLlmKey, FREELLM_MODELS, freeLlmModel, freeLlmUrl } from './seckit/freellm'
@@ -30,7 +32,7 @@ import { loadSpec, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
 import { reconData, startRecon } from './reconscan'
 import { readRequest, saveRequest, stripSecrets, triageFinding } from './sessions'
-import { checkForUpdate, installUpdate } from './updater'
+import { checkForUpdate, installUpdate, releaseNotes, updateStatus } from './updater'
 import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
 import { optionalTools } from './optional'
@@ -309,10 +311,25 @@ function registerIpc(): void {
       const l = p.llm as { baseUrl?: unknown; model?: unknown }
       safe.llm = { baseUrl: typeof l.baseUrl === 'string' ? l.baseUrl : getSettings().llm.baseUrl, model: typeof l.model === 'string' ? l.model : getSettings().llm.model }
     }
-    if (['none', 'claude', 'codex', 'model'].includes(p.reviewer as string)) safe.reviewer = p.reviewer as never
+    if ((REVIEWERS as readonly string[]).includes(p.reviewer as string)) safe.reviewer = p.reviewer as never
+    if (isEditorChoice(p.editor)) safe.editor = p.editor
     if (typeof p.notifications === 'boolean') safe.notifications = p.notifications
     if (p.claudeAuth === 'account' || p.claudeAuth === 'key') safe.claudeAuth = p.claudeAuth
     return setSettings(safe)
+  })
+  handle('editors:list', async () => {
+    const st = getSettings()
+    const found = await installedEditors()
+    const custom = st.editor === 'custom' && st.editorApp ? st.editorApp.split('/').pop()!.replace(/\.app$/, '') : null
+    return { found: found.map((f) => ({ id: f.id, name: f.name })), current: custom ?? pickEditor(st.editor, found)?.name ?? null }
+  })
+  handle('editors:choose-app', async () => {
+    if (!mainWindow) return null
+    const r = await dialog.showOpenDialog(mainWindow, { title: 'Choose the app to open your code with', buttonLabel: 'Use this app', defaultPath: '/Applications', properties: ['openFile'], filters: [{ name: 'Apps', extensions: ['app'] }] })
+    const app = r.canceled ? null : r.filePaths[0]
+    if (!app || !isAppBundle(app)) return null
+    setSettings({ editor: 'custom', editorApp: app.replace(/\/$/, '') })
+    return { app, name: app.split('/').pop()!.replace(/\.app$/, '') }
   })
   handle('settings:choose-www', async () => {
     if (!mainWindow) return null
@@ -371,12 +388,9 @@ function registerIpc(): void {
   handle('sessions:rerun', (id) => rerunSession(String(id)))
   handle('sessions:rerun-latest', async () => {
     // The newest finished test of each target, run again.
-    const seen = new Set<string>()
+    // An audit runs its own code review and web scan again, so they are not started twice.
     const out: SessionInfo[] = []
-    for (const s of listSessions()) {
-      const key = `${s.kind}|${s.target}`
-      if (s.status === 'running' || seen.has(key)) continue
-      seen.add(key)
+    for (const s of latestPerTarget(listSessions(), { finished: false })) {
       if (!readRequest(s.id)) continue
       out.push(await rerunSession(s.id).catch(() => null as never))
     }
@@ -623,7 +637,9 @@ function registerIpc(): void {
   })
 
   handle('app:check-update', () => checkForUpdate())
-  handle('app:install-update', () => installUpdate((p, l) => log('info', `${l ?? 'Updating'}${p !== null ? ` ${Math.round(p)}%` : ''}`)))
+  handle('app:install-update', () => jobs.run('Updating MacSec', (u) => installUpdate((p, l) => u(p, l))))
+  handle('app:update-status', () => updateStatus())
+  handle('app:changelog', () => releaseNotes())
   handle('sessions:get', (id) => sessionDetail(String(id)))
   handle('sessions:delete', (id) => {
     cancelSession(String(id))
@@ -750,9 +766,13 @@ function registerIpc(): void {
     if (what === 'file') {
       const p = normalize(join(code, String(file ?? '')))
       if (!p.startsWith(normalize(code) + sep)) throw new ValidationError('That file is outside the project.')
-      const vscode = findCli('cursor') ?? findCli('code')
-      if (vscode) return void openTerminal(code, `${shellQuote(vscode)} --goto ${shellQuote(`${p}:${line ?? 1}`)} && exit`)
-      return void (await shell.openPath(p))
+      // In the editor chosen in Settings (or the first one found), at the line.
+      const st = getSettings()
+      try {
+        return void (await openInEditorOf({ choice: st.editor ?? 'auto', customApp: st.editorApp, path: p, line: typeof line === 'number' ? line : 1, found: await installedEditors() }))
+      } catch {
+        return void (await shell.openPath(p))
+      }
     }
     if (what === 'code') return void (await shell.openPath(code))
     // Continue in Claude Code or Codex in Terminal, with the report ready to read.

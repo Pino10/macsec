@@ -1,5 +1,5 @@
 import Logo from './Logo'
-import { Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Wrench, Smartphone, Radar } from 'lucide-react'
+import { ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar } from 'lucide-react'
 import { useApp, type Page } from '../store'
 
 type Item = { id: Page; label: string; icon: React.ReactNode }
@@ -14,7 +14,7 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
       { id: 'api', label: 'API security', icon: <Plug size={I} /> },
       { id: 'recon', label: 'Recon', icon: <Radar size={I} /> },
       { id: 'mobile', label: 'Mobile apps', icon: <Smartphone size={I} /> },
-      { id: 'audit', label: 'Special audits', icon: <ShieldHalf size={I} /> },
+      { id: 'audit', label: 'Cloud and servers', icon: <Cloud size={I} /> },
       { id: 'mac', label: 'This Mac', icon: <Laptop size={I} /> }
     ]
   },
@@ -22,12 +22,13 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
 ]
 const FOOT: Item[] = [
   { id: 'tools', label: 'Tools', icon: <Wrench size={I} /> },
+  { id: 'updates', label: 'Updates', icon: <ArrowDownToLine size={I} /> },
   { id: 'settings', label: 'Settings', icon: <Settings size={I} /> }
 ]
 export const PAGE_ORDER: Page[] = [...GROUPS.flatMap((g) => g.items), ...FOOT].map((i) => i.id)
 
 export default function Rail(): React.JSX.Element {
-  const { page, setPage, sessions, updates } = useApp()
+  const { page, setPage, sessions, updates, appUpdate } = useApp()
   const running = sessions.filter((s) => s.status === 'running').length
 
   const item = (it: Item): React.JSX.Element => (
@@ -35,7 +36,7 @@ export default function Rail(): React.JSX.Element {
       <span className="ri">{it.icon}</span>
       {it.label}
       {it.id === 'sessions' && (running ? <span className="live" aria-label={`${running} running`} /> : sessions.length ? <span className="count">{sessions.length}</span> : null)}
-      {it.id === 'tools' && updates.length > 0 && <span className="tag tag-ion" style={{ marginLeft: 'auto' }}>{updates.length} new</span>}
+      {it.id === 'updates' && (appUpdate || updates.length > 0) && <span className="tag tag-ion" style={{ marginLeft: 'auto' }}>{appUpdate ? appUpdate.version : `${updates.length} new`}</span>}
     </button>
   )
   return (

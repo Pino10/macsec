@@ -311,6 +311,9 @@ export interface AppSettings {
   llm: { baseUrl: string; model: string }
   /** Free LLM API's address and model. Its key is a secret, in the Keychain. */
   freellm?: { baseUrl: string; model: string }
+  /** 'auto' (the first editor found), an editor id from seckit/editors.ts, or 'custom' (editorApp). */
+  editor?: string
+  editorApp?: string | null
   /** Default reviewer for new reviews. */
   reviewer: Reviewer
   notifications: boolean
@@ -369,6 +372,20 @@ export interface SessionCompare {
   added: Finding[]
   fixed: Finding[]
   still: number
+}
+
+export interface ReleaseNote {
+  version: string
+  notes: string
+  publishedAt: string
+  url: string
+}
+
+export interface UpdateStatus {
+  current: string
+  update: UpdateInfo | null
+  checkedAt: number | null
+  error: string | null
 }
 
 export interface UpdateInfo {
@@ -444,6 +461,8 @@ export interface Channels {
   'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null]; result: SessionDetail }
   'app:check-update': { args: []; result: UpdateInfo | null }
   'app:install-update': { args: []; result: void }
+  'app:update-status': { args: []; result: UpdateStatus }
+  'app:changelog': { args: []; result: ReleaseNote[] }
   'recon:start': { args: [ReconRequest]; result: SessionInfo }
   'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number } | null }
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
@@ -460,6 +479,8 @@ export interface Channels {
   'packs:list': { args: []; result: SkillPackInfo[] }
   'packs:install': { args: [string]; result: SkillPackInfo[] }
   'packs:remove': { args: [string]; result: SkillPackInfo[] }
+  'editors:list': { args: []; result: { found: { id: string; name: string }[]; current: string | null } }
+  'editors:choose-app': { args: []; result: { app: string; name: string } | null }
   'freellm:get': { args: []; result: FreeLlmInfo }
   'freellm:check': { args: []; result: FreeLlmInfo }
   'freellm:save': { args: [{ baseUrl: string; model: string; key?: string | null }]; result: FreeLlmInfo }

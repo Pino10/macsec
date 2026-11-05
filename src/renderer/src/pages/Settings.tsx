@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import type { Reviewer } from '@shared/types'
 import { useApp } from '../store'
@@ -7,6 +7,10 @@ import { PageHead, Seg, Switch } from '../ui'
 export default function Settings(): React.JSX.Element {
   const { settings, updateSettings, setSettings, act, appInfo } = useApp()
   const [check, setCheck] = useState<string | null>(null)
+  const [eds, setEds] = useState<{ found: { id: string; name: string }[]; current: string | null } | null>(null)
+  useEffect(() => {
+    void window.macsec.invoke('editors:list').then(setEds)
+  }, [])
   const api = window.macsec
   if (!settings) return <></>
   return (
@@ -54,6 +58,34 @@ export default function Settings(): React.JSX.Element {
         </div>
         <div className="ms-row">
           <div className="grow">
+            <div className="row-title">Code editor</div>
+            <div className="row-sub">Where “Open in editor” takes you, at the line of the finding. {eds ? (eds.found.length ? `${eds.found.length} found on this Mac.` : 'None found: choose an app.') : ''}</div>
+          </div>
+          <select
+            className="input"
+            style={{ minWidth: 220 }}
+            aria-label="Code editor"
+            value={settings?.editor && (settings.editor === 'custom' || eds?.found.some((e) => e.id === settings.editor)) ? settings.editor : 'auto'}
+            onChange={async (e) => {
+              if (e.target.value === 'choose') {
+                const r = await act('ed-app', () => window.macsec.invoke('editors:choose-app'))
+                if (r) setSettings(await window.macsec.invoke('settings:get'))
+              } else await updateSettings({ editor: e.target.value })
+              setEds(await window.macsec.invoke('editors:list'))
+            }}
+          >
+            <option value="auto">{eds?.found[0] ? `Automatic (${eds.found[0].name})` : 'Automatic'}</option>
+            {eds?.found.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
+            {settings?.editor === 'custom' && settings.editorApp && <option value="custom">{settings.editorApp.split('/').pop()!.replace(/\.app$/, '')}</option>}
+            <option value="choose">Choose another app…</option>
+          </select>
+        </div>
+        <div className="ms-row">
+          <div className="grow">
             <div className="row-title">The MacSec folder</div>
             <div className="row-sub mono">{appInfo?.root}</div>
           </div>
@@ -77,7 +109,7 @@ export default function Settings(): React.JSX.Element {
           className="link"
           onClick={async () => {
             const u = await act('chk', () => window.macsec.invoke('app:check-update'))
-            setCheck(u === undefined ? null : u ? `MacSec ${u.version} is ready: use the bar at the top to update.` : 'You have the newest MacSec.')
+            setCheck(u === undefined ? null : u ? `MacSec ${u.version} is ready: see Updates.` : 'You have the newest MacSec.')
           }}
         >
           Check for updates

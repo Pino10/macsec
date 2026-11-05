@@ -18,6 +18,7 @@ import Sessions from './pages/Sessions'
 import Tools from './pages/Tools'
 import Logs from './pages/Logs'
 import Settings from './pages/Settings'
+import Updates from './pages/Updates'
 
 function EngineBar(): React.JSX.Element {
   const { sessions, tools, updates, setPage, showSession } = useApp()
@@ -50,30 +51,28 @@ function EngineBar(): React.JSX.Element {
   )
 }
 
-/** MacSec's own update: offered here, installed in place, then MacSec restarts. */
+/** MacSec's own update: offered here, with its notes on the Updates page, installed in place, then MacSec restarts. */
 function UpdateBar(): React.JSX.Element | null {
-  const { act, busy } = useApp()
-  const [u, setU] = useState<UpdateInfo | null>(null)
-  const [later, setLater] = useState(false)
-  useEffect(() => {
-    void window.macsec.invoke('app:check-update').then(setU).catch(() => undefined)
-    return window.macsec.on('app:update', setU)
-  }, [])
-  if (!u || later) return null
+  const { act, busy, appUpdate: u, setPage, page, jobs } = useApp()
+  const [later, setLater] = useState<string | null>(null)
+  if (!u || later === u.version || page === 'updates') return null
+  const job = jobs.find((j) => j.label === 'Updating MacSec' && j.status === 'running')
   return (
     <div className="update-bar glass">
       <Download size={16} style={{ color: 'var(--ion)' }} />
       <span className="grow">
-        <b>MacSec {u.version}</b> is ready (you have {u.current}). Your sessions, tools and settings stay as they are.
+        <b>MacSec {u.version}</b> is ready (you have {u.current}).{job ? ` ${job.label}${job.percent !== null ? `: ${Math.round(job.percent)}%` : '…'}` : ' Your sessions, tools and settings stay as they are.'}
       </span>
-      <button className="link" onClick={() => void window.macsec.invoke('app:open-external', u.url)}>
+      <button className="link" onClick={() => setPage('updates')}>
         What’s new
       </button>
-      <button className="btn btn-sm" onClick={() => setLater(true)}>
-        Later
-      </button>
-      <button className="btn btn-sm btn-primary" disabled={busy.has('app-update')} onClick={() => void act('app-update', () => window.macsec.invoke('app:install-update'))}>
-        {busy.has('app-update') ? 'Updating…' : 'Update and restart'}
+      {!job && (
+        <button className="btn btn-sm" onClick={() => setLater(u.version)}>
+          Later
+        </button>
+      )}
+      <button className="btn btn-sm btn-primary" disabled={!!job || busy.has('app-update')} onClick={() => void act('app-update', () => window.macsec.invoke('app:install-update'))}>
+        {job || busy.has('app-update') ? 'Updating…' : 'Update and restart'}
       </button>
     </div>
   )
@@ -105,6 +104,7 @@ function Shell(): React.JSX.Element {
             <div className="page" key={page}>
               <UpdateBar />
               {page === 'overview' && <Overview />}
+              {page === 'updates' && <Updates />}
               {page === 'projects' && <Projects />}
               {page === 'review' && <CodeReview />}
               {page === 'web' && <WebScan />}
