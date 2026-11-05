@@ -1,3 +1,8 @@
+## MacSec 0.10.2
+
+### A score you cannot misread
+The number in the middle of the core is your posture score, out of 100 (higher is better), not a count of findings. It now says "Score" and "/100", and the lowest posture is called "At risk" instead of "Critical", so it is never mixed up with the number of critical findings next to it.
+
 ## MacSec 0.10.1
 
 ### Laravel's own skills

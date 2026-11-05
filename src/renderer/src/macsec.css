@@ -2342,3 +2342,7 @@ div + .pick-item {
 .watch-alert span { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .watch-alert time { color: var(--ink-3); white-space: nowrap; }
 .panel.watch { padding: 18px 22px; }
+
+/* The core's number is a score out of 100, said plainly so it is never read as a count of findings. */
+.core-kicker { display: block; margin-bottom: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+.core-of { font-style: normal; font-size: 0.32em; font-weight: 500; letter-spacing: 0; margin-left: 3px; color: var(--ink-3); text-shadow: none; }

@@ -70,7 +70,7 @@ export default function Overview(): React.JSX.Element {
         </div>
         <div style={{ display: 'grid', gap: 20 }}>
           <div>
-            <h2>{has ? `Posture: ${postureWord(score, true).toLowerCase()}` : 'Run your first test'}</h2>
+            <h2>{has ? `Posture: ${postureWord(score, true).toLowerCase()}, ${score} out of 100` : 'Run your first test'}</h2>
             <p className="page-desc" style={{ marginTop: 0 }}>
               {!has
                 ? 'Pick a project, a site or an API below. Results gather here, and the core in the middle shows how exposed you are.'

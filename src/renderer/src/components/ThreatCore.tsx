@@ -20,12 +20,14 @@ export function postureOf(list: Record<Severity, number>[]): number {
 
 export function postureWord(score: number, hasData: boolean): string {
   if (!hasData) return 'No results yet'
-  return score >= 90 ? 'Strong' : score >= 70 ? 'Guarded' : score >= 45 ? 'Exposed' : 'Critical'
+  // Not "Critical": that word is for findings, and the score is not a count of them.
+  return score >= 90 ? 'Strong' : score >= 70 ? 'Guarded' : score >= 45 ? 'Exposed' : 'At risk'
 }
 
 /**
- * The threat core: severity as rings of light around a glass sphere, with the posture score in
- * the middle. A sweep turns while tests are running.
+ * The threat core: severity as rings of light around a glass sphere, with the posture score (out
+ * of 100, higher is better) in the middle. It is a score, not a count of findings, and says so.
+ * A sweep turns while tests are running.
  */
 export default function ThreatCore({ counts, size = 300, running = false, label = true, hasData = true, score: given }: { counts: Record<Severity, number>; size?: number; running?: boolean; label?: boolean; hasData?: boolean; score?: number }): React.JSX.Element {
   const score = given ?? postureScore(counts)
@@ -95,7 +97,11 @@ export default function ThreatCore({ counts, size = 300, running = false, label 
       </svg>
       {label && (
         <div className="core-label">
-          <b style={{ textShadow: `0 0 30px ${glow}` }}>{hasData ? score : '·'}</b>
+          {hasData && <small className="core-kicker">Score</small>}
+          <b style={{ textShadow: `0 0 30px ${glow}` }}>
+            {hasData ? score : '·'}
+            {hasData && <i className="core-of">/100</i>}
+          </b>
           <span>{postureWord(score, hasData)}</span>
         </div>
       )}
