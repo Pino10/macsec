@@ -1,0 +1,28 @@
+HTTP/1.1 200 Connection Established
+
+HTTP/2 200 
+date: Thu, 05 Nov 2026 20:05:07 GMT
+content-type: text/html; charset=UTF-8
+vary: Accept-Encoding
+server: BunnyCDN-IL1-871
+cdn-pullzone: 3535225
+cdn-requestcountrycode: US
+cache-control: max-age=0, must-revalidate, private
+expires: Thu, 05 Nov 2026 20:05:07 GMT
+strict-transport-security: max-age=31104000; includeSubDomains; preload
+x-frame-options: DENY
+content-security-policy: default-src 'self'; base-uri 'none'; block-all-mixed-content; connect-src 'self' https://*.algolia.net https://*.algolianet.com; frame-src https://www.google.com/recaptcha/; img-src 'self' https: data:; object-src 'none'; script-src 'unsafe-eval' https://www.gstatic.com/recaptcha/ 'strict-dynamic' 'unsafe-inline' 'nonce-rlMljMLlq1Q6bOExnNGNLg=='; style-src 'self' 'unsafe-inline'
+x-content-security-policy: default-src 'self'; base-uri 'none'; block-all-mixed-content; connect-src 'self' https://*.algolia.net https://*.algolianet.com; frame-src https://www.google.com/recaptcha/; img-src 'self' https: data:; object-src 'none'; script-src 'unsafe-eval' https://www.gstatic.com/recaptcha/ 'strict-dynamic' 'unsafe-inline' 'nonce-rlMljMLlq1Q6bOExnNGNLg=='; style-src 'self' 'unsafe-inline'
+x-xss-protection: 1; mode=block
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+cdn-proxyver: 1.72
+cdn-requestpullsuccess: True
+cdn-requestpullcode: 200
+cdn-cachedat: 11/05/2026 20:05:07
+cdn-edgestorageid: 871
+cdn-requestid: 53758b41271991590fda94fd5c5f5c11
+cdn-cache: MISS
+cdn-status: 200
+cdn-requesttime: 0
+

@@ -43,6 +43,8 @@ import { accounts, azureProjects, connectAzure, connectGitHub, githubRepos, impo
 import { cancelSession, sourceFiles, startReview } from './review'
 import { deleteSession, listSessions, readSession, recoverSessions, saveSession, sessionCodeDir, sessionDetail, sessionDir, sessionEvents, discardCode } from './sessions'
 import { sessionHtml } from './report'
+import { sessionOwasp } from './owaspmap'
+import { leakKit } from './leakkit'
 import { projectStats } from './scanners/plan'
 import { findApp, findCli, installAgent, listAgents, openBurp, openTerminal, shellQuote } from './agents'
 
@@ -279,7 +281,7 @@ function signIn(url: string): Promise<{ cookie: string; count: number } | null> 
 async function exportPdf(id: string): Promise<string | null> {
   const detail = sessionDetail(id)
   const html = join(sessionDir(id), 'report.html')
-  writeFileSync(html, sessionHtml(detail))
+  writeFileSync(html, sessionHtml(detail, sessionOwasp(detail)))
   const win = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true, contextIsolation: true } })
   try {
     await win.loadFile(html)
@@ -564,6 +566,19 @@ function registerIpc(): void {
     }
   }
   handle('integrations:get', () => integrations())
+  handle('kit:leaks', () => leakKit(dirs.bin()))
+  handle('kit:save', async () => {
+    // Saved only under ~/MacSec; you copy them into your projects yourself.
+    const dir = join(dirs.root(), 'kits', 'stop-leaking-keys')
+    const k = leakKit(dirs.bin())
+    mkdirSync(join(dir, '.github', 'workflows'), { recursive: true })
+    writeFileSync(join(dir, 'pre-commit'), k.hook, { mode: 0o755 })
+    writeFileSync(join(dir, '.pre-commit-config.yaml'), k.preCommit)
+    writeFileSync(join(dir, '.github', 'workflows', 'gitleaks.yml'), k.action)
+    writeFileSync(join(dir, 'README.txt'), ['Stop leaking keys, from MacSec', '', 'pre-commit:', ...k.steps.hook.map((s) => `  ${s}`), '', '.pre-commit-config.yaml:', ...k.steps.preCommit.map((s) => `  ${s}`), '', '.github/workflows/gitleaks.yml:', ...k.steps.action.map((s) => `  ${s}`), ''].join('\n'))
+    await shell.openPath(dir)
+    return dir
+  })
   handle('mcp:enable', async (on) => {
     setSettings({ mcpEnabled: on === true })
     if (on === true) {
@@ -682,6 +697,17 @@ function registerIpc(): void {
   handle('app:update-status', () => updateStatus())
   handle('app:changelog', () => releaseNotes())
   handle('sessions:get', (id) => sessionDetail(String(id)))
+  handle('sessions:owasp', (id) => {
+    const s = sessionDetail(String(id))
+    const kids = (s.children ?? []).flatMap((c) => {
+      try {
+        return [sessionDetail(c)]
+      } catch {
+        return []
+      }
+    })
+    return sessionOwasp(s, kids)
+  })
   handle('sessions:delete', (id) => {
     cancelSession(String(id))
     deleteSession(String(id))

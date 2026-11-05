@@ -59,6 +59,12 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 0.11
+
+- `src/main/seckit/owasp.ts` (shared with Laramac) and `src/main/owaspmap.ts`: every session's OWASP Top 10 (2025) checklist (`sessions:owasp`), also in the PDF report.
+- `src/main/leakkit.ts`: the "Stop leaking keys" kit (pre-commit hook, pre-commit config, GitHub Action with Gitleaks pinned by SHA-256). Only shown, copied or saved under ~/MacSec/kits.
+- `pageInfo` in `src/main/seckit/recon.ts`: each crawled page broken down (forms, CSRF fields, cookies by name and flags, security headers, scripts, parameters), shown in `components/ReconPages.tsx`.
+
 ## Tests
 
 ```sh

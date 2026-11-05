@@ -474,10 +474,11 @@ export interface Channels {
   'app:update-status': { args: []; result: UpdateStatus }
   'app:changelog': { args: []; result: ReleaseNote[] }
   'recon:start': { args: [ReconRequest]; result: SessionInfo }
-  'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number } | null }
+  'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number; pages?: ReconPage[] } | null }
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
   'sessions:list': { args: []; result: SessionInfo[] }
   'sessions:get': { args: [string]; result: SessionDetail }
+  'sessions:owasp': { args: [string]; result: OwaspChecklistInfo }
   'sessions:compare': { args: [string]; result: SessionCompare }
   'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json']; result: string | null }
   'projects:save-hook': { args: [string]; result: string | null }
@@ -495,6 +496,8 @@ export interface Channels {
   'freellm:check': { args: []; result: FreeLlmInfo }
   'freellm:save': { args: [{ baseUrl: string; model: string; key?: string | null }]; result: FreeLlmInfo }
   'integrations:get': { args: []; result: IntegrationsInfo }
+  'kit:leaks': { args: []; result: LeakKitInfo }
+  'kit:save': { args: []; result: string }
   'webhook:set': { args: [{ kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all' } | null, string | null]; result: IntegrationsInfo }
   'webhook:test': { args: []; result: void }
   'raycast:install': { args: []; result: IntegrationsInfo }
@@ -572,4 +575,51 @@ export interface WatchInfo {
   lastRetest: string | null
   projects: number
   alerts: WatchAlert[]
+}
+
+export interface OwaspItemInfo {
+  id: string
+  name: string
+  about: string
+  howToCheck: string
+  status: 'issues' | 'checked' | 'not-checked'
+  count: number
+  worst: Severity | null
+  examples: string[]
+  checkedBy: string[]
+}
+
+/** A session's findings under the OWASP Top 10 (2025), and what the session could see. */
+export interface OwaspChecklistInfo {
+  items: OwaspItemInfo[]
+  other: number
+  covered: number
+}
+
+/** The "Stop leaking keys" kit: a pre-commit hook, a pre-commit config and a GitHub Action. */
+export interface LeakKitInfo {
+  hook: string
+  preCommit: string
+  action: string
+  steps: { hook: string[]; preCommit: string[]; action: string[] }
+  version: string
+}
+
+/** One page from a recon's crawl, broken down (read only). */
+export interface ReconPage {
+  url: string
+  status: number
+  title?: string
+  type: string
+  bytes: number
+  ms: number
+  redirect?: string
+  forms: { action: string; method: string; inputs: { name: string; type: string }[]; csrf: boolean; password: boolean; offsite: boolean; insecure: boolean }[]
+  params: string[]
+  scripts: { total: number; inline: number; external: string[]; withoutSri: number }
+  headers: { name: string; present: boolean; value?: string }[]
+  cookies: { name: string; secure: boolean; httpOnly: boolean; sameSite: string | null }[]
+  tech: string[]
+  mixed: number
+  notes: { severity: Severity; text: string }[]
 }

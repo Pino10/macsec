@@ -4,6 +4,8 @@ import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileS
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
+import { SessionOwasp } from '../components/OwaspList'
+import { ReconPages } from '../components/ReconPages'
 import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
 import { FixDiff, LeakHelp } from '../components/FixHelp'
 import { CodeView, Counts, Empty, KindIcon, PageHead, Sev, Spectrum, StepIcon, ago, duration, kindName } from '../ui'
@@ -94,7 +96,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [sevs, setSevs] = useState<Set<Severity>>(new Set(['critical', 'high', 'medium', 'low']))
   const [cat, setCat] = useState<FindingCategory | 'all'>('all')
   const [showFp, setShowFp] = useState(false)
-  const [tab, setTab] = useState<'findings' | 'report' | 'run' | 'surface'>('findings')
+  const [tab, setTab] = useState<'findings' | 'owasp' | 'report' | 'run' | 'surface'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const live = sessions.find((s) => s.id === id)
   const now = useNow(live?.status === 'running')
@@ -252,6 +254,9 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <button role="tab" aria-selected={tab === 'findings'} onClick={() => setTab('findings')}>
             Findings
           </button>
+          <button role="tab" aria-selected={tab === 'owasp'} onClick={() => setTab('owasp')}>
+            OWASP Top 10
+          </button>
           <button role="tab" aria-selected={tab === 'report'} onClick={() => setTab('report')}>
             Report
           </button>
@@ -260,7 +265,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           </button>
           {s.kind === 'recon' && (
             <button role="tab" aria-selected={tab === 'surface'} onClick={() => setTab('surface')}>
-              Hosts and scripts
+              Pages and hosts
             </button>
           )}
         </div>
@@ -312,6 +317,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
       )}
 
       {tab === 'surface' && <Surface id={id} />}
+      {tab === 'owasp' && <SessionOwasp id={id} stamp={stamp} />}
 
       {tab === 'report' && (
         <>
@@ -490,6 +496,7 @@ function Surface({ id }: { id: string }): React.JSX.Element {
   if (!d) return <div className="panel" style={{ padding: 20 }}><span className="hint">The map appears when the recon has collected it.</span></div>
   return (
     <div style={{ display: 'grid', gap: 14 }}>
+      {d.pages && <ReconPages pages={d.pages} />}
       <div className="panel">
         <div style={{ padding: '14px 18px 4px' }} className="section-title">
           {d.hosts.length} hosts, {d.hosts.filter((h) => h.live).length} answer

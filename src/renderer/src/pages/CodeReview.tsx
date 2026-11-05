@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LeakKit } from '../components/LeakKit'
 import { AuditFlow, type AuditKind } from './Audits'
 import { FileSearch, Gauge, Microscope, Radar, Zap } from 'lucide-react'
 import type { ReviewDepth, ReviewFocus, Reviewer } from '@shared/types'
@@ -154,6 +155,7 @@ export default function CodeReview(): React.JSX.Element {
       </div>
       </>
       )}
+      <LeakKit />
     </>
   )
 }

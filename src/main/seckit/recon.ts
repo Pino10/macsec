@@ -45,6 +45,29 @@ export interface JsInfo {
   secrets: { kind: string; masked: string }[]
 }
 
+/** One page read during the crawl, broken down: what is on it and how it is protected. */
+export interface PageInfo {
+  url: string
+  status: number
+  title?: string
+  type: string
+  bytes: number
+  ms: number
+  redirect?: string
+  forms: { action: string; method: string; inputs: { name: string; type: string }[]; csrf: boolean; password: boolean; offsite: boolean; insecure: boolean }[]
+  /** Names of query parameters in the page's links and its own address. */
+  params: string[]
+  scripts: { total: number; inline: number; external: string[]; withoutSri: number }
+  headers: { name: string; present: boolean; value?: string }[]
+  /** Cookie names and flags only: never their values. */
+  cookies: { name: string; secure: boolean; httpOnly: boolean; sameSite: string | null }[]
+  tech: string[]
+  /** http:// resources on an https page. */
+  mixed: number
+  /** What stands out, in plain words, worst first. */
+  notes: { severity: Sev; text: string }[]
+}
+
 export interface ReconResult {
   domain: string
   hosts: HostInfo[]
@@ -53,6 +76,8 @@ export interface ReconResult {
   js: JsInfo[]
   endpoints: string[]
   findings: ReconFinding[]
+  /** Every page the crawl read, one by one. */
+  pages?: PageInfo[]
 }
 
 export interface ReconContext {
@@ -297,6 +322,131 @@ export function linksOf(html: string, base: string, domain: string): { pages: st
   return { pages: [...pages], scripts: [...scripts] }
 }
 
+const SECURITY_HEADERS = ['content-security-policy', 'strict-transport-security', 'x-frame-options', 'x-content-type-options', 'referrer-policy', 'permissions-policy']
+const CSRF_NAME = /csrf|xsrf|authenticity_token|^_token$|requestverificationtoken|__requestdigest|^nonce$|form_key|_wpnonce/i
+
+const attr = (tag: string, name: string): string | undefined => new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(tag)?.slice(1).find((v) => v !== undefined)
+
+/** The cookies a response sets: names and flags only. */
+export function cookiesOf(headers: Headers): PageInfo['cookies'] {
+  const raw = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : (headers.get('set-cookie') ?? '').split(/,(?=\s*[^;,=\s]+=)/)
+  return raw
+    .filter((c) => c.trim())
+    .map((c) => {
+      const [pair, ...flags] = c.split(';').map((x) => x.trim())
+      const f = flags.map((x) => x.toLowerCase())
+      // A cookie that is being deleted (empty, or expiring now) is not a risk.
+      const deleting = /=\s*$/.test(pair) || f.some((x) => x === 'max-age=0')
+      return { name: pair.split('=')[0].trim(), secure: f.includes('secure'), httpOnly: f.includes('httponly'), sameSite: f.find((x) => x.startsWith('samesite='))?.slice(9) ?? null, deleting }
+    })
+    .filter((c) => c.name && !c.deleting)
+    .map(({ deleting: _d, ...c }) => c)
+}
+
+/** The forms in a page: where they send, how, which fields, and whether a CSRF token is there. */
+export function formsOf(html: string, base: string): PageInfo['forms'] {
+  const out: PageInfo['forms'] = []
+  for (const m of html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)) {
+    const tag = m[1]
+    const method = (attr(tag, 'method') ?? 'get').toLowerCase()
+    let action = base
+    try {
+      action = new URL(attr(tag, 'action') ?? '', base).href
+    } catch {
+      /* keep the page */
+    }
+    const inputs: { name: string; type: string }[] = []
+    for (const i of m[2].matchAll(/<(input|select|textarea)\b([^>]*)>/gi)) {
+      const name = attr(i[2], 'name')
+      if (!name) continue
+      inputs.push({ name, type: i[1].toLowerCase() === 'input' ? (attr(i[2], 'type') ?? 'text').toLowerCase() : i[1].toLowerCase() })
+    }
+    const b = new URL(base)
+    const a = new URL(action)
+    out.push({
+      action: a.href,
+      method,
+      inputs: inputs.slice(0, 40),
+      csrf: inputs.some((x) => x.type === 'hidden' && CSRF_NAME.test(x.name)),
+      password: inputs.some((x) => x.type === 'password'),
+      offsite: a.hostname !== b.hostname,
+      insecure: a.protocol === 'http:'
+    })
+  }
+  return out
+}
+
+/** One page, broken down. Read only: it looks at what the server already sent. */
+export function pageInfo(url: string, status: number, headers: Headers, html: string, ms: number, redirect?: string): PageInfo {
+  const https = url.startsWith('https:')
+  const host = new URL(url).hostname
+  const forms = formsOf(html, url)
+  const params = new Set<string>()
+  for (const u of [url, ...[...html.matchAll(/<a[^>]+href=["']([^"'#]+)["']/gi)].map((m) => m[1])]) {
+    try {
+      const x = new URL(u.replace(/&amp;/g, '&'), url)
+      if (x.hostname === host) for (const k of x.searchParams.keys()) params.add(k)
+    } catch {
+      /* not a link */
+    }
+  }
+  const tags = [...html.matchAll(/<script\b([^>]*)>/gi)].map((m) => m[1])
+  const ext = tags.filter((t) => attr(t, 'src'))
+  const externalHosts = new Set<string>()
+  let withoutSri = 0
+  for (const t of ext) {
+    try {
+      const u = new URL(attr(t, 'src')!, url)
+      if (u.hostname !== host) {
+        externalHosts.add(u.hostname)
+        if (!attr(t, 'integrity')) withoutSri++
+      }
+    } catch {
+      /* odd src */
+    }
+  }
+  const sec = SECURITY_HEADERS.map((name) => ({ name, present: headers.has(name), ...(headers.get(name) ? { value: headers.get(name)!.slice(0, 300) } : {}) }))
+  const cookies = cookiesOf(headers)
+  const mixed = https ? [...html.matchAll(/<(?:script|img|iframe|link|audio|video|source)\b[^>]+(?:src|href)=["']http:\/\/[^"']+/gi)].length : 0
+  const notes: PageInfo['notes'] = []
+  const isHtml = /html/i.test(headers.get('content-type') ?? '')
+  for (const f of forms) {
+    if (f.password && (f.insecure || !https)) notes.push({ severity: 'high', text: `A password form sends over plain http (${f.action}).` })
+    if (f.method === 'post' && !f.csrf) notes.push({ severity: f.password ? 'medium' : 'low', text: `A ${f.password ? 'login ' : ''}form posting to ${new URL(f.action).pathname} has no CSRF token field. The site may protect it another way (SameSite cookies, a header): check it.` })
+    if (f.offsite) notes.push({ severity: 'info', text: `A form sends to another site: ${new URL(f.action).hostname}.` })
+  }
+  if (isHtml && status < 400) {
+    if (!headers.has('content-security-policy')) notes.push({ severity: 'low', text: 'No Content-Security-Policy: nothing limits which scripts can run if one gets injected.' })
+    if (!headers.has('x-frame-options') && !/frame-ancestors/i.test(headers.get('content-security-policy') ?? '')) notes.push({ severity: 'low', text: 'Other sites can put this page in a frame (no X-Frame-Options or frame-ancestors).' })
+    if (https && !headers.has('strict-transport-security')) notes.push({ severity: 'low', text: 'No Strict-Transport-Security, so a first visit can be downgraded to http.' })
+  }
+  for (const c of cookies) {
+    if (https && !c.secure) notes.push({ severity: 'low', text: `Cookie ${c.name} can travel over plain http (no Secure).` })
+    if (!c.httpOnly && /sess|auth|token|sid|remember/i.test(c.name)) notes.push({ severity: 'medium', text: `Cookie ${c.name} looks like a session, and JavaScript can read it (no HttpOnly).` })
+  }
+  if (mixed) notes.push({ severity: 'medium', text: `${mixed} ${mixed === 1 ? 'file loads' : 'files load'} over plain http on this https page.` })
+  if (withoutSri) notes.push({ severity: 'info', text: `${withoutSri} ${withoutSri === 1 ? 'script comes' : 'scripts come'} from other sites without an integrity check (SRI).` })
+  const rank: Record<Sev, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+  notes.sort((a, b) => rank[a.severity] - rank[b.severity])
+  return {
+    url,
+    status,
+    title: isHtml ? titleOf(html) : undefined,
+    type: (headers.get('content-type') ?? '').split(';')[0].trim(),
+    bytes: html.length,
+    ms: Math.round(ms),
+    ...(redirect ? { redirect } : {}),
+    forms,
+    params: [...params].slice(0, 60),
+    scripts: { total: tags.length, inline: tags.length - ext.length, external: [...externalHosts].slice(0, 30), withoutSri },
+    headers: sec,
+    cookies,
+    tech: isHtml ? techOf(headers, html) : [],
+    mixed,
+    notes
+  }
+}
+
 // ---------------------------------------------------------------- JavaScript
 
 /** Paths and URLs written in JavaScript, like LinkFinder: where the front end talks to. */
@@ -422,7 +572,7 @@ export async function runRecon(target: string, ctx: ReconContext): Promise<Recon
   const { domain, url: startUrl } = normalizeTarget(target)
   const L = LIMITS[ctx.depth]
   const UA = { 'User-Agent': ctx.userAgent ?? 'Recon (read-only)' }
-  const res: ReconResult = { domain, hosts: [], urls: [], params: [], js: [], endpoints: [], findings: [] }
+  const res: ReconResult = { domain, hosts: [], urls: [], params: [], js: [], endpoints: [], findings: [], pages: [] }
   const hostMap = new Map<string, HostInfo>()
   const addHost = (h: string, src: string): void => {
     const e = hostMap.get(h) ?? { host: h, ips: [], sources: [] }
@@ -563,8 +713,14 @@ export async function runRecon(target: string, ctx: ReconContext): Promise<Recon
       if (seen.has(u)) continue
       seen.add(u)
       try {
+        const t0 = Date.now()
         const r = await get(u, 12000)
         pages++
+        try {
+          res.pages!.push(pageInfo(u, r.status, r.headers, r.text, Date.now() - t0, r.location ? new URL(r.location, u).href : undefined))
+        } catch {
+          // A page that cannot be broken down still counts for the crawl.
+        }
         if (r.location) {
           const next = new URL(r.location, u)
           if (inScope(next.hostname, domain)) queue.push(next.href)

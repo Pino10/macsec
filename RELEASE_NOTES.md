@@ -1,3 +1,14 @@
+## MacSec 0.11.0
+
+### OWASP Top 10 for everything
+Every session now has an **OWASP Top 10 (2025)** tab: code reviews, web scans, API scans, recon, audits and more. Each of the ten says whether it had problems (and how many, and the worst), was checked and looked fine, or was not checked by that run, with what would check it. Findings are sorted by their CWE when they have one and by what they say otherwise, and findings you marked as not a problem do not count. The checklist is in the PDF report too.
+
+### Stop leaking keys
+On the Code review page, a kit that catches keys and passwords before they are committed, and again on GitHub before they are merged: a Git **pre-commit hook** (it uses MacSec's Gitleaks if it is not installed elsewhere), a **pre-commit** config, and a ready-made **GitHub Action** that is free and needs no licence key. The Action checks the Gitleaks download against its SHA-256 and pins its checkout to a commit. Copy them, or save all three in ~/MacSec/kits: MacSec does not change your projects.
+
+### Recon, page by page
+Recon now breaks down **every page it reads**, one by one: its status and title, its forms (where they send, their fields, and whether a POST form has a CSRF token field), the parameters in its links, its scripts and where they come from (and which lack an integrity check), its cookies (names and flags only, never values), its security headers and what it runs on. What stands out on each page is listed worst first, and the pages worth a look come first. It only reads what the site already sends.
+
 ## MacSec 0.10.2
 
 ### A score you cannot misread

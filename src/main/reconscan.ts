@@ -59,7 +59,7 @@ async function run(id: string, req: ReconRequest): Promise<void> {
       tool: (n) => (n === 'subfinder' && sf && isInstalled(sf) ? toolPath('subfinder') : null),
       run: async (bin, args, timeoutMs) => runTool({ name: 'subfinder', bin, args, timeoutMs, absolute: true }, op, s.raw).catch(() => '')
     })
-    writeFileSync(join(s.raw, 'recon.json'), JSON.stringify({ hosts: result.hosts, js: result.js, endpoints: result.endpoints, params: result.params, urls: result.urls.length }))
+    writeFileSync(join(s.raw, 'recon.json'), JSON.stringify({ hosts: result.hosts, js: result.js, endpoints: result.endpoints, params: result.params, urls: result.urls.length, pages: result.pages ?? [] }))
     writeFileSync(join(s.raw, 'urls.txt'), result.urls.join('\n'))
     s.add(result.findings.map(toFinding))
     if (req.reviewer !== 'none' && !s.cancelled) {

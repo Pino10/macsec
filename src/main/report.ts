@@ -3,6 +3,7 @@
  * the network, and every value from the code or a scanner is escaped.
  */
 import type { Finding, SessionDetail, Severity } from '../shared/types'
+import type { OwaspChecklist } from './seckit/owasp'
 
 export const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
@@ -96,7 +97,7 @@ function findingHtml(f: Finding): string {
 </div>`
 }
 
-export function sessionHtml(s: SessionDetail): string {
+export function sessionHtml(s: SessionDetail, owasp?: OwaspChecklist): string {
   const real = s.findings.filter((f) => f.verdict !== 'false-positive')
   const ruledOut = s.findings.length - real.length
   const reviewer = s.reviewer === 'claude' ? 'Claude Code' : s.reviewer === 'claude-local' ? 'Claude Code on a local model' : s.reviewer === 'claude-free' ? 'Claude Code on Free LLM API' : s.reviewer === 'gemini' ? 'Gemini CLI' : s.reviewer === 'codex' ? 'Codex' : s.reviewer === 'model' ? 'Local model' : 'Scanners only'
@@ -151,6 +152,8 @@ ${s.aiReport ? `<div class="ai">${markdownToHtml(s.aiReport)}</div>` : ''}
 <h2>All findings (${real.length})</h2>
 ${ORDER.map((k) => real.filter((f) => f.severity === k).map(findingHtml).join('')).join('')}
 ${ruledOut ? `<h2>Ruled out by the AI reviewer (${ruledOut})</h2>${s.findings.filter((f) => f.verdict === 'false-positive').map((f) => `<p><b>${esc(f.title)}</b> <code>${esc(f.file ?? '')}${f.line ? `:${f.line}` : ''}</code><br>${esc(f.aiNote ?? '')}</p>`).join('')}` : ''}
+${owasp ? `<h2>OWASP Top 10 (2025)</h2>
+<table><tr><th></th><th>Category</th><th>Result</th></tr>${owasp.items.map((i) => `<tr><td>${i.id}</td><td>${esc(i.name)}</td><td>${i.status === 'issues' ? `<b style="color:${COLOR[(i.worst ?? 'medium') as keyof typeof COLOR] ?? '#b91c1c'}">${i.count} to fix</b>` : i.status === 'checked' ? '<span class="ok">Checked, nothing found</span>' : `Not checked. ${esc(i.howToCheck)}`}</td></tr>`).join('')}</table>` : ''}
 <h2>What ran</h2>
 <table><tr><th>Step</th><th>Result</th></tr>${s.steps.map((st) => `<tr><td>${esc(st.label)}</td><td>${esc(st.status)}${st.detail ? `: ${esc(st.detail)}` : ''}</td></tr>`).join('')}</table>
 <div class="foot">Made with MacSec. Findings come from automated tools and AI review; confirm before acting. Secrets are masked. Session ${esc(s.id)}.</div>

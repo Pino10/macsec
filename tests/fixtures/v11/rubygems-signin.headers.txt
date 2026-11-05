@@ -1,0 +1,30 @@
+HTTP/1.1 200 Connection Established
+
+HTTP/2 200 
+content-type: text/html; charset=utf-8
+x-frame-options: SAMEORIGIN
+x-xss-protection: 0
+x-content-type-options: nosniff
+x-permitted-cross-domain-policies: none
+referrer-policy: strict-origin-when-cross-origin
+cross-origin-opener-policy: same-origin
+link: </assets/hammy-8ba0604f.css>; rel=preload; as=style; nopush,</assets/tailwind-fc37c58e.css>; rel=preload; as=style; nopush
+cache-control: max-age=0, private, must-revalidate
+content-security-policy: default-src 'self'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://secure.gaug.es https://gravatar.com https://www.gravatar.com https://secure.gravatar.com https://*.fastly-insights.com https://avatars.githubusercontent.com; object-src 'none'; script-src 'self' 'sha256-IRgcCAw28sB9+HDHW32WG2lFN2FWsEKEgjo6GzF/V50=' https://secure.gaug.es https://www.fastly-insights.com 'nonce-4AwEjkaR4l7i2K5Hp7CX2w=='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' https://s3-us-west-2.amazonaws.com/rubygems-dumps/ https://*.fastly-insights.com https://fastly-insights.com https://api.github.com http://localhost:*; form-action 'self' https://github.com/login/oauth/authorize; frame-ancestors 'self'; base-uri 'self'; report-uri https://csp-report.browser-intake-datadoghq.com/api/v2/logs?dd-api-key=pub852fa3e2312391fafa5640b60784e660&dd-evp-origin=content-security-policy&ddsource=csp-report&ddtags=service%3Arubygems.org%2Cversion%3A8b6fbba682ee84fdfec870b7ac8b98e39c8e7300%2Cenv%3Aproduction%2Ctrace_id%3A6aece179000000000dc8e0ee431bb8b0
+set-cookie: _rubygems_session=REDACTED; path=/; secure; httponly; samesite=strict
+x-request-id: dca01dfb-fa63-4c65-a81f-4ce4eb5c3d8a
+x-runtime: 0.007522
+strict-transport-security: max-age=31536000; includeSubDomains
+x-backend: F_Rails 32.184.230.230:443
+accept-ranges: bytes
+date: Thu, 05 Nov 2026 20:05:13 GMT
+via: 1.1 varnish
+x-served-by: cache-iad-kiad7000077-IAD
+x-cache: MISS
+x-cache-hits: 0
+x-timer: S1793909113.721018,VS0,VE372
+vary: Accept-Encoding
+etag: "24b754c979ae204bfafa79408f70ef37"
+server: RubyGems.org
+content-length: 36209
+
