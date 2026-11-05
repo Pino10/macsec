@@ -1,6 +1,7 @@
 /**
  * Skill packs from the internet, shared by Laramac and MacSec (keep both copies of src/main/seckit
- * the same). A pack is a public GitHub repository of Claude Code skills written by a security team.
+ * the same). A pack is a public GitHub repository of Claude Code skills from a security team or a
+ * framework's own authors (Laravel). Only free, openly licensed skills are listed.
  * The app clones it into its own folder (never anywhere else), records the exact commit, and loads
  * the security skills from it into Claude Code reviews with --plugin-dir. Reviews stay read-only:
  * plan mode with only Read, Grep, Glob and Skill, whatever a skill asks for.
@@ -25,6 +26,8 @@ export interface SkillPack {
   layout: 'plugins' | 'skills' | 'commands'
   /** The security-related plugins or skills that reviews load. */
   pick: string[]
+  /** For the skills layout: where a skill is in the repository, when not skills/<name>. */
+  paths?: Record<string, string>
 }
 
 export const SKILL_PACKS: SkillPack[] = [
@@ -79,6 +82,20 @@ export const SKILL_PACKS: SkillPack[] = [
     pick: ['security-audit']
   },
   {
+    id: 'laravel',
+    name: 'Laravel',
+    repo: 'laravel/boost',
+    license: 'MIT',
+    about: 'Laravel’s own agent skills, from Laravel Boost: Laravel best practices with a rule for each topic (security and authorization, Eloquent and N+1 queries, validation, queues, caching, routing, migrations, error handling), Tailwind CSS 4, and feature flags with Pennant. Free; the paid Flux UI Pro and Laravel Cloud skills are left out.',
+    layout: 'skills',
+    pick: ['laravel-best-practices', 'tailwindcss-development', 'pennant-development'],
+    paths: {
+      'laravel-best-practices': '.ai/laravel/skill/laravel-best-practices',
+      'tailwindcss-development': '.ai/tailwindcss/4/skill/tailwindcss-development',
+      'pennant-development': '.ai/pennant/skill/pennant-development'
+    }
+  },
+  {
     id: 'anthropic',
     name: 'Anthropic',
     repo: 'anthropics/claude-code-security-review',
@@ -101,6 +118,8 @@ export interface PackState {
 const packDir = (root: string, id: string): string => join(root, id)
 const repoDir = (root: string, id: string): string => join(packDir(root, id), 'repo')
 const stateFile = (root: string, id: string): string => join(packDir(root, id), 'state.json')
+/** A skill's folder inside a pack's repository. */
+const skillPath = (pack: SkillPack, repo: string, n: string): string => join(repo, pack.paths?.[n] ?? join('skills', n))
 const known = (id: string): SkillPack => {
   const p = SKILL_PACKS.find((x) => x.id === id)
   if (!p) throw new Error('That skill pack is not on the list.')
@@ -111,7 +130,7 @@ const known = (id: string): SkillPack => {
 export function packContents(pack: SkillPack, repo: string): string[] {
   if (pack.layout === 'plugins') return pack.pick.filter((n) => existsSync(join(repo, 'plugins', n, '.claude-plugin', 'plugin.json')) || existsSync(join(repo, 'plugins', n, 'skills')))
   if (pack.layout === 'commands') return pack.pick.filter((n) => existsSync(join(repo, '.claude', 'commands', `${n}.md`)))
-  return pack.pick.filter((n) => existsSync(join(repo, 'skills', n, 'SKILL.md')))
+  return pack.pick.filter((n) => existsSync(join(skillPath(pack, repo, n), 'SKILL.md')))
 }
 
 /**
@@ -159,7 +178,7 @@ function wrapSkills(pack: SkillPack, root: string, names: string[]): void {
       const skill = `${pack.id}-${n}`
       mkdirSync(join(plugin, 'skills', skill), { recursive: true })
       writeFileSync(join(plugin, 'skills', skill, 'SKILL.md'), commandToSkill(md, skill, `${pack.name}, ${pack.license}`))
-    } else cpSync(join(repoDir(root, pack.id), 'skills', n), join(plugin, 'skills', n), { recursive: true })
+    } else cpSync(skillPath(pack, repoDir(root, pack.id), n), join(plugin, 'skills', n), { recursive: true })
   }
 }
 

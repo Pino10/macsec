@@ -4,7 +4,7 @@ import type { FreeLlmInfo, IntegrationsInfo, SkillPackInfo } from '@shared/types
 import { useApp } from '../store'
 import { Switch } from '../ui'
 
-/** Security skills from Trail of Bits, Sentry, Cloudflare and Anthropic, loaded into MacSec's Claude Code reviews. */
+/** Skills from Trail of Bits, Sentry, Cloudflare, Laravel and Anthropic, loaded into MacSec's Claude Code reviews. */
 export function SkillPacks(): React.JSX.Element {
   const { act, busy } = useApp()
   const api = window.macsec

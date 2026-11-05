@@ -117,7 +117,7 @@ export function skillCatalog(o: { app: string; ownDir: string; mineDir?: string;
 export type StackTag =
   | 'php' | 'laravel' | 'wordpress' | 'symfony' | 'js' | 'ts' | 'react' | 'vue' | 'next' | 'node-api' | 'electron' | 'ai'
   | 'python' | 'django' | 'go' | 'rust' | 'c' | 'solidity' | 'android' | 'ios' | 'docker' | 'terraform' | 'gha'
-  | 'supabase' | 'firebase' | 'claude' | 'mobile'
+  | 'supabase' | 'firebase' | 'claude' | 'mobile' | 'tailwind' | 'pennant'
 
 /** What a project is made of, from the files at its top (and a few known places). */
 export function detectStack(root: string): StackTag[] {
@@ -154,7 +154,10 @@ export function detectStack(root: string): StackTag[] {
     if (deps.includes('"@supabase/supabase-js"')) t.add('supabase')
     if (deps.includes('"firebase"') || deps.includes('"firebase-admin"')) t.add('firebase')
     if (deps.includes('"react-native"') || deps.includes('"expo"')) t.add('mobile')
+    if (deps.includes('"tailwindcss"') || deps.includes('"@tailwindcss/')) t.add('tailwind')
   }
+  const composer = read('composer.json').toLowerCase()
+  if (composer.includes('"laravel/pennant"')) t.add('pennant')
   const py = read('requirements.txt') + read('pyproject.toml')
   if (py || top.some((n) => n.endsWith('.py'))) t.add('python')
   if (/django/i.test(py) || has('manage.py')) t.add('django')
@@ -202,6 +205,11 @@ export function recommend(items: SkillItem[], stack: StackTag[], o: { changesOnl
       else if (name === 'change-review' && o.changesOnly) on.add(i.id)
     } else if (kind === 'pack') {
       if (a === 'anthropic' || a === 'cloudflare') on.add(i.id)
+      else if (a === 'laravel') {
+        if (name === 'laravel-best-practices' && any('laravel')) on.add(i.id)
+        else if (name === 'tailwindcss-development' && any('tailwind')) on.add(i.id)
+        else if (name === 'pennant-development' && any('pennant')) on.add(i.id)
+      }
       else if (a === 'sentry') {
         if (['security-review', 'find-bugs', 'security-model', 'secret-serialization'].includes(name)) on.add(i.id)
         else if (name === 'gha-security-review' && any('gha')) on.add(i.id)

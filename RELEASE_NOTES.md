@@ -1,3 +1,8 @@
+## MacSec 0.10.1
+
+### Laravel's own skills
+Code reviews can now use Laravel Boost's free skills from Laravel (MIT): Laravel best practices with a rule for each topic (security and authorization, Eloquent and N+1 queries, validation, queues, caching, routing), Tailwind CSS 4 and Pennant. They install by default with the other skill packs and are switched on for Laravel projects in the skill picker. The paid Flux UI Pro and Laravel Cloud skills are left out.
+
 ## MacSec 0.10.0
 
 ### Choose the skills for each review

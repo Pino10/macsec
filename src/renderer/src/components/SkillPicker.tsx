@@ -14,7 +14,7 @@ function estimate(files: number, skills: number, guides: number, reviewer: strin
 const STACK_NAMES: Record<string, string> = {
   php: 'PHP', laravel: 'Laravel', wordpress: 'WordPress', symfony: 'Symfony', js: 'JavaScript', ts: 'TypeScript', react: 'React', vue: 'Vue', next: 'Next.js', 'node-api': 'Node API',
   electron: 'Electron', ai: 'AI features', python: 'Python', django: 'Django', go: 'Go', rust: 'Rust', c: 'C/C++', solidity: 'Solidity', android: 'Android', ios: 'iOS', docker: 'Docker',
-  terraform: 'Infrastructure as code', gha: 'GitHub Actions', supabase: 'Supabase', firebase: 'Firebase', claude: 'Claude settings', mobile: 'Mobile'
+  terraform: 'Infrastructure as code', gha: 'GitHub Actions', supabase: 'Supabase', firebase: 'Firebase', claude: 'Claude settings', mobile: 'Mobile', tailwind: 'Tailwind', pennant: 'Pennant'
 }
 
 /**
