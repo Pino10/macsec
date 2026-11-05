@@ -5,13 +5,14 @@
  *   claude        Claude Code with your normal sign-in: plan mode, only Read, Grep, Glob and Skill.
  *   claude-local  The same Claude Code, talking to your own model in LM Studio (or any server with
  *                 an Anthropic-compatible /v1/messages endpoint) instead of Anthropic.
+ *   claude-free   The same Claude Code, through Free LLM API: your free keys behind one address.
  *   codex         OpenAI's Codex in its read-only sandbox.
  *   gemini        Google's Gemini CLI, in plan mode (it reads, it cannot change files or run commands).
  *   coderabbit    CodeRabbit's CLI: an independent second opinion on the changes in a Git project.
  */
 import { randomUUID } from 'crypto'
 
-export type ReviewerId = 'claude' | 'claude-local' | 'codex' | 'gemini' | 'coderabbit'
+export type ReviewerId = 'claude' | 'claude-local' | 'claude-free' | 'codex' | 'gemini' | 'coderabbit'
 
 export interface LocalModel {
   /** The server's address, such as http://127.0.0.1:1234/v1 (LM Studio). */
@@ -34,6 +35,7 @@ export interface ReviewerRun {
 export const REVIEWER_NAMES: Record<ReviewerId, string> = {
   claude: 'Claude Code',
   'claude-local': 'Claude Code on your model',
+  'claude-free': 'Claude Code on Free LLM API',
   codex: 'Codex',
   gemini: 'Gemini CLI',
   coderabbit: 'CodeRabbit'
@@ -67,14 +69,15 @@ export function localModelEnv(m: LocalModel): Record<string, string> {
 
 /** The command line for one reviewer. `bin` is the CLI's path; `plugins` are --plugin-dir folders. */
 export function reviewerRun(id: ReviewerId, bin: string, prompt: string, o: { plugins?: string[]; name?: string; local?: LocalModel; outFile?: string; cwd?: string; base?: string } = {}): ReviewerRun {
-  if (id === 'claude' || id === 'claude-local') {
+  if (id === 'claude' || id === 'claude-local' || id === 'claude-free') {
+    const viaServer = id !== 'claude' && o.local
     const session = randomUUID()
     const plugins = (o.plugins ?? []).flatMap((p) => ['--plugin-dir', p])
     return {
       bin,
       session,
-      args: ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', '--disallowedTools', 'Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch', '--session-id', session, ...(o.name ? ['--name', o.name.slice(0, 80)] : []), ...(id === 'claude-local' && o.local ? ['--model', o.local.model] : []), ...plugins],
-      env: id === 'claude-local' && o.local ? localModelEnv(o.local) : {}
+      args: ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', '--disallowedTools', 'Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch', '--session-id', session, ...(o.name ? ['--name', o.name.slice(0, 80)] : []), ...(viaServer ? ['--model', viaServer.model] : []), ...plugins],
+      env: viaServer ? localModelEnv(viaServer) : {}
     }
   }
   if (id === 'codex') return { bin, args: ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', ...(o.outFile ? ['--output-last-message', o.outFile] : []), prompt], env: {} }
@@ -84,6 +87,11 @@ export function reviewerRun(id: ReviewerId, bin: string, prompt: string, o: { pl
 
 /** Claude Code's error text, in words a person can act on. */
 export function explainFailure(id: ReviewerId, err: string): string {
+  if (id === 'claude-free') {
+    if (/ECONNREFUSED|fetch failed|connect/i.test(err)) return 'Claude Code could not reach Free LLM API. Open Free LLM API and make sure its server is running, then try again.'
+    if (/401|403|unauthori[sz]ed|invalid.*key/i.test(err)) return 'Free LLM API did not accept the key. Paste the unified key again on the Tools page.'
+    if (/429|rate.?limit|quota/i.test(err)) return 'Every model in your Free LLM API chain is at its free limit right now. Add more keys in Free LLM API, or try again later.'
+  }
   if (id === 'claude-local' && /ECONNREFUSED|connect|fetch failed|404/i.test(err)) return 'Claude Code could not reach your model. In LM Studio, load the model and start the server (Developer, Start server), then try again. LM Studio 0.4.1 or newer is needed.'
   if (id === 'claude-local' && /context|too long|maximum/i.test(err)) return 'The model’s context window is too small for Claude Code. In LM Studio, load it with a context length of 32,000 tokens or more.'
   if (/log ?in|auth|credential|api key|401/i.test(err)) return `${REVIEWER_NAMES[id]} is not signed in. Open it once in Terminal and sign in, then try again.`

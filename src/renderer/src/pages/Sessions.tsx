@@ -7,7 +7,7 @@ import Markdown from '../components/Markdown'
 import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
 import { CodeView, Counts, Empty, KindIcon, PageHead, Sev, Spectrum, StepIcon, ago, duration, kindName } from '../ui'
 
-const reviewerName = (s: SessionInfo): string => ({ claude: 'Claude Code', 'claude-local': 'Claude Code on your model', codex: 'Codex', gemini: 'Gemini CLI', model: 'Your model', none: 'No AI' } as const)[s.reviewer ?? 'none'] ?? 'No AI'
+const reviewerName = (s: SessionInfo): string => ({ claude: 'Claude Code', 'claude-local': 'Claude Code on your model', 'claude-free': 'Claude Code on Free LLM API', codex: 'Codex', gemini: 'Gemini CLI', model: 'Your model', none: 'No AI' } as const)[s.reviewer ?? 'none'] ?? 'No AI'
 
 export default function Sessions(): React.JSX.Element {
   const { sessions, openSession, showSession } = useApp()

@@ -2,6 +2,7 @@
  * For web and API scans: the AI reads the findings (never the site itself) and writes what
  * matters most, what is likely noise, and how to fix each problem.
  */
+import { freeServer } from './freellm'
 import { spawn } from 'child_process'
 import type { Finding, Reviewer } from '../shared/types'
 import { agentEnv, findCli } from './agents'
@@ -47,14 +48,15 @@ export async function summarizeWithAi(reviewer: Reviewer, prompt: string, op: Op
     const bin = findCli(cli)
     if (!bin) throw new Error(`${reviewer === 'codex' ? 'Codex' : reviewer === 'gemini' ? 'Gemini CLI' : 'Claude Code'} is not installed. Set it up on Tools.`)
     const st = getSettings()
-    const localEnv = reviewer === 'claude-local' ? localModelEnv({ baseUrl: st.llm.baseUrl, model: st.llm.model }) : {}
+    const free = reviewer === 'claude-free' ? freeServer() : null
+    const localEnv = reviewer === 'claude-local' ? localModelEnv({ baseUrl: st.llm.baseUrl, model: st.llm.model }) : free ? localModelEnv(free) : {}
     // The AI only reads the findings in the prompt: no tools, no session saved.
     const args =
       reviewer === 'codex'
         ? ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', prompt]
         : reviewer === 'gemini'
           ? ['-p', prompt, '--approval-mode', 'plan', '--skip-trust', '--output-format', 'text']
-          : ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--disallowedTools', 'Bash,Edit,Write,WebFetch,WebSearch,NotebookEdit', '--no-session-persistence', ...(reviewer === 'claude-local' ? ['--model', st.llm.model] : []), ...pluginArgs()]
+          : ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--disallowedTools', 'Bash,Edit,Write,WebFetch,WebSearch,NotebookEdit', '--no-session-persistence', ...(reviewer === 'claude-local' ? ['--model', st.llm.model] : free ? ['--model', free.model] : []), ...pluginArgs()]
     text = await new Promise<string>((resolve, reject) => {
       const child = spawn(bin, args, { cwd, env: { ...agentEnv(), ...localEnv }, stdio: ['ignore', 'pipe', 'pipe'] })
       op.children.add(child)

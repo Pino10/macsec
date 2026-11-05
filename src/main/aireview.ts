@@ -172,20 +172,21 @@ const TIMEOUT: Record<ReviewDepth, number> = { quick: 15, standard: 40, deep: 12
  * "Continue in Claude Code" picks up the same conversation. Read-only: plan mode, and only the
  * Read, Grep and Glob tools.
  */
-export async function reviewWithClaude(root: string, prompt: string, depth: ReviewDepth, onChild: (c: ChildProcess) => void, onActivity: () => void, session?: { id: string; name: string }, local?: LocalModel): Promise<AiResult> {
+export async function reviewWithClaude(root: string, prompt: string, depth: ReviewDepth, onChild: (c: ChildProcess) => void, onActivity: () => void, session?: { id: string; name: string }, local?: LocalModel, free = false): Promise<AiResult> {
   const bin = findCli('claude')
   if (!bin) throw new Error('Claude Code’s command line tool is not installed (the Claude desktop app is separate). Install it on the Tools page.')
   // With a local model, Claude Code talks to LM Studio's Anthropic-compatible API instead of Anthropic.
   const env = local ? localModelEnv(local) : {}
-  const method = local ? `\n\nFollow this method:\n${skillText(['review-vectors', 'security-code-review', 'local-model-review', 'security-report'])}` : ''
-  if (local) {
+  // Free LLM API routes to big hosted models: they get the full method, not the short local one.
+  const method = local ? `\n\nFollow this method:\n${skillText(['review-vectors', 'security-code-review', free ? 'false-positive-check' : 'local-model-review', 'security-report'])}` : ''
+  if (local && !free) {
     const ctx = await ensureLmContext(local.baseUrl, local.model, local.token)
     if (!ctx.ok) throw new Error(ctx.note)
   }
   const base = ['-p', prompt + method, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', ...(local ? ['--model', local.model] : []), ...pluginArgs()]
   const keep = session ? ['--session-id', session.id, '--name', session.name] : ['--no-session-persistence']
   let r = await runCli(bin, [...base, ...keep], root, onChild, (local ? 2 : 1) * TIMEOUT[depth] * 60_000, onActivity, env)
-  if (local && r.code !== 0) throw new Error(explainFailure('claude-local', r.err))
+  if (local && r.code !== 0) throw new Error(explainFailure(free ? 'claude-free' : 'claude-local', r.err))
   // Older Claude Code versions: without the newer options.
   if (r.code !== 0 && /unknown option/i.test(r.err)) r = await runCli(bin, ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
   if (r.code !== 0 || !r.out.trim()) {

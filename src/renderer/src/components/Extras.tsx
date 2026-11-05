@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Bell, Command, Copy, Download, ExternalLink, Plug, RefreshCw, Trash2, Users, Workflow } from 'lucide-react'
-import type { IntegrationsInfo, SkillPackInfo } from '@shared/types'
+import { Bell, Command, Copy, Download, ExternalLink, Network, Plug, RefreshCw, Trash2, Users, Workflow } from 'lucide-react'
+import type { FreeLlmInfo, IntegrationsInfo, SkillPackInfo } from '@shared/types'
 import { useApp } from '../store'
 import { Switch } from '../ui'
 
-/** Security skills from Trail of Bits and Sentry, loaded into MacSec's Claude Code reviews. */
+/** Security skills from Trail of Bits, Sentry, Cloudflare and Anthropic, loaded into MacSec's Claude Code reviews. */
 export function SkillPacks(): React.JSX.Element {
   const { act, busy } = useApp()
   const api = window.macsec
@@ -163,6 +163,77 @@ export function Integrations(): React.JSX.Element {
           ))}
         </div>
         <span />
+      </div>
+    </div>
+  )
+}
+
+/** Free LLM API: your free keys behind one address, for Claude Code reviews. The key goes to the Keychain. */
+export function FreeLlmPanel(): React.JSX.Element {
+  const { act, busy, notify } = useApp()
+  const api = window.macsec
+  const [s, setS] = useState<FreeLlmInfo | null>(null)
+  const [url, setUrl] = useState('')
+  const [model, setModel] = useState('auto')
+  const [key, setKey] = useState('')
+  useEffect(() => {
+    void api.invoke('freellm:get').then((r) => {
+      setS(r)
+      setUrl(r.baseUrl)
+      setModel(r.model)
+      if (r.hasKey) void api.invoke('freellm:check').then(setS)
+    })
+  }, [api])
+  if (!s) return <></>
+  const save = async (k?: string | null): Promise<void> => {
+    const r = await act('free', () => api.invoke('freellm:save', { baseUrl: url, model, ...(k !== undefined ? { key: k } : {}) }))
+    if (!r) return
+    setS(r)
+    setKey('')
+    notify({ kind: 'info', text: r.ok ? 'Free LLM API is connected. Choose “Claude Code on Free LLM API” when you start a review.' : r.note })
+  }
+  const models = s.models.includes(model) ? s.models : [model, ...s.models]
+  return (
+    <div className="panel">
+      <div className="arsenal-row" data-on={s.ok === true}>
+        <span className="glyph" style={{ ['--g' as string]: '#7cc4ff' }}>
+          <Network size={18} />
+        </span>
+        <div>
+          <div className="row-title">
+            Free LLM API {s.ok === true && <span className="tag tag-ok">Connected</span>} {s.hasKey && s.ok === false && <span className="tag">Not answering</span>}
+          </div>
+          <div className="row-sub" style={{ whiteSpace: 'normal' }}>
+            All the free keys you added to Free LLM API (Google AI Studio, Groq, NVIDIA, OpenRouter and more) behind one address. Claude Code reviews can run on it, next to your Claude account and LM Studio. {s.ok !== null && s.note}
+            {!s.claudeCode && ' Needs Claude Code: install it above.'}
+          </div>
+          <div className="int-form">
+            <input className="input mono" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://127.0.0.1:31415/v1" aria-label="Address" spellCheck={false} />
+            <select className="input" value={model} onChange={(e) => setModel(e.target.value)} aria-label="Model">
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m === 'auto' ? 'auto: your routing chain' : m === 'auto:fast' ? 'auto:fast: the fastest' : m}
+                </option>
+              ))}
+            </select>
+            <input className="input mono" type="password" placeholder={s.hasKey ? 'Key saved (paste to replace)' : 'Unified key: freellmapi-…'} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" aria-label="Unified key" />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: 6 }}>
+          <button className="btn btn-sm" disabled={busy.has('free') || (!key.trim() && !s.hasKey)} onClick={() => save(key.trim() ? key.trim() : undefined)}>
+            {s.hasKey ? 'Save' : 'Connect'}
+          </button>
+          {s.hasKey && (
+            <button className="btn btn-sm" disabled={busy.has('freec')} onClick={async () => setS((await act('freec', () => api.invoke('freellm:check'))) ?? s)}>
+              <RefreshCw size={13} /> Check
+            </button>
+          )}
+          {s.hasKey && (
+            <button className="btn btn-sm" onClick={() => save(null)}>
+              Forget key
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

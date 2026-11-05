@@ -6,6 +6,7 @@
  *  4. The AI reviewer reads the code, checks the scanner findings and hunts for logic flaws.
  *  5. Delete the private copy, unless you asked to keep it for fixing.
  */
+import { freeServer } from './freellm'
 import { spawn, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
@@ -203,19 +204,19 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
 
     // 3. The AI reviewer.
     if (req.reviewer !== 'none' && !r.cancelled) {
-      const name = req.reviewer === 'claude' ? 'Claude Code' : req.reviewer === 'claude-local' ? `Claude Code on ${getSettings().llm.model || 'your model'}` : req.reviewer === 'codex' ? 'Codex' : req.reviewer === 'gemini' ? 'Gemini CLI' : getSettings().llm.model || 'Your model'
+      const name = req.reviewer === 'claude' ? 'Claude Code' : req.reviewer === 'claude-local' ? `Claude Code on ${getSettings().llm.model || 'your model'}` : req.reviewer === 'claude-free' ? 'Claude Code on Free LLM API' : req.reviewer === 'codex' ? 'Codex' : req.reviewer === 'gemini' ? 'Gemini CLI' : getSettings().llm.model || 'Your model'
       const ai = step({ id: 'ai', label: `${name} reviews the code and checks the findings`, status: 'running', startedAt: new Date().toISOString() })
       const t = Date.now()
       try {
         const prompt = reviewPrompt(info.title, req.focus, req.depth, findings.filter((f) => f.category !== 'dependency'))
         let res: AiResult
         const beat = (): void => set(ai, { detail: `Reading… ${Math.round((Date.now() - t) / 60000)} min` })
-        if (req.reviewer === 'claude' || req.reviewer === 'claude-local') {
+        if (req.reviewer === 'claude' || req.reviewer === 'claude-local' || req.reviewer === 'claude-free') {
           // A normal Claude Code session with a known id, so you can continue the conversation later.
           info.claudeSession = randomUUID()
           saveSession(info)
           const st = getSettings()
-          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) }, req.reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : undefined)
+          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) }, req.reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : req.reviewer === 'claude-free' ? freeServer() : undefined, req.reviewer === 'claude-free')
         }
         else if (req.reviewer === 'gemini') res = await reviewWithGemini(root, prompt, req.depth, (c) => r.children.add(c), beat)
         else if (req.reviewer === 'codex') res = await reviewWithCodex(root, prompt, req.depth, join(raw, 'codex-last.md'), (c) => r.children.add(c), beat)

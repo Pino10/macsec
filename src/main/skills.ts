@@ -43,7 +43,7 @@ export function pluginArgs(): string[] {
   const out: string[] = []
   if (existsSync(join(builtinPluginDir(), '.claude-plugin'))) out.push('--plugin-dir', builtinPluginDir())
   if (listSkills().some((s) => s.mine)) out.push('--plugin-dir', userPluginDir())
-  // Skill packs from Trail of Bits and Sentry, when added on the Tools page.
+  // Skill packs from Trail of Bits, Sentry, Cloudflare and Anthropic, when added on the Tools page.
   for (const d of packPluginDirs(join(dirs.tools(), 'skill-packs'))) out.push('--plugin-dir', d)
   return out
 }

@@ -12,6 +12,7 @@ const recent: LogLine[] = []
 export function redact(text: string): string {
   return text
     .replace(/(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g, '[token]')
+    .replace(/freellmapi-[A-Za-z0-9_-]{8,}/g, '[key]')
     .replace(/(authorization:\s*(?:basic|bearer)\s+)[^\s'"]+/gi, '$1[hidden]')
     .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/g, '$1[hidden]@')
 }

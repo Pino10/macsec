@@ -18,8 +18,11 @@ export interface SkillPack {
   repo: string
   license: string
   about: string
-  /** plugins: each folder in plugins/ is a Claude Code plugin. skills: skills/<name>/SKILL.md. */
-  layout: 'plugins' | 'skills'
+  /**
+   * plugins: each folder in plugins/ is a Claude Code plugin. skills: skills/<name>/SKILL.md.
+   * commands: .claude/commands/<name>.md, Claude Code slash commands, loaded as a command and as a skill.
+   */
+  layout: 'plugins' | 'skills' | 'commands'
   /** The security-related plugins or skills that reviews load. */
   pick: string[]
 }
@@ -65,6 +68,24 @@ export const SKILL_PACKS: SkillPack[] = [
     about: 'From Sentry’s engineering team: security review based on the OWASP Cheat Sheets, bug finding, GitHub Actions security, Django access control, secrets in serialised data and security models.',
     layout: 'skills',
     pick: ['security-review', 'find-bugs', 'code-review', 'gha-security-review', 'django-access-review', 'secret-serialization', 'security-model', 'claude-settings-audit']
+  },
+  {
+    id: 'cloudflare',
+    name: 'Cloudflare',
+    repo: 'cloudflare/security-audit-skill',
+    license: 'MIT',
+    about: 'Cloudflare’s security audit: reconnaissance, hunting by attack class (web and auth, client side, cloud and deployment, data isolation, supply chain, AI and LLM apps, desktop and local IPC, protocols, memory safety, resource exhaustion) and checked, evidence-backed findings.',
+    layout: 'skills',
+    pick: ['security-audit']
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    repo: 'anthropics/claude-code-security-review',
+    license: 'MIT',
+    about: 'Anthropic’s /security-review: a senior security engineer’s review of your changes that only reports high-confidence problems and filters out the usual false positives. Use it as /security-review in Claude Code too.',
+    layout: 'commands',
+    pick: ['security-review']
   }
 ]
 
@@ -89,7 +110,23 @@ const known = (id: string): SkillPack => {
 /** What a pack provides once cloned: plugin folders, by name. */
 export function packContents(pack: SkillPack, repo: string): string[] {
   if (pack.layout === 'plugins') return pack.pick.filter((n) => existsSync(join(repo, 'plugins', n, '.claude-plugin', 'plugin.json')) || existsSync(join(repo, 'plugins', n, 'skills')))
+  if (pack.layout === 'commands') return pack.pick.filter((n) => existsSync(join(repo, '.claude', 'commands', `${n}.md`)))
   return pack.pick.filter((n) => existsSync(join(repo, 'skills', n, 'SKILL.md')))
+}
+
+/**
+ * Turns a Claude Code slash command into a skill. Commands run shell lines written as !`...`
+ * before the model sees them; a skill cannot, so those become plain instructions to read the
+ * same information with the tools a read-only review has. The command's own allowed-tools line
+ * is dropped: the review decides what the agent may use.
+ */
+export function commandToSkill(md: string, name: string, pack: string): string {
+  const fm = /^---\n([\s\S]*?)\n---\n?/.exec(md)
+  const description = (fm && /^description:\s*(.+)$/m.exec(fm[1])?.[1].trim()) || `The ${name} command`
+  let body = fm ? md.slice(fm[0].length) : md
+  body = body.replace(/```\s*\n!`([^`]+)`\s*\n```/g, (_m, cmd: string) => `(Find this yourself: the output of \`${cmd.trim()}\`. If you cannot run commands, read the files involved and any diff or change list you were given.)`)
+  body = body.replace(/!`([^`]+)`/g, (_m, cmd: string) => `the output of \`${cmd.trim()}\``)
+  return `---\nname: ${name}\ndescription: ${description.replace(/\n/g, ' ')} (from ${pack}). When no branch or diff is given, review the files you were asked to review.\n---\n\n${body.trim()}\n`
 }
 
 export function packState(root: string, id: string): PackState {
@@ -107,13 +144,23 @@ function git(args: string[], cwd: string): Promise<string> {
   )
 }
 
-/** Wraps a skills/ layout as one Claude Code plugin, with only the chosen skills. */
+/** Wraps a skills/ or commands layout as one Claude Code plugin, with only the chosen skills. */
 function wrapSkills(pack: SkillPack, root: string, names: string[]): void {
   const plugin = join(packDir(root, pack.id), 'plugin')
   rmSync(plugin, { recursive: true, force: true })
   mkdirSync(join(plugin, '.claude-plugin'), { recursive: true })
   writeFileSync(join(plugin, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: `${pack.id}-security`, description: `${pack.name} security skills (${pack.license}), from github.com/${pack.repo}`, version: '1.0.0' }, null, 2))
-  for (const n of names) cpSync(join(repoDir(root, pack.id), 'skills', n), join(plugin, 'skills', n), { recursive: true })
+  for (const n of names) {
+    if (pack.layout === 'commands') {
+      const md = readFileSync(join(repoDir(root, pack.id), '.claude', 'commands', `${n}.md`), 'utf8')
+      mkdirSync(join(plugin, 'commands'), { recursive: true })
+      writeFileSync(join(plugin, 'commands', `${n}.md`), md)
+      // Sentry has a security-review skill too, so the skill carries the pack's name.
+      const skill = `${pack.id}-${n}`
+      mkdirSync(join(plugin, 'skills', skill), { recursive: true })
+      writeFileSync(join(plugin, 'skills', skill, 'SKILL.md'), commandToSkill(md, skill, `${pack.name}, ${pack.license}`))
+    } else cpSync(join(repoDir(root, pack.id), 'skills', n), join(plugin, 'skills', n), { recursive: true })
+  }
 }
 
 /** Clones (or refreshes) a pack into the app's folder and records the commit. */
@@ -131,7 +178,7 @@ export async function installPack(root: string, id: string): Promise<PackState> 
   cpSync(staging, repoDir(root, id), { recursive: true })
   rmSync(staging, { recursive: true, force: true })
   const loaded = packContents(pack, repoDir(root, id))
-  if (pack.layout === 'skills') wrapSkills(pack, root, loaded)
+  if (pack.layout !== 'plugins') wrapSkills(pack, root, loaded)
   const state: PackState = { id, installed: true, commit, at: new Date().toISOString(), loaded }
   writeFileSync(stateFile(root, id), JSON.stringify(state, null, 2))
   return state
@@ -162,5 +209,6 @@ export function packSkillFolders(root: string): { name: string; dir: string }[] 
     if (!existsSync(skills)) continue
     for (const n of readdirSync(skills)) if (existsSync(join(skills, n, 'SKILL.md'))) out.push({ name: n, dir: join(skills, n) })
   }
-  return out
+  // Two packs can use the same name (Sentry's and Anthropic's security-review): the first one keeps it.
+  return out.filter((f, i) => out.findIndex((g) => g.name === f.name) === i)
 }

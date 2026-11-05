@@ -99,7 +99,7 @@ function findingHtml(f: Finding): string {
 export function sessionHtml(s: SessionDetail): string {
   const real = s.findings.filter((f) => f.verdict !== 'false-positive')
   const ruledOut = s.findings.length - real.length
-  const reviewer = s.reviewer === 'claude' ? 'Claude Code' : s.reviewer === 'claude-local' ? 'Claude Code on a local model' : s.reviewer === 'gemini' ? 'Gemini CLI' : s.reviewer === 'codex' ? 'Codex' : s.reviewer === 'model' ? 'Local model' : 'Scanners only'
+  const reviewer = s.reviewer === 'claude' ? 'Claude Code' : s.reviewer === 'claude-local' ? 'Claude Code on a local model' : s.reviewer === 'claude-free' ? 'Claude Code on Free LLM API' : s.reviewer === 'gemini' ? 'Gemini CLI' : s.reviewer === 'codex' ? 'Codex' : s.reviewer === 'model' ? 'Local model' : 'Scanners only'
   const kind = s.kind === 'web-scan' ? 'Web scan' : s.kind === 'api-scan' ? 'API security review' : s.kind === 'mobile-scan' ? 'Mobile app check' : s.kind === 'recon' ? 'Recon' : s.kind === 'audit' ? 'Security audit' : 'Code review'
   const total = ORDER.reduce((n, k) => n + s.counts[k], 0) || 1
   const sc = score(s.counts)

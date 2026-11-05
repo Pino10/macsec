@@ -5,10 +5,12 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
-import type { IntegrationsInfo, SkillPackInfo, ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest, SessionInfo } from '../shared/types'
+import type { FreeLlmInfo, IntegrationsInfo, SkillPackInfo, ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest, SessionInfo } from '../shared/types'
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { getSecret, setSecret, setSecretsCrypto } from './secrets'
+import { FREE_KEY, freeConfig } from './freellm'
+import { checkFreeLlm, checkFreeLlmKey, FREELLM_MODELS, freeLlmModel, freeLlmUrl } from './seckit/freellm'
 import { ensureSkills, listSkills } from './skills'
 import { setModelCrypto, detectLlms, testLlm, listServers, saveServer, deleteServer } from './models'
 import { jobs } from './jobs'
@@ -181,7 +183,7 @@ function allowedProject(path: unknown): string {
 
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d)
 const MODES = ['quick', 'standard', 'thorough'] as const
-const REVIEWERS = ['none', 'claude', 'claude-local', 'codex', 'gemini', 'model'] as const
+const REVIEWERS = ['none', 'claude', 'claude-local', 'claude-free', 'codex', 'gemini', 'model'] as const
 
 function validWeb(req: unknown): WebScanRequest {
   const r = (req ?? {}) as Partial<WebScanRequest>
@@ -540,6 +542,38 @@ function registerIpc(): void {
   const writeCli = (): void => {
     writeFileSync(cliPath(), macsecCli(join(dirs.config(), 'mcp-token'), MCP_PORT), { mode: 0o755 })
   }
+  // ---- Free LLM API: your free keys behind one address, for Claude Code reviews
+  let freeCheck: { ok: boolean | null; note: string; models: string[] } = { ok: null, note: '', models: [...FREELLM_MODELS] }
+  const freeInfo = async (): Promise<FreeLlmInfo> => ({ ...freeConfig(), hasKey: !!getSecret(FREE_KEY), claudeCode: (await listAgents()).some((a) => a.id === 'claude' && a.installed), ...freeCheck })
+  const runFreeCheck = async (): Promise<void> => {
+    const key = getSecret(FREE_KEY)
+    if (!key) {
+      freeCheck = { ok: false, note: 'Paste the unified key from Free LLM API’s Keys page.', models: [...FREELLM_MODELS] }
+      return
+    }
+    const r = await checkFreeLlm(freeConfig().baseUrl, key)
+    freeCheck = { ok: r.ok, note: r.note, models: r.ok ? r.models : [...FREELLM_MODELS] }
+  }
+  handle('freellm:get', () => freeInfo())
+  handle('freellm:check', async () => {
+    await runFreeCheck()
+    return freeInfo()
+  })
+  handle('freellm:save', async (o) => {
+    if (!o || typeof o !== 'object') throw new ValidationError('That is not a Free LLM API setting.')
+    try {
+      const baseUrl = freeLlmUrl(String(o.baseUrl ?? ''))
+      const model = freeLlmModel(String(o.model ?? ''))
+      if (o.key === null) setSecret(FREE_KEY, null)
+      else if (typeof o.key === 'string' && o.key.trim()) setSecret(FREE_KEY, checkFreeLlmKey(o.key))
+      setSettings({ freellm: { baseUrl, model } })
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+    await runFreeCheck()
+    if (freeCheck.ok) log('info', 'Free LLM API is connected')
+    return freeInfo()
+  })
   handle('webhook:set', (cfg, url) => {
     if (cfg === null) {
       setSettings({ webhook: undefined })

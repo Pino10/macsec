@@ -106,7 +106,7 @@ export interface Finding {
   triagedAt?: string
 }
 
-export type Reviewer = 'none' | 'claude' | 'claude-local' | 'codex' | 'gemini' | 'model'
+export type Reviewer = 'none' | 'claude' | 'claude-local' | 'claude-free' | 'codex' | 'gemini' | 'model'
 
 /** How much a scan covers. Every mode only reads: nothing is changed, fuzzed or attacked. */
 export type ScanMode = 'quick' | 'standard' | 'thorough'
@@ -309,6 +309,8 @@ export interface AppSettings {
   /** Laramac's www folder by default. */
   wwwPath: string
   llm: { baseUrl: string; model: string }
+  /** Free LLM API's address and model. Its key is a secret, in the Keychain. */
+  freellm?: { baseUrl: string; model: string }
   /** Default reviewer for new reviews. */
   reviewer: Reviewer
   notifications: boolean
@@ -318,6 +320,16 @@ export interface AppSettings {
   mcpEnabled?: boolean
   /** Slack, Teams, Discord or other webhook. The address is in the Keychain. */
   webhook?: { kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all' }
+}
+
+export interface FreeLlmInfo {
+  baseUrl: string
+  model: string
+  hasKey: boolean
+  claudeCode: boolean
+  models: string[]
+  ok: boolean | null
+  note: string
 }
 
 export interface IntegrationsInfo {
@@ -448,6 +460,9 @@ export interface Channels {
   'packs:list': { args: []; result: SkillPackInfo[] }
   'packs:install': { args: [string]; result: SkillPackInfo[] }
   'packs:remove': { args: [string]; result: SkillPackInfo[] }
+  'freellm:get': { args: []; result: FreeLlmInfo }
+  'freellm:check': { args: []; result: FreeLlmInfo }
+  'freellm:save': { args: [{ baseUrl: string; model: string; key?: string | null }]; result: FreeLlmInfo }
   'integrations:get': { args: []; result: IntegrationsInfo }
   'webhook:set': { args: [{ kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all' } | null, string | null]; result: IntegrationsInfo }
   'webhook:test': { args: []; result: void }
