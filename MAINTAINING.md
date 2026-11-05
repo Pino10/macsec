@@ -34,7 +34,9 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 | `src/main/webscan.ts` | Web scan: httpx, header checks, Katana, the exposed-files check and Nuclei (read-only tags only, see `NOT_READ_ONLY`). |
 | `src/main/apispec.ts`, `src/main/apiscan.ts` | Reading Postman, OpenAPI, Swagger and HAR files, and the API review. |
 | `src/main/evidence.ts` | The code lines behind each finding, with secrets masked (`maskSecrets`). |
-| `src/main/skills.ts` | MacSec's Claude Code plugin (written to `tools/claude-plugin`) and your skills (`extensions/claude`), loaded with `--plugin-dir`. |
+| `src/main/skills.ts` | MacSec's Claude Code plugin (written to `tools/claude-plugin`) and your skills (`extensions/claude`). A review loads only the skills you picked (`chosenPluginArgs`, built in the session's `skills` folder and removed when it ends). |
+| `src/main/watch.ts` | Keeping watch: the daily package check (OSV-Scanner on the projects you reviewed) and the weekly re-test, which only reports serious findings that are new (`newSerious`). State in `config/watch.json`. |
+| `src/shared/leaked.ts`, `src/shared/fixdiff.ts` | "I leaked a key" steps per provider, and the AI's suggested fix as a diff (shown only: MacSec never changes your code). |
 | `src/main/webextra.ts` | TLS check, keys in public JavaScript, signed-in versus signed-out comparison. |
 | `src/main/audit.ts` | Special audits: full audit, portfolio sweep, change review. |
 | `src/main/mobilescan.ts`, `src/main/scanners/mobile.ts` | Mobile app checks: mobsfscan, the Android manifest and Info.plist checks, and binary hardening (`hardening()` reads Mach-O and ELF headers). |

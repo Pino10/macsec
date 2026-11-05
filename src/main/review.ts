@@ -9,7 +9,7 @@
 import { freeServer } from './freellm'
 import { spawn, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Finding, ReviewRequest, SessionInfo, SessionStep } from '../shared/types'
 import { createSession, discardCode, readSession, saveAiReport, saveFindings, saveSession, sessionCodeDir, sessionDir } from './sessions'
@@ -22,6 +22,7 @@ import { log, redact } from './logs'
 import { addEvidence } from './evidence'
 import { beginOp, cancelOp, endOp, type Op, friendly, percentOf } from './engine'
 import { getSettings } from './settings'
+import { chosenPluginArgs } from './skills'
 
 
 type Running = Op
@@ -144,6 +145,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
     }
   }
   let findings: Finding[] = []
+  let skillDir: string | null = null
 
   try {
     // 1. The code.
@@ -216,7 +218,12 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
           info.claudeSession = randomUUID()
           saveSession(info)
           const st = getSettings()
-          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) }, req.reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : req.reviewer === 'claude-free' ? freeServer() : undefined, req.reviewer === 'claude-free')
+          // Only the skills you picked (or the ones that fit the project), from a folder built for this review.
+          skillDir = join(dir, 'skills')
+          const chosen = chosenPluginArgs(req.skills ?? [], skillDir, root)
+          info.skills = chosen.names
+          saveSession(info)
+          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) }, req.reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : req.reviewer === 'claude-free' ? freeServer() : undefined, req.reviewer === 'claude-free', chosen.args)
         }
         else if (req.reviewer === 'gemini') res = await reviewWithGemini(root, prompt, req.depth, (c) => r.children.add(c), beat)
         else if (req.reviewer === 'codex') res = await reviewWithCodex(root, prompt, req.depth, join(raw, 'codex-last.md'), (c) => r.children.add(c), beat)
@@ -252,6 +259,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
     log('error', info.error, id)
   } finally {
     endOp(id)
+    if (skillDir) rmSync(skillDir, { recursive: true, force: true })
     info.finishedAt = new Date().toISOString()
     if (remote) {
       if (req.keepCode && info.status === 'done') info.codeKept = true

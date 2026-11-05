@@ -6,6 +6,7 @@ import { useApp, type PresetSource } from '../store'
 import { FlowStep, PageHead, Seg } from '../ui'
 import SourcePicker, { sourceName } from '../components/SourcePicker'
 import ReviewerChoice from '../components/ReviewerChoice'
+import SkillPicker from '../components/SkillPicker'
 
 const DEPTHS: { id: ReviewDepth; icon: React.ReactNode; title: string; text: string }[] = [
   { id: 'quick', icon: <Zap size={18} />, title: 'Quick', text: 'Core Semgrep rules, keys in files, known flaws in packages. A few minutes.' },
@@ -22,6 +23,7 @@ export default function CodeReview(): React.JSX.Element {
   const [focus, setFocus] = useState<ReviewFocus>('security')
   const [keep, setKeep] = useState(false)
   const [mode, setMode] = useState<'project' | 'changes' | 'full'>('project')
+  const [skills, setSkills] = useState<string[] | undefined>(undefined)
 
   useEffect(() => {
     if (preset) {
@@ -92,6 +94,7 @@ export default function CodeReview(): React.JSX.Element {
 
         <FlowStep n={2} title="Who reads the results" help="The scanners always run first. The AI then reads the code and every scanner result, decides what is real, and writes the report." state={source ? 'current' : 'todo'}>
           <ReviewerChoice value={reviewer} onChange={setReviewer} what="code" />
+          {reviewer.startsWith('claude') && <SkillPicker site={source?.kind === 'local' ? source.path : null} reviewer={reviewer} onChange={setSkills} />}
         </FlowStep>
 
         <FlowStep n={3} title="How deep" state={source ? 'current' : 'todo'}>
@@ -138,7 +141,8 @@ export default function CodeReview(): React.JSX.Element {
                   reviewer,
                   depth,
                   focus,
-                  keepCode: keep
+                  keepCode: keep,
+                  skills: reviewer.startsWith('claude') ? skills : undefined
                 })
               )
               if (s) showSession(s.id)

@@ -164,6 +164,8 @@ export interface ReviewRequest {
   keepCode: boolean
   /** Tool ids to skip. */
   skip?: string[]
+  /** Skills for a Claude Code review (ids from review:skill-plan). Empty: the ones that fit. */
+  skills?: string[]
 }
 
 export interface SessionStep {
@@ -231,6 +233,8 @@ export interface SessionInfo {
   children?: string[]
   /** The Claude Code session that did the review, to continue it. */
   claudeSession?: string
+  /** The skills a Claude Code review loaded. */
+  skills?: string[]
   error?: string
   languages?: string[]
   files?: number
@@ -323,6 +327,8 @@ export interface AppSettings {
   mcpEnabled?: boolean
   /** Slack, Teams, Discord or other webhook. The address is in the Keychain. */
   webhook?: { kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all' }
+  /** Skill packs you removed: they are not added back by themselves. */
+  packsDeclined?: string[]
 }
 
 export interface FreeLlmInfo {
@@ -443,6 +449,10 @@ export interface Channels {
   'azure:projects': { args: [string]; result: AzureProject[] }
 
   'review:start': { args: [ReviewRequest]; result: SessionInfo }
+  'review:skill-plan': { args: [string | null]; result: SkillPlan }
+  'watch:get': { args: []; result: WatchInfo }
+  'watch:set': { args: [{ packages?: boolean; retest?: boolean }]; result: WatchInfo }
+  'watch:check-now': { args: []; result: WatchInfo }
   'web:sites': { args: []; result: LocalSite[] }
   'web:start': { args: [WebScanRequest]; result: SessionInfo }
   'burp:open': { args: []; result: void }
@@ -518,10 +528,48 @@ export interface Events {
   'session:updated': SessionInfo
   'logs:line': LogLine
   'app:update': UpdateInfo
+  'watch:alert': { title: string; body: string }
 }
 
 export interface MacSecApi {
   invoke<K extends keyof Channels>(channel: K, ...args: Channels[K]['args']): Promise<Channels[K]['result']>
   on<K extends keyof Events>(event: K, cb: (payload: Events[K]) => void): () => void
   platform: string
+}
+
+export interface SkillChoice {
+  id: string
+  name: string
+  source: string
+  about: string
+  guides: number
+}
+
+export interface SkillPlan {
+  /** What the project is made of, as short tags (php, laravel, react...). */
+  stack: string[]
+  items: SkillChoice[]
+  recommended: string[]
+  files: number
+}
+
+export interface WatchAlert {
+  at: string
+  kind: 'packages' | 'retest'
+  project: string
+  /** The session to open for details. */
+  session: string
+  count: number
+  titles: string[]
+}
+
+export interface WatchInfo {
+  /** Daily: new flaws in the packages of the projects you reviewed. */
+  packages: boolean
+  /** Weekly: the newest review of each project runs again. */
+  retest: boolean
+  lastPackages: string | null
+  lastRetest: string | null
+  projects: number
+  alerts: WatchAlert[]
 }

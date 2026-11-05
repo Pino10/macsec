@@ -4,6 +4,7 @@ import { SEVERITIES, type Severity } from '@shared/types'
 import { useApp, type Page } from '../store'
 import { Counts, KindIcon, Spectrum, ago, kindName } from '../ui'
 import ThreatCore, { postureOf, postureWord } from '../components/ThreatCore'
+import Watch from '../components/Watch'
 
 const LAUNCH: { page: Page; icon: React.ReactNode; g: string; title: string; text: string }[] = [
   { page: 'review', icon: <FileSearch size={20} />, g: '#38e1ff', title: 'Review code', text: 'Every scanner that fits, then an AI reviewer that checks their work.' },
@@ -151,6 +152,7 @@ export default function Overview(): React.JSX.Element {
           </div>
         </div>
       </div>
+      <Watch />
     </>
   )
 }

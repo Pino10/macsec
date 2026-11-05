@@ -5,6 +5,7 @@ import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, typ
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
 import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
+import { FixDiff, LeakHelp } from '../components/FixHelp'
 import { CodeView, Counts, Empty, KindIcon, PageHead, Sev, Spectrum, StepIcon, ago, duration, kindName } from '../ui'
 
 const reviewerName = (s: SessionInfo): string => ({ claude: 'Claude Code', 'claude-local': 'Claude Code on your model', 'claude-free': 'Claude Code on Free LLM API', codex: 'Codex', gemini: 'Gemini CLI', model: 'Your model', none: 'No AI' } as const)[s.reviewer ?? 'none'] ?? 'No AI'
@@ -428,9 +429,10 @@ function Detail({ f, id, canOpen, onChange }: { f: Finding; id: string; canOpen:
         <div className="fix">
           <b>How to fix</b>
           {f.fix}
-          {f.fixCode && <pre style={{ marginTop: 10 }}>{f.fixCode}</pre>}
+          <FixDiff f={f} />
         </div>
       )}
+      <LeakHelp f={f} />
       {f.verify && (
         <>
           <h5>How to check the fix</h5>

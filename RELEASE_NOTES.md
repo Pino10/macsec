@@ -1,3 +1,23 @@
+## MacSec 0.10.0
+
+### Choose the skills for each review
+The skills that fit your project are switched on (MacSec reads the stack: PHP, Laravel, React, Electron, Docker and more). Switch any on or off, and see about how long the review will take. The review then loads exactly those, and nothing else.
+
+The best skill packs now come by default: Trail of Bits, Sentry, Cloudflare and Anthropic. Remove one on Tools and it stays removed.
+
+### I leaked a key: what now?
+Every key a scanner finds comes with the steps for its provider (AWS, GitHub, GitLab, Stripe, Google Cloud and Firebase, Azure, Slack, OpenAI, Anthropic, Twilio, SendGrid, databases and private keys): revoke it first, with a button to the right page, check whether it was used, then take it out of the code. When it is in the Git history, how to clean that too.
+
+### Fixes you can read
+The AI's suggested fix is shown as a change to your code: the old line in red, the new lines in green, in place. Copy the fix, or copy it as a patch. MacSec still never changes your code.
+
+### Keeping watch
+- **New flaws in your packages, daily.** OSV-Scanner checks the lock files of the projects you reviewed on this Mac, and you get a notification when a new critical or high flaw appears. Only package names and versions leave the Mac. On by default.
+- **Test again every week.** The newest review of each project runs again while MacSec is open, and you hear about it only when it finds serious problems that were not there before. Off by default: switch it on in the Overview.
+
+### Fixed
+- Choosing Claude Code on your own model, Claude Code on Free LLM API or Gemini CLI for a code review now uses that reviewer. Before, the review quietly used Claude Code with Anthropic's models instead.
+
 ## MacSec 0.9.0
 
 ### Updates you can see

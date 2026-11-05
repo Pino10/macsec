@@ -2162,3 +2162,183 @@ div + .pick-item {
   flex: 0 0 auto;
   width: 240px;
 }
+
+/* ---------- Skill picker ---------- */
+.skillpick {
+  margin: 6px 0 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--glass);
+  overflow: hidden;
+}
+.skillpick-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.skillpick-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.skillpick-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.skillpick-main strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.skillpick-main strong small {
+  font-weight: 400;
+  color: var(--ink-3);
+}
+.skillpick-main > span {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.skillpick-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--hover);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.skillpick-chev {
+  color: var(--ink-3);
+  transition: transform 0.2s var(--ease);
+}
+.skillpick-head[aria-expanded='true'] .skillpick-chev {
+  transform: rotate(180deg);
+}
+.skillpick-body {
+  display: grid;
+  gap: 14px;
+  padding: 4px 16px 16px;
+  border-top: 1px solid var(--line);
+}
+.skillpick-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+}
+.skillpick-quick .hint {
+  font-size: 12px;
+}
+.skillpick-source {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.skillpick-source span {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-3);
+}
+.skillpick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.skill-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.skill-chip[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--ink);
+}
+.skill-guides {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.skill-rec {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+@media (max-width: 760px) {
+  .skillpick-head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .skillpick-time {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+}
+
+
+/* ---------- Suggested fix as a diff (0.10) ---------- */
+.fixdiff { margin-top: 10px; display: grid; gap: 8px; }
+.fixdiff-code { border-radius: 12px; overflow: auto; background: var(--well); border: 1px solid var(--line); font-family: var(--mono); font-size: 12px; line-height: 1.6; max-height: 360px; }
+.fd-line { display: grid; grid-template-columns: 44px 16px minmax(0, 1fr); white-space: pre; }
+.fd-line code { font: inherit; background: none; padding: 0 10px 0 0; }
+.fd-n { color: var(--ink-3); text-align: right; padding-right: 8px; user-select: none; }
+.fd-sign { color: var(--ink-3); user-select: none; text-align: center; }
+.fd-del { background: color-mix(in srgb, var(--sev-critical) 13%, transparent); }
+.fd-del .fd-sign, .fd-del code { color: color-mix(in srgb, var(--sev-critical) 70%, var(--ink)); }
+.fd-add { background: color-mix(in srgb, var(--ok) 13%, transparent); }
+.fd-add .fd-sign, .fd-add code { color: color-mix(in srgb, var(--ok) 70%, var(--ink)); }
+.fixdiff-foot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.fixdiff-foot .hint { flex: 1 1 220px; font-size: 12px; }
+
+/* ---------- I leaked a key ---------- */
+.leak { border-radius: 14px; border: 1px solid color-mix(in srgb, var(--sev-high) 35%, transparent); background: color-mix(in srgb, var(--sev-high) 7%, transparent); overflow: hidden; }
+.leak-head { display: flex; gap: 10px; align-items: center; width: 100%; padding: 10px 14px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.leak-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: color-mix(in srgb, var(--sev-high) 20%, transparent); color: var(--sev-high); flex-shrink: 0; }
+.leak-steps { margin: 0; padding: 2px 18px 14px 40px; display: grid; gap: 7px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.leak-steps b { color: var(--ink); font-weight: 600; }
+
+/* ---------- Keeping watch ---------- */
+.watch { display: grid; gap: 12px; }
+.watch-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+.watch-row > div { min-width: 0; flex: 1 1 260px; }
+.watch-row strong { display: block; font-size: 13.5px; font-weight: 600; }
+.watch-row .hint { font-size: 12px; }
+.watch-alerts { display: grid; gap: 6px; }
+.watch-alert { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; border-radius: 10px; background: var(--hover); border: 0; color: inherit; text-align: left; cursor: pointer; font-size: 12.5px; }
+.watch-alert b { color: var(--sev-high); font-weight: 600; white-space: nowrap; }
+.watch-alert span { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.watch-alert time { color: var(--ink-3); white-space: nowrap; }
+.panel.watch { padding: 18px 22px; }

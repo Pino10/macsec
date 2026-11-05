@@ -15,7 +15,8 @@ import { latestPerTarget } from '../shared/latest'
 import { USER_AGENT } from './download'
 import { FREE_KEY, freeConfig } from './freellm'
 import { checkFreeLlm, checkFreeLlmKey, FREELLM_MODELS, freeLlmModel, freeLlmUrl } from './seckit/freellm'
-import { ensureSkills, listSkills } from './skills'
+import { ensureSkills, listSkills, skillPlan } from './skills'
+import { autoRunFinished, checkPackages, isAutoRun, setWatch, startWatch, watchInfo } from './watch'
 import { setModelCrypto, detectLlms, testLlm, listServers, saveServer, deleteServer } from './models'
 import { jobs } from './jobs'
 import { log, logEvents, listLogs, clearLogs } from './logs'
@@ -39,7 +40,7 @@ import { optionalTools } from './optional'
 import { startAudit } from './audit'
 import { cancelOp, finishEvents } from './engine'
 import { accounts, azureProjects, connectAzure, connectGitHub, githubRepos, importIntoWww, listLocal } from './projects'
-import { cancelSession, startReview } from './review'
+import { cancelSession, sourceFiles, startReview } from './review'
 import { deleteSession, listSessions, readSession, recoverSessions, saveSession, sessionCodeDir, sessionDetail, sessionDir, sessionEvents, discardCode } from './sessions'
 import { sessionHtml } from './report'
 import { projectStats } from './scanners/plan'
@@ -230,11 +231,12 @@ function validReview(req: unknown): ReviewRequest {
   else throw new ValidationError('That source is not valid.')
   return {
     source,
-    reviewer: pick(r.reviewer, ['none', 'claude', 'codex', 'model'] as const, 'claude'),
+    reviewer: pick(r.reviewer, ['none', 'claude', 'claude-local', 'claude-free', 'codex', 'gemini', 'model'] as const, 'claude'),
     depth: pick(r.depth, ['quick', 'standard', 'deep'] as const, 'standard'),
     focus: pick(r.focus, ['security', 'bugs', 'all'] as const, 'security'),
     keepCode: r.keepCode === true,
-    skip: Array.isArray(r.skip) ? r.skip.filter((x): x is string => typeof x === 'string') : []
+    skip: Array.isArray(r.skip) ? r.skip.filter((x): x is string => typeof x === 'string') : [],
+    skills: Array.isArray(r.skills) ? r.skills.filter((x): x is string => typeof x === 'string' && /^(own|mine|pack):[\w.:-]{1,120}$/.test(x)).slice(0, 80) : []
   }
 }
 
@@ -384,6 +386,11 @@ function registerIpc(): void {
 
   // Reviews and sessions
   handleStart('review:start', (req) => startReview(validReview(req)))
+  handle('review:skill-plan', (path) => {
+    const root = typeof path === 'string' && path ? allowedProject(path) : null
+    const p = skillPlan(root, root ? sourceFiles(root).length : 0)
+    return { stack: p.stack, recommended: p.recommended, files: p.files, items: p.items.map((i) => ({ id: i.id, name: i.name, source: i.source, about: i.about, guides: i.guides })) }
+  })
   handle('sessions:list', () => listSessions())
   handle('sessions:rerun', (id) => rerunSession(String(id)))
   handle('sessions:rerun-latest', async () => {
@@ -495,14 +502,27 @@ function registerIpc(): void {
   handle('packs:list', () => packList())
   handle('packs:install', async (id) => {
     if (!SKILL_PACKS.some((p) => p.id === id)) throw new ValidationError('That skill pack is not on the list.')
+    setSettings({ packsDeclined: (getSettings().packsDeclined ?? []).filter((x) => x !== id) })
     const st = await jobs.run(`Getting the ${SKILL_PACKS.find((p) => p.id === id)!.name} skills`, () => installPack(packsRoot(), String(id)))
     log('info', `${st.loaded.length} skills from ${id}, commit ${st.commit}`)
     return packList()
   })
   handle('packs:remove', (id) => {
     removePack(packsRoot(), String(id))
+    // Removed on purpose: it is not added back by itself.
+    setSettings({ packsDeclined: [...new Set([...(getSettings().packsDeclined ?? []), String(id)])] })
     return packList()
   })
+  // The well-known skill packs (Trail of Bits, Sentry, Cloudflare, Anthropic) come by default, a little after start.
+  setTimeout(() => {
+    void (async () => {
+      const declined = new Set(getSettings().packsDeclined ?? [])
+      for (const p of SKILL_PACKS) {
+        if (declined.has(p.id) || packState(packsRoot(), p.id).installed) continue
+        await jobs.run(`Getting the ${p.name} skills`, () => installPack(packsRoot(), p.id)).catch(() => undefined)
+      }
+    })()
+  }, 25_000)
   // Integrations: MCP, CLI, webhooks, Raycast, Apple Shortcuts
   const cliPath = (): string => join(dirs.bin(), 'macsec')
   const raycastDir = (): string => join(dirs.root(), 'raycast')
@@ -633,8 +653,29 @@ function registerIpc(): void {
     const w = getSettings().webhook
     const url = getSecret('webhook-url')
     if (w && url && (info.status === 'failed' || bad > 0 || w.events === 'all')) void sendHook(w.kind, url, hookBody(w.kind, 'MacSec', info.status === 'failed' || bad ? 'error' : 'success', title, body)).catch(() => undefined)
+    // A weekly re-test speaks up only about serious problems that are new (watch.ts).
+    if (isAutoRun(info.id)) return autoRunFinished(info, (sid) => sessionDetail(sid).findings, watchNotify)
     if (getSettings().notifications && Notification.isSupported() && !mainWindow?.isFocused()) new Notification({ title, body: body?.slice(0, 180), silent: !bad }).show()
   })
+  // Keeping watch: daily package alerts and the weekly re-test.
+  const watchNotify = (title: string, body: string): void => {
+    const w = getSettings().webhook
+    const url = getSecret('webhook-url')
+    if (w && url) void sendHook(w.kind, url, hookBody(w.kind, 'MacSec', 'error', title, body)).catch(() => undefined)
+    if (getSettings().notifications && Notification.isSupported()) new Notification({ title, body: body.slice(0, 180) }).show()
+    send('watch:alert', { title, body })
+  }
+  handle('watch:get', () => watchInfo(listSessions()))
+  handle('watch:set', (patch) => {
+    const p = (patch ?? {}) as { packages?: unknown; retest?: unknown }
+    setWatch({ packages: typeof p.packages === 'boolean' ? p.packages : undefined, retest: typeof p.retest === 'boolean' ? p.retest : undefined })
+    return watchInfo(listSessions())
+  })
+  handle('watch:check-now', async () => {
+    await jobs.run('Checking your projects’ packages', () => checkPackages(listSessions(), watchNotify))
+    return watchInfo(listSessions())
+  })
+  startWatch({ sessions: () => listSessions(), rerun: (sid) => rerunSession(sid), notify: watchNotify, busy: () => listSessions().some((x) => x.status === 'running') })
 
   handle('app:check-update', () => checkForUpdate())
   handle('app:install-update', () => jobs.run('Updating MacSec', (u) => installUpdate((p, l) => u(p, l))))

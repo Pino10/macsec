@@ -47,3 +47,26 @@ export function pluginArgs(): string[] {
   for (const d of packPluginDirs(join(dirs.tools(), 'skill-packs'))) out.push('--plugin-dir', d)
   return out
 }
+
+// ---------------------------------------------------------------- Picking skills per review
+
+import { buildSkillSet, detectStack, recommend, skillCatalog, type SkillItem, type StackTag } from './seckit/skillplan'
+
+const packsRoot = (): string => join(dirs.tools(), 'skill-packs')
+
+/** Every skill a review could load, the project's stack, and the ones that fit it. */
+export function skillPlan(root: string | null, files = 0): { items: SkillItem[]; stack: StackTag[]; recommended: string[]; files: number } {
+  ensureSkills()
+  const items = skillCatalog({ app: 'MacSec', ownDir: builtinPluginDir(), mineDir: userPluginDir(), packsRoot: packsRoot() })
+  const stack = root && existsSync(root) ? detectStack(root) : []
+  return { items, stack, recommended: recommend(items, stack), files }
+}
+
+/** Builds a folder with only the chosen skills for one review; returns the --plugin-dir args. */
+export function chosenPluginArgs(chosen: string[], outDir: string, root: string | null): { args: string[]; names: string[] } {
+  const plan = skillPlan(root)
+  const ids = chosen.filter((c) => plan.items.some((i) => i.id === c))
+  const dirsOut = buildSkillSet(plan.items, ids.length ? ids : plan.recommended, outDir)
+  const names = plan.items.filter((i) => (ids.length ? ids : plan.recommended).includes(i.id)).map((i) => i.name)
+  return { args: dirsOut.flatMap((d) => ['--plugin-dir', d]), names }
+}
