@@ -1,0 +1,19 @@
+name: Move release tags (one time)
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/retag.yml']
+permissions:
+  contents: write
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - run: |
+          set -e
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v0.7.0" -f sha=66d519d77a2874ba28c83b6506eb94339005f27f -F force=true > /dev/null && echo moved v0.7.0
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v0.8.0" -f sha=d22a1e79c79c8e409b5d6c469d02030cf5b64f25 -F force=true > /dev/null && echo moved v0.8.0
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v0.8.1" -f sha=95697cef696cf05ce5154741273a59aad53aaad3 -F force=true > /dev/null && echo moved v0.8.1
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/move-tags" || true
