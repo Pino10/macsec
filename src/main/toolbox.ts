@@ -7,6 +7,7 @@
  * Every tool then runs with a private home folder (tools/home), so caches, databases and
  * templates stay inside MacSec too.
  */
+import { githubApi } from './seckit/ghapi'
 import { execFile } from 'child_process'
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -174,10 +175,7 @@ export function hashFor(text: string, name: string): string | null {
 }
 
 async function latestRelease(repo: string): Promise<{ tag: string; assets: Asset[] }> {
-  const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(30000) })
-  if (res.status === 403 || res.status === 429) throw new Error('GitHub is limiting downloads for a moment. Try again in a few minutes.')
-  if (!res.ok) throw new Error(`GitHub answered ${res.status} for ${repo}.`)
-  const j = (await res.json()) as { tag_name: string; assets: { name: string; browser_download_url: string }[] }
+  const j = await githubApi<{ tag_name: string; assets: { name: string; browser_download_url: string }[] }>(`/repos/${repo}/releases/latest`)
   return { tag: j.tag_name, assets: j.assets.map((a) => ({ name: a.name, url: a.browser_download_url })) }
 }
 

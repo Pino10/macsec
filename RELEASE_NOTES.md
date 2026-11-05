@@ -1,10 +1,5 @@
-## MacSec 0.8.0
+## MacSec 0.8.1
 
-### Free LLM API
-Connect Free LLM API on the Tools page: paste its unified key once (it goes to the Keychain) and Claude Code reviews can run on every free key you added to it (Google AI Studio, Groq, NVIDIA, OpenRouter and more). Choose “Claude Code on Free LLM API” when you start a review, next to your Claude account and LM Studio. Pick auto (your routing chain), auto:fast or one model. The key is hidden in MacSec's logs.
-
-### Skills from Cloudflare and Anthropic
-Two more skill sets on the Tools page:
-- **Cloudflare's security audit**: reconnaissance, hunting by attack class (web and sign-in, client side, cloud, data isolation, supply chain, AI apps, desktop and local IPC, protocols, memory safety, resource exhaustion) and checked findings with evidence.
-- **Anthropic's /security-review**: a senior engineer's review of your changes that reports only high-confidence problems. It becomes a skill for reviews and stays a /security-review command in Claude Code.
+### Checking for updates no longer stops with 403
+GitHub only answers about 60 questions an hour from apps that are not signed in, shared by everything on your network. Update checks and tool installs now use your GitHub sign-in when you connected it (5,000 an hour), keep answers for ten minutes, and read GitHub's release feed for updates when the hour is used up. If nothing works, MacSec says when GitHub's limit comes back.
 

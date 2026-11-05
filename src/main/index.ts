@@ -9,6 +9,8 @@ import type { FreeLlmInfo, IntegrationsInfo, SkillPackInfo, ApiScanRequest, Chan
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { getSecret, setSecret, setSecretsCrypto } from './secrets'
+import { configureGitHub } from './seckit/ghapi'
+import { USER_AGENT } from './download'
 import { FREE_KEY, freeConfig } from './freellm'
 import { checkFreeLlm, checkFreeLlmKey, FREELLM_MODELS, freeLlmModel, freeLlmUrl } from './seckit/freellm'
 import { ensureSkills, listSkills } from './skills'
@@ -813,6 +815,8 @@ app.whenReady().then(() => {
   ensureDirs()
   const crypto = { available: () => safeStorage.isEncryptionAvailable(), encrypt: (s: string) => safeStorage.encryptString(s).toString('base64'), decrypt: (s: string) => safeStorage.decryptString(Buffer.from(s, 'base64')) }
   setSecretsCrypto(crypto)
+  // Every GitHub API call uses your GitHub sign-in when you added one: 5,000 an hour instead of 60.
+  configureGitHub({ userAgent: USER_AGENT, token: () => getSecret('github') })
   setModelCrypto(crypto)
   recoverSessions()
   ensureSkills()

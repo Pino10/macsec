@@ -3,6 +3,7 @@
  * checks it against the release's SHA256SUMS.txt and its code signature, swaps it in place of the
  * running copy and restarts. Sessions, tools and settings live in ~/MacSec and are untouched.
  */
+import { releasesWithFallback } from './seckit/ghapi'
 import { app } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, mkdtempSync, renameSync, rmSync } from 'fs'
@@ -51,9 +52,10 @@ function run(cmd: string, args: string[]): Promise<string> {
 let pending: { info: UpdateInfo; dmg: string; sums: string } | null = null
 
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
-  const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(20000) })
-  if (!r.ok) throw new Error(r.status === 403 || r.status === 429 ? 'GitHub is limiting requests for a moment. Try again in a few minutes.' : `GitHub answered ${r.status}.`)
-  pending = pickUpdate((await r.json()) as Release[], app.getVersion())
+  // Through the shared GitHub client: your sign-in when there is one, answers kept for a while, and
+  // GitHub's release feed when its hourly limit is used up.
+  const releases = await releasesWithFallback(REPO, (v) => [`MacSec-${v}-arm64.dmg`, `MacSec-${v}-x64.dmg`, 'SHA256SUMS.txt'])
+  pending = pickUpdate(releases as Release[], app.getVersion())
   return pending?.info ?? null
 }
 

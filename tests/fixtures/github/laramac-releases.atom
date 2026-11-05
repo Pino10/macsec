@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/Pino10/laramac/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/Pino10/laramac/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/Pino10/laramac/releases.atom"/>
+  <title>Release notes from laramac</title>
+  <updated>2026-11-05T03:07:22Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.23.1</id>
+    <updated>2026-11-05T03:13:03Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.23.1"/>
+    <title>Laramac v0.23.1</title>
+    <content type="html">&lt;h2&gt;New in 0.23.1&lt;/h2&gt;
+&lt;h3&gt;Studio, rich and in glass&lt;/h3&gt;
+&lt;p&gt;Studio is now dark Liquid Glass: a deep night canvas lit by soft blue, teal and violet light, thick frosted panels with a bright rim and a sheen across the top, and Google blue that glows on the page you are on, the main buttons and the switches. Titles shine from white to blue. On macOS 26 the window itself is glass too, so your desktop shows through. Still Apple&#39;s own font, and still in Settings, Look.&lt;/p&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.23.0</id>
+    <updated>2026-11-05T02:55:20Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.23.0"/>
+    <title>Laramac v0.23.0</title>
+    <content type="html">&lt;h2&gt;New in 0.23&lt;/h2&gt;
+&lt;h3&gt;Studio: a new look, and the default&lt;/h3&gt;
+&lt;p&gt;Solid dark surfaces in calm greys and a soft blue, like Google&#39;s dark apps, with Apple&#39;s own font, rounding and fine lines. The page you are on is a filled blue pill, the main button is filled blue, and nothing is see-through, so text is easy to read all day. Everyone gets it once with this update; Settings, Look switches back to Smoked, Aurora, Midnight or Frosted.&lt;/p&gt;
+&lt;h3&gt;Free LLM API&lt;/h3&gt;
+&lt;p&gt;Connect Free LLM API on the Tools page: paste its unified key once (it goes to the Keychain) and every free key you added to it works through one address.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;claudefree&lt;/strong&gt;: a third way to run Claude Code, next to &lt;strong&gt;claude&lt;/strong&gt; (your Claude account) and &lt;strong&gt;claudelm&lt;/strong&gt; (LM Studio). &lt;code&gt;claudefree --free-model auto:fast&lt;/code&gt; picks the fastest model for one session, &lt;code&gt;claudefree --free-models&lt;/code&gt; lists them. Every other argument passes through to claude.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Code reviews&lt;/strong&gt; can run on it: choose “Claude Code on Free LLM API”.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The Assistant&lt;/strong&gt; gets it as a model server, with auto (your routing chain) and auto:fast.&lt;/li&gt;
+&lt;li&gt;A claudefree button on every site&#39;s page and in the site details.&lt;/li&gt;
+&lt;li&gt;Code reviews flag Free LLM API keys left in files.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Skills from Cloudflare and Anthropic&lt;/h3&gt;
+&lt;p&gt;Two more skill sets on the Code review page:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Cloudflare&#39;s security audit&lt;/strong&gt;: reconnaissance, hunting by attack class (web and sign-in, client side, cloud, data isolation, supply chain, AI apps, desktop and local IPC, protocols, memory safety, resource exhaustion) and checked findings with evidence.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Anthropic&#39;s /security-review&lt;/strong&gt;: a senior engineer&#39;s review of your changes that reports only high-confidence problems. It becomes a skill for reviews and stays a /security-review command in Claude Code.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.22.0</id>
+    <updated>2026-11-04T19:18:57Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.22.0"/>
+    <title>Laramac v0.22.0</title>
+    <content type="html">&lt;h2&gt;New in 0.22&lt;/h2&gt;
+&lt;h3&gt;claudelm&lt;/h3&gt;
+&lt;p&gt;The command for Claude Code on your LM Studio model is now &lt;strong&gt;claudelm&lt;/strong&gt; (no hyphen). &lt;strong&gt;claude&lt;/strong&gt; stays your normal Claude Code. Laramac moves an existing claude-lm over on its own.&lt;/p&gt;
+&lt;h3&gt;Site details on the Overview&lt;/h3&gt;
+&lt;p&gt;Each card under Your sites has a &lt;strong&gt;details&lt;/strong&gt; button: address, status, kind, folder, PHP or Node version, database, dev server, HTTPS, Git, .env files and the last security review, with buttons for the editor, Claude Code, claudelm, the folder, logs and its page.&lt;/p&gt;
+&lt;h3&gt;A site&#39;s page does more&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Requests&lt;/strong&gt;: the site&#39;s latest requests from the web server, live, with timings, the slowest addresses, and errors highlighted.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Workers&lt;/strong&gt;: queue workers, the Laravel scheduler, Horizon, Reverb, Symfony Messenger or your own command, each with Start, Stop and its log. Laramac suggests the ones the project needs.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Tests&lt;/strong&gt;: runs Pest, PHPUnit, Vitest, Jest, Playwright, npm test, pytest, go test or cargo test, with passed and failed counts and what failed.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Hosting&lt;/strong&gt; on the Ship tab: deploy to Laravel Forge or Ploi (their deploy hook, kept in the Keychain), Vercel, Netlify or Azure App Service.&lt;/li&gt;
+&lt;li&gt;On the overview: a &lt;strong&gt;CORS&lt;/strong&gt; switch (pages on localhost and .test may call the site, nothing on the internet can), &lt;strong&gt;Set up debugging&lt;/strong&gt; (Xdebug on, plus “Listen for Xdebug” in .vscode/launch.json), a &lt;strong&gt;QR code&lt;/strong&gt; to open the site on your phone, and &lt;strong&gt;Docker Compose&lt;/strong&gt; start and stop when the project has a compose file.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Databases&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Daily backups&lt;/strong&gt; per database (the newest 7 kept), and &lt;strong&gt;Back up now&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Scramble personal data&lt;/strong&gt; in a local copy of production: emails, names, phone numbers, addresses, IPs and birth dates become fake ones. A backup is saved first.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Compare the structure&lt;/strong&gt; of two databases.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Ollama&lt;/h3&gt;
+&lt;p&gt;Ollama is now a service like MySQL: Laramac installs it (checked against its published checksums), starts it on 127.0.0.1:11434 and keeps its models in its own folder.&lt;/p&gt;
+&lt;h3&gt;Skills from security teams&lt;/h3&gt;
+&lt;p&gt;On the Code review page, add the &lt;strong&gt;Trail of Bits&lt;/strong&gt; and &lt;strong&gt;Sentry&lt;/strong&gt; security skill sets from GitHub. Every Claude Code review loads them next to Laramac&#39;s own, which are now &lt;strong&gt;29&lt;/strong&gt;: audit context, entry points, threat model, variant analysis, false-positive checks, change review, insecure defaults, sharp edges and fix verification are new. Reviews stay read-only.&lt;/p&gt;
+&lt;h3&gt;Use Laramac from everywhere&lt;/h3&gt;
+&lt;p&gt;Under Tools, Integrations:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Messages to Slack, Teams or Discord&lt;/strong&gt; when something fails (or also when work finishes). The webhook address is kept in the Keychain.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Raycast&lt;/strong&gt; script commands.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Apple Shortcuts&lt;/strong&gt;: commands to paste into “Run Shell Script”.&lt;/li&gt;
+&lt;li&gt;The laramac command has &lt;strong&gt;--json&lt;/strong&gt; and &lt;code&gt;laramac tool &amp;lt;name&amp;gt;&lt;/code&gt; for scripts.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.21.0</id>
+    <updated>2026-11-04T17:16:45Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.21.0"/>
+    <title>Laramac v0.21.0</title>
+    <content type="html">&lt;h2&gt;New in 0.21&lt;/h2&gt;
+&lt;h3&gt;Node.js per project&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Each site runs on the Node.js version it asks for: .nvmrc, .node-version, .tool-versions, Volta or &quot;engines&quot; in package.json. You can also pick one on the site&#39;s page.&lt;/li&gt;
+&lt;li&gt;Laramac installs the version for that project only (checked against nodejs.org&#39;s checksums); other sites keep theirs. Its dev server, package updates and setup steps all use it.&lt;/li&gt;
+&lt;li&gt;In Terminal, node, npm and npx switch on their own when you are inside a project folder.&lt;/li&gt;
+&lt;li&gt;Languages lists every Node.js line, with Install, Update and Remove. The Doctor offers &lt;strong&gt;Install Node 18&lt;/strong&gt; (or whichever) when a site needs one you do not have.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Updates for everything&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The Updates page now shows everything Laramac looks after, with what you have and what is new: Laramac, PHP, Node.js, other languages, Homebrew services (Apache, Nginx, MariaDB, Redis, Memcached), Composer, phpMyAdmin, Cloudflare Tunnel, Claude Code, and each site&#39;s npm and Composer packages.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Update all&lt;/strong&gt;, or tick what you want. Services restart if they were running.&lt;/li&gt;
+&lt;li&gt;A site&#39;s packages only update when you agree, because npm and Composer run the project&#39;s own install scripts. Laramac saves a snapshot first, and only installs versions the project already allows. Bigger jumps wait on the site&#39;s Packages tab, with &lt;strong&gt;Update to&lt;/strong&gt; per package.&lt;/li&gt;
+&lt;li&gt;Laramac looks once a day (if you let it) and puts a dot on Updates.&lt;/li&gt;
+&lt;li&gt;The changelog shows what is new since your version first, and marks changes that touch what you use.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Claude everywhere&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Set up Claude everywhere&lt;/strong&gt; (Tools) does it all in one go: Claude Code connected to Laramac, the Claude desktop app connected, the security skills installed, and the commands added to Terminal.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;claude-lm&lt;/strong&gt;: a new Terminal command that starts Claude Code on your model in LM Studio, while &lt;strong&gt;claude&lt;/strong&gt; stays your normal Claude Code. Everything you type after it is passed on, so &lt;code&gt;claude-lm --resume&lt;/code&gt; works. &lt;code&gt;claude-lm --lm-models&lt;/code&gt; lists your models and &lt;code&gt;--lm-model&lt;/code&gt; picks another one for that session.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;No more &quot;context too small&quot;.&lt;/strong&gt; Before claude-lm or a review on your model starts, Laramac asks LM Studio what context the model was loaded with and, when it is too small for Claude Code, loads it again with enough (64k tokens, or the most the model allows). It tells you when a model is simply too small.&lt;/li&gt;
+&lt;li&gt;The Claude app connection now works even when Node.js is not on its PATH.&lt;/li&gt;
+&lt;li&gt;An LM Studio API token, if you use one, is kept in the macOS Keychain.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;GitHub and Azure DevOps&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Azure DevOps&lt;/strong&gt; has its own tab: connect with a personal access token, see every repository by project, its pipelines, pull requests and commits, open a pull request, create a repository, and clone it. The token is encrypted in the Keychain and sent only to dev.azure.com.&lt;/li&gt;
+&lt;li&gt;Push a site to Azure Repos from its page (Ship, then Push to Azure DevOps): main, a new branch or a version tag.&lt;/li&gt;
+&lt;li&gt;GitHub repositories show their latest &lt;strong&gt;Actions&lt;/strong&gt; runs.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;API client&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Your sites are environments.&lt;/strong&gt; Each site gives you {{base}}, its address and the non-secret URLs from its .env.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Requests from a site&#39;s code&lt;/strong&gt;: Laramac reads Laravel, Next.js, Express, Fastify, Hono, NestJS, FastAPI and Flask routes (and OpenAPI files) and makes a collection, without running anything.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;GraphQL&lt;/strong&gt; bodies with variables; &lt;strong&gt;API key&lt;/strong&gt; and &lt;strong&gt;OAuth 2&lt;/strong&gt; (client credentials) sign-in; cookies kept between requests like a browser (and a switch to turn that off).&lt;/li&gt;
+&lt;li&gt;History opens a past request again.&lt;/li&gt;
+&lt;li&gt;Code in more languages: HTTPie, axios, Laravel&#39;s Http, and Go.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Settings&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Search&lt;/strong&gt; every setting: type &quot;port&quot;, &quot;theme&quot; or &quot;.test&quot;. Settings also appear in ⌘K.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Security reviews and recon&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Twelve new review skills, so reviews cover far more ground: API security (OWASP API Top 10, GraphQL, webhooks), sign-in and sessions (JWT, OAuth, password reset, MFA), every kind of injection, browser-side issues, business logic and races, Docker and CI configuration (GitHub Actions, Azure Pipelines), supply chain, personal data, Supabase and Firebase rules, AI features, and Electron apps. A &lt;strong&gt;review-vectors&lt;/strong&gt; plan makes every review say which areas apply.&lt;/li&gt;
+&lt;li&gt;Recon asks five more free public sources for subdomains (CertSpotter, AlienVault OTX, HackerTarget, urlscan.io and Anubis). None of them contacts the site itself.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.20.0</id>
+    <updated>2026-11-04T13:32:36Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.20.0"/>
+    <title>Laramac v0.20.0</title>
+    <content type="html">&lt;h2&gt;New in 0.20&lt;/h2&gt;
+&lt;h3&gt;Every site has its own page&lt;/h3&gt;
+&lt;p&gt;Click a site&#39;s name to open it. Everything about that site is in one place:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Overview:&lt;/strong&gt; whether it answers and with what, its stack (framework, PHP or Node version, database, Git), Start and Stop, open in your editor, in Claude Code or in Finder, and cards for the Site Doctor, snapshots, the latest security review and shipping.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Logs:&lt;/strong&gt; the dev server&#39;s live output and the web server&#39;s logs for the site.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Database:&lt;/strong&gt; the site&#39;s tables, with a read-only query box (SELECT, SHOW, DESCRIBE and EXPLAIN).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Environment:&lt;/strong&gt; edit .env, .env.local and the development ones. Secret values stay hidden until you choose to show them.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Packages:&lt;/strong&gt; outdated npm and Composer packages, with the newest version and how big the jump is.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Security:&lt;/strong&gt; the latest review as a list of findings, each with &lt;strong&gt;Fix with Claude Code&lt;/strong&gt;, &lt;strong&gt;Fixed&lt;/strong&gt;, &lt;strong&gt;Accept the risk&lt;/strong&gt; or &lt;strong&gt;Not a problem&lt;/strong&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Ship:&lt;/strong&gt; push to GitHub, share a public link or deploy.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;A doctor that checks on its own&lt;/h3&gt;
+&lt;p&gt;Overview checks every 30 seconds whether the web server runs, .test addresses work, services are up, dev servers are started and each site answers without errors. Each problem comes with the reason and a &lt;strong&gt;Fix&lt;/strong&gt; button (start the web server, set up .test addresses, restart a service, start a dev server, or open the site&#39;s logs). When a port is taken, it says by what.&lt;/p&gt;
+&lt;h3&gt;Overview and activity&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Your sites&lt;/strong&gt; on the Overview: up to eight sites with Live or Start, and a New project card.&lt;/li&gt;
+&lt;li&gt;Long jobs collect in one &lt;strong&gt;activity&lt;/strong&gt; area at the bottom that you can fold away.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;New project&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Recipes&lt;/strong&gt; for common apps: a SaaS app (Next.js and Supabase), an app with an admin panel (Laravel, React and Filament), a real-time app (React and Firebase), a blog, and an API with a database (NestJS and PostgreSQL).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;From a Git repository&lt;/strong&gt; sits next to them.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Code review and recon&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Reviews are split into findings you can act on and mark, and the full report is still there.&lt;/li&gt;
+&lt;li&gt;Recon can &lt;strong&gt;compare&lt;/strong&gt; with the previous run (new and gone subdomains, endpoints and findings) and &lt;strong&gt;export&lt;/strong&gt; a URL list for Burp or ZAP, a CSV, or a Markdown report.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Smaller things&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Databases: click a database to browse its tables, and copy a connection string.&lt;/li&gt;
+&lt;li&gt;Sites: filter by Live, PHP, JavaScript or Other.&lt;/li&gt;
+&lt;li&gt;Assistant: quick questions to start from.&lt;/li&gt;
+&lt;li&gt;Settings: jump to a section.&lt;/li&gt;
+&lt;li&gt;PHP: search extensions.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;A new icon:&lt;/strong&gt; three glass layers and a spark.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.19.0</id>
+    <updated>2026-11-04T12:39:37Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.19.0"/>
+    <title>Laramac v0.19.0</title>
+    <content type="html">&lt;h2&gt;New in 0.19&lt;/h2&gt;
+&lt;h3&gt;New projects that open&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;The Mac gets ready first.&lt;/strong&gt; A new project with no web server yet asks which one you want (Apache or Nginx), installs it and starts it. It starts the one you have when it is stopped, and sets up .test addresses when they are missing, so the project&#39;s address opens straight away. The window lists everything it will set up before it starts.&lt;/li&gt;
+&lt;li&gt;Next.js and the other JavaScript starters were tested behind Laramac&#39;s Apache and Nginx: pages, scripts and live reload all pass through.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Supabase and Firebase&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;JavaScript starters (Next.js, Nuxt, SvelteKit, React, Vue, Vite, Astro, Angular, NestJS, Hono, Elysia, Expo) have a &lt;strong&gt;Database&lt;/strong&gt; choice: Supabase, Firebase, PostgreSQL, MySQL or SQLite.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Supabase&lt;/strong&gt; runs on your Mac with the official Supabase CLI. It uses Docker Desktop or OrbStack if you have one, or installs Colima, a small free container runtime. Each project gets its own ports.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Firebase&lt;/strong&gt; runs the official emulators (Auth, Firestore, Storage, and the Emulator UI) with a demo project, so nothing connects to Google. Java is installed when needed.&lt;/li&gt;
+&lt;li&gt;The keys go into the project&#39;s .env with the names its framework reads (NEXT_PUBLIC_, VITE_, PUBLIC_...), plus a ready client file in lib/.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Add Supabase or Firebase to a site you already have&lt;/strong&gt; from its dev server window. They start with the dev server, and Open Studio or Open Emulator UI takes you to their dashboards.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;A sidebar by stack&lt;/h3&gt;
+&lt;p&gt;Overview, Sites and New project; then &lt;strong&gt;Your stack&lt;/strong&gt; (Web servers, Languages, PHP, Databases); &lt;strong&gt;Security&lt;/strong&gt; (Code review, Recon); Build and ship; AI and tools. Languages has its own page.&lt;/p&gt;
+&lt;h3&gt;Code review&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;More reviewers:&lt;/strong&gt;
+&lt;ul&gt;
+&lt;li&gt;Claude Code&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code on your own model&lt;/strong&gt; (LM Studio 0.4.1 or newer, through its Anthropic-compatible API; nothing leaves your Mac)&lt;/li&gt;
+&lt;li&gt;Codex&lt;/li&gt;
+&lt;li&gt;Gemini CLI&lt;/li&gt;
+&lt;li&gt;CodeRabbit (for changes)&lt;/li&gt;
+&lt;li&gt;your model directly&lt;br&gt;
+Every one runs read-only.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Skills:&lt;/strong&gt; every Claude Code review loads Laramac&#39;s security skills (code review method, secrets, dependencies, report writing, recon, JavaScript recon, attack surface reports, and one for local models). Add your own in ~/.laramac/my-skills. &lt;strong&gt;Install for Claude Code and Claude desktop&lt;/strong&gt; puts them in ~/.claude/skills, so every Claude Code session can use them.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;MacSec&#39;s scanners:&lt;/strong&gt; when MacSec is installed, Semgrep, Gitleaks and OSV-Scanner run first and the reviewer checks each result.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Reviews are sessions now:&lt;/strong&gt; each Claude Code review is a saved Claude Code conversation. &lt;strong&gt;Continue in Claude Code&lt;/strong&gt; opens that same conversation in Terminal to fix the findings.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude desktop:&lt;/strong&gt; &lt;strong&gt;Connect Claude desktop&lt;/strong&gt; lets Claude in the desktop app review your sites, run recon and read the results through Laramac.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Recon (new)&lt;/h3&gt;
+&lt;p&gt;Map what a domain exposes, without attacking it:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;subdomains from certificate logs, subfinder and the Wayback Machine&lt;/li&gt;
+&lt;li&gt;DNS, with possible subdomain takeovers&lt;/li&gt;
+&lt;li&gt;which hosts answer and what they run&lt;/li&gt;
+&lt;li&gt;old URLs and their parameters&lt;/li&gt;
+&lt;li&gt;every script checked for &lt;strong&gt;source maps&lt;/strong&gt;, endpoints and keys&lt;/li&gt;
+&lt;li&gt;a few files that should never be public&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Choose Passive (nothing sent to the site), Standard or Deep. Optionally, an AI writes the attack surface map and where to look first. Each recon is kept as a session, with live progress while it runs. Domains that are not on your Mac need your confirmation that you may assess them.&lt;/p&gt;
+&lt;h2&gt;New in 0.18&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Just the newest PHP:&lt;/strong&gt; the PHP page offers the newest PHP and keeps it up to date. Versions you already have stay and keep working.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Add an older PHP yourself, the Laragon way:&lt;/strong&gt; download the macOS &lt;code&gt;cli&lt;/code&gt; and &lt;code&gt;fpm&lt;/code&gt; files from static-php.dev, press &lt;strong&gt;Add a version&lt;/strong&gt; and choose both (archives or a folder). Laramac checks they run on your Mac and match, then sets them up.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Databases:&lt;/strong&gt; always the newest MySQL and PostgreSQL; the version boxes in Settings are gone.&lt;/li&gt;
+&lt;li&gt;Laramac&#39;s PHP builds now make only the newest PHP, with Xdebug, and remove older builds automatically, so releases never wait behind PHP builds again.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.17.1&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Private review sessions:&lt;/strong&gt; every code review of a GitHub, Azure DevOps or other Git repository now downloads its own private copy, and that copy is deleted the moment the review finishes, whether it succeeded or not. Only the report stays. Reviews never share or reuse code, so you can run several at once.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code leaves nothing behind:&lt;/strong&gt; reviews run as one-off Claude Code sessions that are not saved to disk.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Web scans&lt;/strong&gt; remove their raw results even when a scan stops early. Anything left over from a crash is cleaned up when Laramac starts.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.17&lt;/h2&gt;
+&lt;h3&gt;Import any project&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Every kind of project:&lt;/strong&gt; Laravel, WordPress, React, Vue, Next.js, Nuxt, Svelte, Angular, Django, FastAPI, Flask, Go, .NET and more. Laramac shows what it found (&quot;Next.js project&quot;) and what it takes to run it.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Get it running:&lt;/strong&gt; install packages (Composer, npm, pnpm, yarn, bun, Python, Go, .NET), create &lt;code&gt;.env&lt;/code&gt; from &lt;code&gt;.env.example&lt;/code&gt; with a new app key, build the front end, create the database tables, and start the dev server. You tick what runs; the site opens when it is done, like a new project from Starters.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Clone from Git:&lt;/strong&gt; paste a GitHub, Azure DevOps, GitLab or Bitbucket address (and a token for private ones, used once and not saved). The full history comes along, so you can keep working in it.&lt;/li&gt;
+&lt;li&gt;If a step does not finish, the import still completes and tells you which step and why.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Xdebug&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;One switch on the PHP page. While it is off, Xdebug is not loaded at all, so PHP runs at full speed. Turn it on to step through your code in VS Code, Cursor or PhpStorm.&lt;/li&gt;
+&lt;li&gt;Laramac&#39;s daily PHP builds now include Xdebug as a separate file. Versions you already have get it the first time you switch Xdebug on.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;For the owner&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;MAINTAINING.md:&lt;/strong&gt; how releases, PHP builds and fixes work, without needing any chat. &lt;strong&gt;CLAUDE.md&lt;/strong&gt; does the same for AI assistants.&lt;/li&gt;
+&lt;li&gt;Imports now use your MySQL root password, if you set one.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16.1&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery menu:&lt;/strong&gt; the ⋯ menu on a gallery card now opens above the cards instead of hiding inside.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Code review, pick with a token:&lt;/strong&gt; paste a GitHub token, or an Azure DevOps organization and token, and press &lt;strong&gt;Show my repositories&lt;/strong&gt; to choose from a list. The token is used once and not saved.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code reviews:&lt;/strong&gt; a clearer message when only the Claude desktop app is installed (reviews need Claude Code&#39;s command line tool), and an &lt;strong&gt;Install Claude Code&lt;/strong&gt; button.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Model servers:&lt;/strong&gt; just the address and port is enough, like &lt;code&gt;http://127.0.0.1:8000&lt;/code&gt;. Laramac adds &lt;code&gt;/v1&lt;/code&gt; for the OpenAI format itself.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Packages check (Security):&lt;/strong&gt; looks up every Composer and npm package a site uses in the public lists of known security problems.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Key check before pushing:&lt;/strong&gt; Push to GitHub looks for passwords and API keys in the files it is about to send, and asks you to confirm if it finds any.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16&lt;/h2&gt;
+&lt;h3&gt;A new icon and a sweeter sidebar&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;New icon:&lt;/strong&gt; three layers of smoked glass, for the web server, languages and databases, with green running lights. A matching icon sits in the menu bar.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Sidebar:&lt;/strong&gt; named groups you can fold, a glowing active item, live counts (sites and running dev servers), and Settings and Updates moved into the footer.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Slim mode:&lt;/strong&gt; press ⌘\ (or the button by the logo) for an icon-only rail.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Dumps&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;dump()&lt;/code&gt; and &lt;code&gt;dd()&lt;/code&gt; from Laravel, Symfony and any project using VarDumper land in a new &lt;strong&gt;Dumps&lt;/strong&gt; window (the bug next to the bell) instead of the page.&lt;/li&gt;
+&lt;li&gt;Each dump shows the file and line (click to open it in your editor) and the request that made it, with a filter. Turn it on and off there.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Sites&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery view&lt;/strong&gt; with a live preview of each site.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Logs&lt;/strong&gt; for each site, live, with search and an errors-only filter, from the new ⋯ menu.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;laramac.yml project files:&lt;/strong&gt; save a project&#39;s setup (PHP, HTTPS, services, database, dev server, setup commands) so anyone who clones it gets the same setup in one click, after seeing every command.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Databases and services&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;S3 storage&lt;/strong&gt; (RustFS) and &lt;strong&gt;RabbitMQ&lt;/strong&gt; as services.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Root password&lt;/strong&gt; for MySQL and MariaDB, kept in your Keychain and used by phpMyAdmin, backups, imports and new projects.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Terminal&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;The &lt;code&gt;laramac&lt;/code&gt; command:&lt;/strong&gt; status, start, stop, open, dev, php, db and logs. &lt;strong&gt;Add to Terminal&lt;/strong&gt; also puts Laramac&#39;s PHP, Composer and Node.js on your PATH.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Security&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The web scan says plainly that it works on any website you are allowed to test, not just local ones.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.18.0</id>
+    <updated>2026-11-02T00:03:36Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.18.0"/>
+    <title>Laramac v0.18.0</title>
+    <content type="html">&lt;h2&gt;New in 0.18&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Just the newest PHP:&lt;/strong&gt; the PHP page offers the newest PHP and keeps it up to date. Versions you already have stay and keep working.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Add an older PHP yourself, the Laragon way:&lt;/strong&gt; download the macOS &lt;code&gt;cli&lt;/code&gt; and &lt;code&gt;fpm&lt;/code&gt; files from static-php.dev, press &lt;strong&gt;Add a version&lt;/strong&gt; and choose both (archives or a folder). Laramac checks they run on your Mac and match, then sets them up.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Databases:&lt;/strong&gt; always the newest MySQL and PostgreSQL; the version boxes in Settings are gone.&lt;/li&gt;
+&lt;li&gt;Laramac&#39;s PHP builds now make only the newest PHP, with Xdebug, and remove older builds automatically, so releases never wait behind PHP builds again.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.17.1&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Private review sessions:&lt;/strong&gt; every code review of a GitHub, Azure DevOps or other Git repository now downloads its own private copy, and that copy is deleted the moment the review finishes, whether it succeeded or not. Only the report stays. Reviews never share or reuse code, so you can run several at once.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code leaves nothing behind:&lt;/strong&gt; reviews run as one-off Claude Code sessions that are not saved to disk.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Web scans&lt;/strong&gt; remove their raw results even when a scan stops early. Anything left over from a crash is cleaned up when Laramac starts.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.17&lt;/h2&gt;
+&lt;h3&gt;Import any project&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Every kind of project:&lt;/strong&gt; Laravel, WordPress, React, Vue, Next.js, Nuxt, Svelte, Angular, Django, FastAPI, Flask, Go, .NET and more. Laramac shows what it found (&quot;Next.js project&quot;) and what it takes to run it.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Get it running:&lt;/strong&gt; install packages (Composer, npm, pnpm, yarn, bun, Python, Go, .NET), create &lt;code&gt;.env&lt;/code&gt; from &lt;code&gt;.env.example&lt;/code&gt; with a new app key, build the front end, create the database tables, and start the dev server. You tick what runs; the site opens when it is done, like a new project from Starters.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Clone from Git:&lt;/strong&gt; paste a GitHub, Azure DevOps, GitLab or Bitbucket address (and a token for private ones, used once and not saved). The full history comes along, so you can keep working in it.&lt;/li&gt;
+&lt;li&gt;If a step does not finish, the import still completes and tells you which step and why.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Xdebug&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;One switch on the PHP page. While it is off, Xdebug is not loaded at all, so PHP runs at full speed. Turn it on to step through your code in VS Code, Cursor or PhpStorm.&lt;/li&gt;
+&lt;li&gt;Laramac&#39;s daily PHP builds now include Xdebug as a separate file. Versions you already have get it the first time you switch Xdebug on.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;For the owner&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;MAINTAINING.md:&lt;/strong&gt; how releases, PHP builds and fixes work, without needing any chat. &lt;strong&gt;CLAUDE.md&lt;/strong&gt; does the same for AI assistants.&lt;/li&gt;
+&lt;li&gt;Imports now use your MySQL root password, if you set one.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16.1&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery menu:&lt;/strong&gt; the ⋯ menu on a gallery card now opens above the cards instead of hiding inside.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Code review, pick with a token:&lt;/strong&gt; paste a GitHub token, or an Azure DevOps organization and token, and press &lt;strong&gt;Show my repositories&lt;/strong&gt; to choose from a list. The token is used once and not saved.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code reviews:&lt;/strong&gt; a clearer message when only the Claude desktop app is installed (reviews need Claude Code&#39;s command line tool), and an &lt;strong&gt;Install Claude Code&lt;/strong&gt; button.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Model servers:&lt;/strong&gt; just the address and port is enough, like &lt;code&gt;http://127.0.0.1:8000&lt;/code&gt;. Laramac adds &lt;code&gt;/v1&lt;/code&gt; for the OpenAI format itself.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Packages check (Security):&lt;/strong&gt; looks up every Composer and npm package a site uses in the public lists of known security problems.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Key check before pushing:&lt;/strong&gt; Push to GitHub looks for passwords and API keys in the files it is about to send, and asks you to confirm if it finds any.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16&lt;/h2&gt;
+&lt;h3&gt;A new icon and a sweeter sidebar&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;New icon:&lt;/strong&gt; three layers of smoked glass, for the web server, languages and databases, with green running lights. A matching icon sits in the menu bar.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Sidebar:&lt;/strong&gt; named groups you can fold, a glowing active item, live counts (sites and running dev servers), and Settings and Updates moved into the footer.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Slim mode:&lt;/strong&gt; press ⌘\ (or the button by the logo) for an icon-only rail.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Dumps&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;dump()&lt;/code&gt; and &lt;code&gt;dd()&lt;/code&gt; from Laravel, Symfony and any project using VarDumper land in a new &lt;strong&gt;Dumps&lt;/strong&gt; window (the bug next to the bell) instead of the page.&lt;/li&gt;
+&lt;li&gt;Each dump shows the file and line (click to open it in your editor) and the request that made it, with a filter. Turn it on and off there.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Sites&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery view&lt;/strong&gt; with a live preview of each site.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Logs&lt;/strong&gt; for each site, live, with search and an errors-only filter, from the new ⋯ menu.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;laramac.yml project files:&lt;/strong&gt; save a project&#39;s setup (PHP, HTTPS, services, database, dev server, setup commands) so anyone who clones it gets the same setup in one click, after seeing every command.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Databases and services&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;S3 storage&lt;/strong&gt; (RustFS) and &lt;strong&gt;RabbitMQ&lt;/strong&gt; as services.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Root password&lt;/strong&gt; for MySQL and MariaDB, kept in your Keychain and used by phpMyAdmin, backups, imports and new projects.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Terminal&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;The &lt;code&gt;laramac&lt;/code&gt; command:&lt;/strong&gt; status, start, stop, open, dev, php, db and logs. &lt;strong&gt;Add to Terminal&lt;/strong&gt; also puts Laramac&#39;s PHP, Composer and Node.js on your PATH.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Security&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The web scan says plainly that it works on any website you are allowed to test, not just local ones.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.17.1</id>
+    <updated>2026-11-01T23:59:24Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.17.1"/>
+    <title>Laramac v0.17.1</title>
+    <content type="html">&lt;h2&gt;New in 0.17.1&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Private review sessions:&lt;/strong&gt; every code review of a GitHub, Azure DevOps or other Git repository now downloads its own private copy, and that copy is deleted the moment the review finishes, whether it succeeded or not. Only the report stays. Reviews never share or reuse code, so you can run several at once.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code leaves nothing behind:&lt;/strong&gt; reviews run as one-off Claude Code sessions that are not saved to disk.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Web scans&lt;/strong&gt; remove their raw results even when a scan stops early. Anything left over from a crash is cleaned up when Laramac starts.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.17&lt;/h2&gt;
+&lt;h3&gt;Import any project&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Every kind of project:&lt;/strong&gt; Laravel, WordPress, React, Vue, Next.js, Nuxt, Svelte, Angular, Django, FastAPI, Flask, Go, .NET and more. Laramac shows what it found (&quot;Next.js project&quot;) and what it takes to run it.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Get it running:&lt;/strong&gt; install packages (Composer, npm, pnpm, yarn, bun, Python, Go, .NET), create &lt;code&gt;.env&lt;/code&gt; from &lt;code&gt;.env.example&lt;/code&gt; with a new app key, build the front end, create the database tables, and start the dev server. You tick what runs; the site opens when it is done, like a new project from Starters.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Clone from Git:&lt;/strong&gt; paste a GitHub, Azure DevOps, GitLab or Bitbucket address (and a token for private ones, used once and not saved). The full history comes along, so you can keep working in it.&lt;/li&gt;
+&lt;li&gt;If a step does not finish, the import still completes and tells you which step and why.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Xdebug&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;One switch on the PHP page. While it is off, Xdebug is not loaded at all, so PHP runs at full speed. Turn it on to step through your code in VS Code, Cursor or PhpStorm.&lt;/li&gt;
+&lt;li&gt;Laramac&#39;s daily PHP builds now include Xdebug as a separate file. Versions you already have get it the first time you switch Xdebug on.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;For the owner&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;MAINTAINING.md:&lt;/strong&gt; how releases, PHP builds and fixes work, without needing any chat. &lt;strong&gt;CLAUDE.md&lt;/strong&gt; does the same for AI assistants.&lt;/li&gt;
+&lt;li&gt;Imports now use your MySQL root password, if you set one.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16.1&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery menu:&lt;/strong&gt; the ⋯ menu on a gallery card now opens above the cards instead of hiding inside.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Code review, pick with a token:&lt;/strong&gt; paste a GitHub token, or an Azure DevOps organization and token, and press &lt;strong&gt;Show my repositories&lt;/strong&gt; to choose from a list. The token is used once and not saved.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code reviews:&lt;/strong&gt; a clearer message when only the Claude desktop app is installed (reviews need Claude Code&#39;s command line tool), and an &lt;strong&gt;Install Claude Code&lt;/strong&gt; button.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Model servers:&lt;/strong&gt; just the address and port is enough, like &lt;code&gt;http://127.0.0.1:8000&lt;/code&gt;. Laramac adds &lt;code&gt;/v1&lt;/code&gt; for the OpenAI format itself.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Packages check (Security):&lt;/strong&gt; looks up every Composer and npm package a site uses in the public lists of known security problems.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Key check before pushing:&lt;/strong&gt; Push to GitHub looks for passwords and API keys in the files it is about to send, and asks you to confirm if it finds any.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16&lt;/h2&gt;
+&lt;h3&gt;A new icon and a sweeter sidebar&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;New icon:&lt;/strong&gt; three layers of smoked glass, for the web server, languages and databases, with green running lights. A matching icon sits in the menu bar.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Sidebar:&lt;/strong&gt; named groups you can fold, a glowing active item, live counts (sites and running dev servers), and Settings and Updates moved into the footer.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Slim mode:&lt;/strong&gt; press ⌘\ (or the button by the logo) for an icon-only rail.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Dumps&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;dump()&lt;/code&gt; and &lt;code&gt;dd()&lt;/code&gt; from Laravel, Symfony and any project using VarDumper land in a new &lt;strong&gt;Dumps&lt;/strong&gt; window (the bug next to the bell) instead of the page.&lt;/li&gt;
+&lt;li&gt;Each dump shows the file and line (click to open it in your editor) and the request that made it, with a filter. Turn it on and off there.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Sites&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery view&lt;/strong&gt; with a live preview of each site.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Logs&lt;/strong&gt; for each site, live, with search and an errors-only filter, from the new ⋯ menu.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;laramac.yml project files:&lt;/strong&gt; save a project&#39;s setup (PHP, HTTPS, services, database, dev server, setup commands) so anyone who clones it gets the same setup in one click, after seeing every command.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Databases and services&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;S3 storage&lt;/strong&gt; (RustFS) and &lt;strong&gt;RabbitMQ&lt;/strong&gt; as services.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Root password&lt;/strong&gt; for MySQL and MariaDB, kept in your Keychain and used by phpMyAdmin, backups, imports and new projects.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Terminal&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;The &lt;code&gt;laramac&lt;/code&gt; command:&lt;/strong&gt; status, start, stop, open, dev, php, db and logs. &lt;strong&gt;Add to Terminal&lt;/strong&gt; also puts Laramac&#39;s PHP, Composer and Node.js on your PATH.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Security&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The web scan says plainly that it works on any website you are allowed to test, not just local ones.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.17.0</id>
+    <updated>2026-11-01T23:27:59Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.17.0"/>
+    <title>Laramac v0.17.0</title>
+    <content type="html">&lt;h2&gt;New in 0.17&lt;/h2&gt;
+&lt;h3&gt;Import any project&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Every kind of project:&lt;/strong&gt; Laravel, WordPress, React, Vue, Next.js, Nuxt, Svelte, Angular, Django, FastAPI, Flask, Go, .NET and more. Laramac shows what it found (&quot;Next.js project&quot;) and what it takes to run it.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Get it running:&lt;/strong&gt; install packages (Composer, npm, pnpm, yarn, bun, Python, Go, .NET), create &lt;code&gt;.env&lt;/code&gt; from &lt;code&gt;.env.example&lt;/code&gt; with a new app key, build the front end, create the database tables, and start the dev server. You tick what runs; the site opens when it is done, like a new project from Starters.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Clone from Git:&lt;/strong&gt; paste a GitHub, Azure DevOps, GitLab or Bitbucket address (and a token for private ones, used once and not saved). The full history comes along, so you can keep working in it.&lt;/li&gt;
+&lt;li&gt;If a step does not finish, the import still completes and tells you which step and why.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Xdebug&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;One switch on the PHP page. While it is off, Xdebug is not loaded at all, so PHP runs at full speed. Turn it on to step through your code in VS Code, Cursor or PhpStorm.&lt;/li&gt;
+&lt;li&gt;Laramac&#39;s daily PHP builds now include Xdebug as a separate file. Versions you already have get it the first time you switch Xdebug on.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;For the owner&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;MAINTAINING.md:&lt;/strong&gt; how releases, PHP builds and fixes work, without needing any chat. &lt;strong&gt;CLAUDE.md&lt;/strong&gt; does the same for AI assistants.&lt;/li&gt;
+&lt;li&gt;Imports now use your MySQL root password, if you set one.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16.1&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery menu:&lt;/strong&gt; the ⋯ menu on a gallery card now opens above the cards instead of hiding inside.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Code review, pick with a token:&lt;/strong&gt; paste a GitHub token, or an Azure DevOps organization and token, and press &lt;strong&gt;Show my repositories&lt;/strong&gt; to choose from a list. The token is used once and not saved.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code reviews:&lt;/strong&gt; a clearer message when only the Claude desktop app is installed (reviews need Claude Code&#39;s command line tool), and an &lt;strong&gt;Install Claude Code&lt;/strong&gt; button.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Model servers:&lt;/strong&gt; just the address and port is enough, like &lt;code&gt;http://127.0.0.1:8000&lt;/code&gt;. Laramac adds &lt;code&gt;/v1&lt;/code&gt; for the OpenAI format itself.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Packages check (Security):&lt;/strong&gt; looks up every Composer and npm package a site uses in the public lists of known security problems.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Key check before pushing:&lt;/strong&gt; Push to GitHub looks for passwords and API keys in the files it is about to send, and asks you to confirm if it finds any.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16&lt;/h2&gt;
+&lt;h3&gt;A new icon and a sweeter sidebar&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;New icon:&lt;/strong&gt; three layers of smoked glass, for the web server, languages and databases, with green running lights. A matching icon sits in the menu bar.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Sidebar:&lt;/strong&gt; named groups you can fold, a glowing active item, live counts (sites and running dev servers), and Settings and Updates moved into the footer.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Slim mode:&lt;/strong&gt; press ⌘\ (or the button by the logo) for an icon-only rail.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Dumps&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;dump()&lt;/code&gt; and &lt;code&gt;dd()&lt;/code&gt; from Laravel, Symfony and any project using VarDumper land in a new &lt;strong&gt;Dumps&lt;/strong&gt; window (the bug next to the bell) instead of the page.&lt;/li&gt;
+&lt;li&gt;Each dump shows the file and line (click to open it in your editor) and the request that made it, with a filter. Turn it on and off there.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Sites&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery view&lt;/strong&gt; with a live preview of each site.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Logs&lt;/strong&gt; for each site, live, with search and an errors-only filter, from the new ⋯ menu.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;laramac.yml project files:&lt;/strong&gt; save a project&#39;s setup (PHP, HTTPS, services, database, dev server, setup commands) so anyone who clones it gets the same setup in one click, after seeing every command.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Databases and services&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;S3 storage&lt;/strong&gt; (RustFS) and &lt;strong&gt;RabbitMQ&lt;/strong&gt; as services.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Root password&lt;/strong&gt; for MySQL and MariaDB, kept in your Keychain and used by phpMyAdmin, backups, imports and new projects.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Terminal&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;The &lt;code&gt;laramac&lt;/code&gt; command:&lt;/strong&gt; status, start, stop, open, dev, php, db and logs. &lt;strong&gt;Add to Terminal&lt;/strong&gt; also puts Laramac&#39;s PHP, Composer and Node.js on your PATH.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Security&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The web scan says plainly that it works on any website you are allowed to test, not just local ones.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1441641560/v0.16.1</id>
+    <updated>2026-11-01T21:20:14Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/Pino10/laramac/releases/tag/v0.16.1"/>
+    <title>Laramac v0.16.1</title>
+    <content type="html">&lt;h2&gt;New in 0.16.1&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery menu:&lt;/strong&gt; the ⋯ menu on a gallery card now opens above the cards instead of hiding inside.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Code review, pick with a token:&lt;/strong&gt; paste a GitHub token, or an Azure DevOps organization and token, and press &lt;strong&gt;Show my repositories&lt;/strong&gt; to choose from a list. The token is used once and not saved.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Claude Code reviews:&lt;/strong&gt; a clearer message when only the Claude desktop app is installed (reviews need Claude Code&#39;s command line tool), and an &lt;strong&gt;Install Claude Code&lt;/strong&gt; button.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Model servers:&lt;/strong&gt; just the address and port is enough, like &lt;code&gt;http://127.0.0.1:8000&lt;/code&gt;. Laramac adds &lt;code&gt;/v1&lt;/code&gt; for the OpenAI format itself.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Packages check (Security):&lt;/strong&gt; looks up every Composer and npm package a site uses in the public lists of known security problems.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Key check before pushing:&lt;/strong&gt; Push to GitHub looks for passwords and API keys in the files it is about to send, and asks you to confirm if it finds any.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;New in 0.16&lt;/h2&gt;
+&lt;h3&gt;A new icon and a sweeter sidebar&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;New icon:&lt;/strong&gt; three layers of smoked glass, for the web server, languages and databases, with green running lights. A matching icon sits in the menu bar.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Sidebar:&lt;/strong&gt; named groups you can fold, a glowing active item, live counts (sites and running dev servers), and Settings and Updates moved into the footer.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Slim mode:&lt;/strong&gt; press ⌘\ (or the button by the logo) for an icon-only rail.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Dumps&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;dump()&lt;/code&gt; and &lt;code&gt;dd()&lt;/code&gt; from Laravel, Symfony and any project using VarDumper land in a new &lt;strong&gt;Dumps&lt;/strong&gt; window (the bug next to the bell) instead of the page.&lt;/li&gt;
+&lt;li&gt;Each dump shows the file and line (click to open it in your editor) and the request that made it, with a filter. Turn it on and off there.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Sites&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Gallery view&lt;/strong&gt; with a live preview of each site.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Logs&lt;/strong&gt; for each site, live, with search and an errors-only filter, from the new ⋯ menu.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;laramac.yml project files:&lt;/strong&gt; save a project&#39;s setup (PHP, HTTPS, services, database, dev server, setup commands) so anyone who clones it gets the same setup in one click, after seeing every command.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Databases and services&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;S3 storage&lt;/strong&gt; (RustFS) and &lt;strong&gt;RabbitMQ&lt;/strong&gt; as services.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Root password&lt;/strong&gt; for MySQL and MariaDB, kept in your Keychain and used by phpMyAdmin, backups, imports and new projects.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Terminal&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;The &lt;code&gt;laramac&lt;/code&gt; command:&lt;/strong&gt; status, start, stop, open, dev, php, db and logs. &lt;strong&gt;Add to Terminal&lt;/strong&gt; also puts Laramac&#39;s PHP, Composer and Node.js on your PATH.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;Security&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The web scan says plainly that it works on any website you are allowed to test, not just local ones.&lt;/li&gt;
+&lt;/ul&gt;</content>
+    <author>
+      <name>github-actions[bot]</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/in/15368?s=60&amp;v=4"/>
+  </entry>
+</feed>
