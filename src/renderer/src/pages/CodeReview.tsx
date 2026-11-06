@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { LeakKit } from '../components/LeakKit'
 import { AuditFlow, type AuditKind } from './Audits'
 import { FileSearch, Gauge, Microscope, Radar, Zap } from 'lucide-react'
-import type { ReviewDepth, ReviewFocus, Reviewer } from '@shared/types'
+import type { DeepEngine, DeepReviewerKind, ReviewDepth, ReviewFocus, Reviewer } from '@shared/types'
 import { useApp, type PresetSource } from '../store'
 import { FlowStep, PageHead, Seg } from '../ui'
 import SourcePicker, { sourceName } from '../components/SourcePicker'
 import ReviewerChoice from '../components/ReviewerChoice'
 import SkillPicker from '../components/SkillPicker'
+import DeepAudit from '../components/DeepAudit'
 
 const DEPTHS: { id: ReviewDepth; icon: React.ReactNode; title: string; text: string }[] = [
   { id: 'quick', icon: <Zap size={18} />, title: 'Quick', text: 'Core Semgrep rules, keys in files, known flaws in packages. A few minutes.' },
@@ -25,6 +26,10 @@ export default function CodeReview(): React.JSX.Element {
   const [keep, setKeep] = useState(false)
   const [mode, setMode] = useState<'project' | 'changes' | 'full'>('project')
   const [skills, setSkills] = useState<string[] | undefined>(undefined)
+  const [deep, setDeep] = useState<DeepEngine | null>(null)
+  const [deepAi, setDeepAi] = useState<DeepReviewerKind>('claude')
+  const localPath = source?.kind === 'local' ? source.path : null
+  const desktopHandoff = !!deep && deepAi === 'claude-desktop'
 
   useEffect(() => {
     if (preset) {
@@ -94,8 +99,9 @@ export default function CodeReview(): React.JSX.Element {
         </FlowStep>
 
         <FlowStep n={2} title="Who reads the results" help="The scanners always run first. The AI then reads the code and every scanner result, decides what is real, and writes the report." state={source ? 'current' : 'todo'}>
-          <ReviewerChoice value={reviewer} onChange={setReviewer} what="code" />
-          {reviewer.startsWith('claude') && <SkillPicker site={source?.kind === 'local' ? source.path : null} reviewer={reviewer} onChange={setSkills} />}
+          <DeepAudit engine={deep} onEngine={setDeep} ai={deepAi} onAi={setDeepAi} projectPath={localPath} />
+          {!deep && <ReviewerChoice value={reviewer} onChange={setReviewer} what="code" />}
+          {!deep && reviewer.startsWith('claude') && <SkillPicker site={source?.kind === 'local' ? source.path : null} reviewer={reviewer} onChange={setSkills} />}
         </FlowStep>
 
         <FlowStep n={3} title="How deep" state={source ? 'current' : 'todo'}>
@@ -133,23 +139,28 @@ export default function CodeReview(): React.JSX.Element {
           </span>
           <button
             className="btn btn-primary btn-lg"
-            disabled={!source || busy.has('review')}
+            disabled={!source || busy.has('review') || (desktopHandoff && !localPath)}
             onClick={async () => {
               if (!source) return
+              if (desktopHandoff && localPath) {
+                await act('review', () => api.invoke('review:deep-handoff', { engine: deep!, path: localPath }))
+                return
+              }
               const s = await act('review', () =>
                 api.invoke('review:start', {
                   source: source.kind === 'local' ? { kind: 'local', path: source.path } : source.kind === 'github' ? { kind: 'github', repo: source.repo } : { kind: 'azure', url: source.url },
-                  reviewer,
+                  reviewer: deep ? (deepAi as Reviewer) : reviewer,
+                  ...(deep ? { deep: { engine: deep } } : {}),
                   depth,
                   focus,
                   keepCode: keep,
-                  skills: reviewer.startsWith('claude') ? skills : undefined
+                  skills: !deep && reviewer.startsWith('claude') ? skills : undefined
                 })
               )
               if (s) showSession(s.id)
             }}
           >
-            <Radar size={17} /> Start review
+            <Radar size={17} /> {desktopHandoff ? 'Copy the request and open Claude' : deep ? 'Start deep audit' : 'Start review'}
           </button>
         </div>
       </div>

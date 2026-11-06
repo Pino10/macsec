@@ -2407,3 +2407,197 @@ div + .pick-item {
 .rpage-kv .bad { color: var(--bad); }
 .rpage-form { display: grid; gap: 2px; padding: 6px 0; font-size: 12px; border-bottom: 1px dashed var(--line); }
 .rpage-form:last-child { border-bottom: 0; }
+
+/* ---------------------------------------------------------------- Messages (top right, with history) */
+
+.note-stack {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 2000;
+  display: grid;
+  gap: 10px;
+  width: min(400px, calc(100vw - 36px));
+  pointer-events: none;
+}
+.note {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 225, 255, 0.35);
+  background: rgba(16, 20, 40, 0.94);
+  box-shadow: 0 24px 60px -20px #000;
+  animation: settle 0.25s var(--ease);
+}
+.note[data-kind='error'] {
+  border-color: rgba(255, 61, 127, 0.6);
+}
+.note[data-kind='success'] {
+  border-color: rgba(62, 240, 168, 0.5);
+}
+.note-body {
+  all: unset;
+  box-sizing: border-box;
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.note-body:focus-visible,
+.note-row:focus-visible {
+  outline: 2px solid var(--ion);
+}
+.note-body strong {
+  display: block;
+}
+.note-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ink-2, #aab3d4);
+}
+.note-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--ion);
+  padding-top: 1px;
+}
+[data-kind='error'] > .note-body .note-ic,
+.note-row[data-kind='error'] .note-ic {
+  color: #ff3d7f;
+}
+[data-kind='success'] > .note-body .note-ic,
+.note-row[data-kind='success'] .note-ic {
+  color: #3ef0a8;
+}
+.note-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: grid;
+  place-items: center;
+  background: rgba(4, 6, 16, 0.62);
+  backdrop-filter: blur(6px);
+}
+.note-scrim-soft {
+  place-items: start start;
+  background: rgba(4, 6, 16, 0.35);
+}
+.note-detail,
+.note-history {
+  width: min(560px, calc(100vw - 40px));
+  max-height: min(640px, calc(100vh - 60px));
+  overflow: auto;
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(16, 20, 40, 0.97);
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+}
+.note-history {
+  margin: 56px 0 0 240px;
+  width: min(460px, calc(100vw - 260px));
+}
+.note-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.note-detail-head > div {
+  flex: 1;
+}
+.note-detail-head small {
+  display: block;
+  opacity: 0.7;
+}
+.note-detail-text {
+  white-space: pre-wrap;
+  user-select: text;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.note-row {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border: 1px solid transparent;
+}
+.note-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.note-row[data-unread='true'] {
+  border-color: rgba(56, 225, 255, 0.3);
+}
+.note-row-main {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.note-row-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+@media (prefers-reduced-motion: reduce) {
+  .note {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- Deep audit */
+
+.deep {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.deep-label {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.deep-plan {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+.deep-line {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.deep-key {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  opacity: 0.85;
+}
+.tag-new {
+  background: rgba(255, 201, 74, 0.18);
+  color: #ffc94a;
+}

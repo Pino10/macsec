@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, session, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, safeStorage, session, shell, type IpcMainInvokeEvent } from 'electron'
 import { installedEditors, isAppBundle, isEditorChoice, openInEditorOf, pickEditor } from './seckit/editors'
 import { execFile } from 'child_process'
 import type { Server } from 'http'
@@ -25,7 +25,10 @@ import { dockerPath, localSites, startWebScan } from './webscan'
 import { ciWorkflow, compareFindings, preCommitHook, previousSession, toDefectDojo, toSarif } from './exports'
 import { runCheckup } from './checkup'
 import { parseTrivy } from './scanners/parse'
-import { installPack, packState, removePack, SKILL_PACKS } from './seckit/skillpacks'
+import { checkPackUpdates, installPack, packState, packUpdates, removePack, SKILL_PACKS } from './seckit/skillpacks'
+import { deepHandoffPrompt } from './seckit/deepaudit'
+import { deepPlanFor } from './deepreview'
+import { connectClaudeDesktop, desktopAppInstalled, desktopAppPath, desktopConfigPath, desktopConnected } from './desktop'
 import { checkHookUrl, hookBody, raycastScripts, sendHook, type HookKind } from './webhooks'
 import { MCP_PORT, mcpToken, mcpUrl, startMcpServer } from './mcp'
 import { macsecCli, macsecTools } from './mcptools'
@@ -231,9 +234,14 @@ function validReview(req: unknown): ReviewRequest {
   else if (s.kind === 'github' && typeof s.repo === 'string' && /^[\w.-]+\/[\w.-]+$/.test(s.repo)) source = { kind: 'github', repo: s.repo }
   else if (s.kind === 'azure' && typeof s.url === 'string' && /^https:\/\/[^\s'"]+$/.test(s.url)) source = { kind: 'azure', url: s.url }
   else throw new ValidationError('That source is not valid.')
+  const deepEngine = r.deep && typeof r.deep === 'object' ? (['cloudflare', 'anthropic', 'both'] as const).find((e) => e === (r.deep as { engine?: unknown }).engine) : undefined
+  if (r.deep && !deepEngine) throw new ValidationError('Pick which deep audit to run.')
+  const reviewer = pick(r.reviewer, ['none', 'claude', 'claude-local', 'claude-free', 'codex', 'gemini', 'model'] as const, 'claude')
+  if (deepEngine && !(['claude', 'claude-local', 'claude-free'] as const).includes(reviewer as 'claude')) throw new ValidationError('A deep audit runs through Claude Code: pick Claude Code, Claude Code on your model or Claude Code on Free LLM API.')
   return {
     source,
-    reviewer: pick(r.reviewer, ['none', 'claude', 'claude-local', 'claude-free', 'codex', 'gemini', 'model'] as const, 'claude'),
+    ...(deepEngine ? { deep: { engine: deepEngine } } : {}),
+    reviewer,
     depth: pick(r.depth, ['quick', 'standard', 'deep'] as const, 'standard'),
     focus: pick(r.focus, ['security', 'bugs', 'all'] as const, 'security'),
     keepCode: r.keepCode === true,
@@ -502,6 +510,50 @@ function registerIpc(): void {
   const packsRoot = (): string => join(dirs.tools(), 'skill-packs')
   const packList = (): SkillPackInfo[] => SKILL_PACKS.map((p) => ({ name: p.name, repo: p.repo, license: p.license, about: p.about, ...packState(packsRoot(), p.id), id: p.id }))
   handle('packs:list', () => packList())
+  handle('packs:updates', () => packUpdates(packsRoot()))
+  const checkSkillUpdates = async (announce: boolean): Promise<ReturnType<typeof packUpdates>> => {
+    const list = await checkPackUpdates(packsRoot())
+    const fresh = list.filter((u) => u.available && u.latest && getSettings().packsNotified?.[u.id] !== u.latest)
+    if (announce && fresh.length) {
+      const names = fresh.map((u) => SKILL_PACKS.find((p) => p.id === u.id)!.name)
+      setSettings({ packsNotified: { ...(getSettings().packsNotified ?? {}), ...Object.fromEntries(fresh.map((u) => [u.id, u.latest as string])) } })
+      send('notice', { kind: 'info', title: 'Newer security skills are available', body: `${names.join(', ')}. Open Tools and press Update on the skill pack to get them.` })
+    }
+    return list
+  }
+  handle('packs:check-updates', () => checkSkillUpdates(false))
+  // Once a day, quietly: new versions are announced once, never installed without a click.
+  setTimeout(() => void checkSkillUpdates(true).catch(() => undefined), 90_000)
+  setInterval(() => void checkSkillUpdates(true).catch(() => undefined), 24 * 60 * 60_000)
+  handle('review:deep-plan', (req) => {
+    const r = (req ?? {}) as Partial<{ engine: string; reviewer: string }>
+    const engine = (['cloudflare', 'anthropic', 'both'] as const).find((e) => e === r.engine)
+    const reviewer = (['claude', 'claude-local', 'claude-free', 'claude-desktop'] as const).find((e) => e === r.reviewer)
+    if (!engine || !reviewer) throw new ValidationError('That deep audit request is not valid.')
+    const st = getSettings()
+    return deepPlanFor({ engine, reviewer, local: reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : undefined })
+  })
+  // Claude Desktop cannot be driven from here, so the request is copied and the app opened: the person pastes it.
+  handle('review:deep-handoff', async (req) => {
+    const r = (req ?? {}) as Partial<{ engine: string; path: string }>
+    const engine = (['cloudflare', 'anthropic', 'both'] as const).find((e) => e === r.engine)
+    if (!engine || typeof r.path !== 'string') throw new ValidationError('Pick a project on this Mac first. Claude Desktop reads folders on this Mac, so a GitHub or Azure DevOps project needs downloading first.')
+    const root = allowedProject(r.path)
+    clipboard.writeText(deepHandoffPrompt({ engine, name: root.split('/').pop() ?? 'project', root }))
+    const appPath = desktopAppPath()
+    if (appPath) await shell.openPath(appPath)
+    send('notice', { kind: 'info', title: 'Request copied for Claude Desktop', body: appPath ? 'In the Claude app, open the Code tab on your project, then paste.' : 'The Claude desktop app is not installed. Get it at claude.ai/download, then paste the request there.' })
+    return { copied: true, opened: !!appPath }
+  })
+  handle('desktop:status', () => ({ app: desktopAppInstalled(), connected: desktopConnected(), path: desktopConfigPath() }))
+  handle('desktop:connect', async () => {
+    setSettings({ mcpEnabled: true })
+    await startMcp()
+    writeCli()
+    const r = connectClaudeDesktop(mcpUrl(MCP_PORT), join(dirs.config(), 'mcp-token'))
+    send('notice', { kind: 'success', title: 'Claude Desktop is connected to MacSec', body: 'Restart the Claude app, then ask it for your latest sessions or to review a project.' })
+    return r
+  })
   handle('packs:install', async (id) => {
     if (!SKILL_PACKS.some((p) => p.id === id)) throw new ValidationError('That skill pack is not on the list.')
     setSettings({ packsDeclined: (getSettings().packsDeclined ?? []).filter((x) => x !== id) })

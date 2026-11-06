@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Bell, Command, Copy, Download, ExternalLink, Network, Plug, RefreshCw, Trash2, Users, Workflow } from 'lucide-react'
-import type { FreeLlmInfo, IntegrationsInfo, SkillPackInfo } from '@shared/types'
+import { Bell, Command, MonitorUp, Copy, Download, ExternalLink, Network, Plug, RefreshCw, Trash2, Users, Workflow } from 'lucide-react'
+import type { FreeLlmInfo, IntegrationsInfo, PackUpdateInfo, SkillPackInfo } from '@shared/types'
 import { useApp } from '../store'
 import { Switch } from '../ui'
 
@@ -9,11 +9,22 @@ export function SkillPacks(): React.JSX.Element {
   const { act, busy } = useApp()
   const api = window.macsec
   const [packs, setPacks] = useState<SkillPackInfo[]>([])
+  const [updates, setUpdates] = useState<PackUpdateInfo[]>([])
   useEffect(() => {
     void api.invoke('packs:list').then(setPacks)
+    void api.invoke('packs:updates').then(setUpdates)
   }, [api])
+  const newer = (id: string): PackUpdateInfo | undefined => updates.find((u) => u.id === id && u.available)
+  const checkedAt = updates.map((u) => u.checkedAt).filter(Boolean).sort().pop()
+  const count = updates.filter((u) => u.available).length
   return (
     <div className="panel">
+      <div className="row-sub" style={{ whiteSpace: 'normal', padding: '4px 4px 10px' }}>
+        {count ? `${count} newer ${count === 1 ? 'version is' : 'versions are'} available.` : 'Everything is up to date.'} {checkedAt ? `Checked ${new Date(checkedAt).toLocaleString()}.` : 'Not checked yet.'} MacSec checks once a day and never updates a pack without you pressing Update.{' '}
+        <button className="link" disabled={busy.has('pk-check')} onClick={async () => setUpdates((await act('pk-check', () => api.invoke('packs:check-updates'))) ?? updates)}>
+          <RefreshCw size={11} /> {busy.has('pk-check') ? 'Checking…' : 'Check now'}
+        </button>
+      </div>
       {packs.map((p) => (
         <div key={p.id} className="arsenal-row" data-on={p.installed}>
           <span className="glyph" style={{ ['--g' as string]: '#f0a35b' }}>
@@ -21,11 +32,19 @@ export function SkillPacks(): React.JSX.Element {
           </span>
           <div>
             <div className="row-title">
-              {p.name} skills <span className="tag">{p.license}</span> {p.installed && <span className="tag tag-ok">{p.loaded.length} loaded</span>}
+              {p.name} skills <span className="tag">{p.license}</span> {p.installed && <span className="tag tag-ok">{p.loaded.length} loaded</span>} {newer(p.id) && <span className="tag tag-new">Update available</span>}
             </div>
             <div className="row-sub" style={{ whiteSpace: 'normal' }}>
               {p.about}
               {p.commit ? ` Version ${p.commit.slice(0, 7)}.` : ''} Kept in MacSec’s folder; reviews stay read-only.
+              {newer(p.id) && (
+                <>
+                  {' '}Newer: {newer(p.id)!.latest!.slice(0, 7)}.{' '}
+                  <button className="link" onClick={() => api.invoke('app:open-external', newer(p.id)!.changes!)}>
+                    See what changed
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -37,8 +56,11 @@ export function SkillPacks(): React.JSX.Element {
                 <Trash2 />
               </button>
             )}
-            <button className="btn btn-sm" disabled={busy.has(`pk-${p.id}`)} onClick={async () => setPacks((await act(`pk-${p.id}`, () => api.invoke('packs:install', p.id))) ?? packs)}>
-              {p.installed ? <RefreshCw size={13} /> : <Download size={13} />} {busy.has(`pk-${p.id}`) ? 'Getting…' : p.installed ? 'Update' : 'Add'}
+            <button className="btn btn-sm" disabled={busy.has(`pk-${p.id}`)} onClick={async () => {
+              setPacks((await act(`pk-${p.id}`, () => api.invoke('packs:install', p.id))) ?? packs)
+              setUpdates(await api.invoke('packs:updates'))
+            }}>
+              {p.installed ? <RefreshCw size={13} /> : <Download size={13} />} {busy.has(`pk-${p.id}`) ? 'Getting…' : p.installed ? (newer(p.id) ? 'Update now' : 'Reinstall') : 'Add'}
             </button>
           </div>
         </div>
@@ -55,6 +77,7 @@ export function Integrations(): React.JSX.Element {
   const { act, busy, notify } = useApp()
   const api = window.macsec
   const [info, setInfo] = useState<IntegrationsInfo | null>(null)
+  const [desk, setDesk] = useState<{ app: boolean; connected: boolean } | null>(null)
   const [kind, setKind] = useState<Kind>('slack')
   const [events, setEvents] = useState<'errors' | 'all'>('errors')
   const [url, setUrl] = useState('')
@@ -67,6 +90,9 @@ export function Integrations(): React.JSX.Element {
       }
     })
   }, [api])
+  useEffect(() => {
+    void api.invoke('desktop:status').then(setDesk)
+  }, [api, info?.mcp.enabled])
   if (!info) return <></>
   const copy = (t: string): void => {
     void navigator.clipboard.writeText(t)
@@ -94,6 +120,25 @@ export function Integrations(): React.JSX.Element {
           )}
         </div>
         <Switch on={info.mcp.enabled} label="Let AI tools use MacSec" onChange={async () => setInfo((await act('mcp', () => api.invoke('mcp:enable', !info.mcp.enabled))) ?? info)} />
+      </div>
+      <div className="arsenal-row" data-on={!!desk?.connected}>
+        <span className="glyph" style={{ ['--g' as string]: '#7cc4ff' }}>
+          <MonitorUp size={18} />
+        </span>
+        <div>
+          <div className="row-title">Claude Desktop {desk?.connected && <span className="tag tag-ok">Connected</span>}</div>
+          <div className="row-sub" style={{ whiteSpace: 'normal' }}>
+            Adds MacSec to the Claude app, so you can ask it about your sessions or to review a project. It uses a tiny helper that talks to MacSec on this Mac only, with your private key read when it runs. This also turns on “Let AI tools use MacSec”. Restart the Claude app afterwards.
+            {desk && !desk.app && ' The Claude desktop app was not found on this Mac: get it at claude.ai/download.'}
+          </div>
+        </div>
+        <button className="btn btn-sm" disabled={busy.has('desktop')} onClick={async () => {
+          await act('desktop', () => api.invoke('desktop:connect'))
+          setDesk(await api.invoke('desktop:status'))
+          setInfo(await api.invoke('integrations:get'))
+        }}>
+          {busy.has('desktop') ? 'Connecting…' : desk?.connected ? 'Repair connection' : 'Connect'}
+        </button>
       </div>
       <div className="arsenal-row" data-on={!!info.webhook?.saved}>
         <span className="glyph" style={{ ['--g' as string]: '#8b6cff' }}>

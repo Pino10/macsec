@@ -1,5 +1,6 @@
 import Logo from './Logo'
 import { ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar } from 'lucide-react'
+import { Bell_ } from './Notifications'
 import { useApp, type Page } from '../store'
 
 type Item = { id: Page; label: string; icon: React.ReactNode }
@@ -56,7 +57,10 @@ export default function Rail(): React.JSX.Element {
           </div>
         ))}
       </nav>
-      <div className="rail-foot">{FOOT.map(item)}</div>
+      <div className="rail-foot">
+        <Bell_ />
+        {FOOT.map(item)}
+      </div>
     </aside>
   )
 }

@@ -1,3 +1,19 @@
+## MacSec 0.12.0
+
+### Deep audit
+A new **Deep audit** option in step 2 of Code review, for projects on this Mac, in GitHub or in Azure DevOps. Pick the Cloudflare security audit, Claude Code security review or both, then the AI to run it with: Claude Code, Claude Desktop (MacSec copies the request and opens the Claude app), claudelm (your model in LM Studio) or claudefree (Free LLM API). Before it starts, MacSec lists which AI, which method and version, what it reads, what it writes and where your code goes.
+
+The audit is read-only and MacSec checks that: your project is measured before and after, every finding is checked against Cloudflare's report format, and each file and line it cites must exist, otherwise it shows as "needs checking". Results are saved as a normal session, and leads are never stored with secrets in them.
+
+### Claude Desktop
+**Connect** in Extras adds MacSec to the Claude app with a small helper that only needs curl. It reads MacSec's private key when it runs, so the key is never copied into the app's settings. Restart the Claude app afterwards.
+
+### Skills you can update
+Skill packs say when a newer version exists, link to what changed and have an **Update now** button. MacSec checks once a day, tells you once, and never updates anything until you press it.
+
+### Messages you can see
+Notifications now pop up at the top right and errors stay until you close them. Click one to read it full size, and the **Messages** button in the sidebar keeps the history with a count of unread ones.
+
 ## MacSec 0.11.0
 
 ### OWASP Top 10 for everything

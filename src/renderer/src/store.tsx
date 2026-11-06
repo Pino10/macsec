@@ -2,8 +2,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { AppInfo, AppSettings, JobInfo, SessionInfo, ToolInfo, UpdateInfo } from '@shared/types'
 
 export interface Toast {
-  kind: 'error' | 'info'
+  kind: 'error' | 'info' | 'success'
   text: string
+  /** A short heading. Without one, the text is the whole message. */
+  title?: string
+}
+
+/** A message kept in the notification history. */
+export interface Notice extends Toast {
+  id: number
+  at: string
+  read: boolean
+  /** Still shown as a pop-up. */
+  popup: boolean
 }
 
 export type Page = 'overview' | 'projects' | 'review' | 'web' | 'api' | 'mobile' | 'recon' | 'audit' | 'mac' | 'sessions' | 'tools' | 'logs' | 'settings' | 'updates'
@@ -30,7 +41,12 @@ interface AppCtx {
   updates: string[]
   /** A newer MacSec, when there is one. */
   appUpdate: UpdateInfo | null
-  toast: Toast | null
+  /** Newest first. */
+  notices: Notice[]
+  /** Hide a pop-up but keep it in the history. */
+  dismiss: (id: number) => void
+  markRead: (id?: number) => void
+  clearNotices: () => void
   busy: Set<string>
   act: <T>(key: string, fn: () => Promise<T>) => Promise<T | undefined>
   notify: (t: Toast) => void
@@ -58,15 +74,17 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   const [jobs, setJobs] = useState<JobInfo[]>([])
   const [updates, setUpdates] = useState<string[]>([])
   const [appUpdate, setAppUpdate] = useState<UpdateInfo | null>(null)
-  const [toast, setToast] = useState<Toast | null>(null)
+  const [notices, setNotices] = useState<Notice[]>([])
   const [busy, setBusy] = useState<Set<string>>(new Set())
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const noticeId = useRef(0)
 
   const notify = useCallback((t: Toast) => {
-    setToast(t)
-    if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), t.kind === 'error' ? 7000 : 4000)
+    const id = ++noticeId.current
+    setNotices((list) => [{ ...t, id, at: new Date().toISOString(), read: false, popup: true }, ...list].slice(0, 60))
   }, [])
+  const dismiss = useCallback((id: number) => setNotices((l) => l.map((n) => (n.id === id ? { ...n, popup: false, read: true } : n))), [])
+  const markRead = useCallback((id?: number) => setNotices((l) => l.map((n) => (id === undefined || n.id === id ? { ...n, read: true, popup: false } : n))), [])
+  const clearNotices = useCallback(() => setNotices([]), [])
 
   const act = useCallback(
     async <T,>(key: string, fn: () => Promise<T>): Promise<T | undefined> => {
@@ -113,6 +131,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       })
     const offs = [
       api().on('jobs:changed', setJobs),
+      api().on('notice', (n) => notify({ kind: n.kind, title: n.title, text: n.body ?? '' })),
       api().on('tools:updates', setUpdates),
       api().on('app:update', setAppUpdate),
       api().on('session:updated', (s) =>
@@ -126,7 +145,7 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       )
     ]
     return () => offs.forEach((o) => o())
-  }, [])
+  }, [notify])
 
   // Refresh the tool list when installs finish.
   const running = jobs.some((j) => j.status === 'running')
@@ -135,8 +154,8 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
   }, [running])
 
   const value = useMemo<AppCtx>(
-    () => ({ page, setPage, openSession, showSession, preset, setPreset, appInfo, settings, updateSettings, setSettings, sessions, setSessions, tools, setTools, jobs, updates, appUpdate, toast, busy, act, notify }),
-    [page, setPage, openSession, showSession, preset, appInfo, settings, updateSettings, sessions, tools, jobs, updates, appUpdate, toast, busy, act, notify]
+    () => ({ page, setPage, openSession, showSession, preset, setPreset, appInfo, settings, updateSettings, setSettings, sessions, setSessions, tools, setTools, jobs, updates, appUpdate, notices, dismiss, markRead, clearNotices, busy, act, notify }),
+    [page, setPage, openSession, showSession, preset, appInfo, settings, updateSettings, sessions, tools, jobs, updates, appUpdate, notices, dismiss, markRead, clearNotices, busy, act, notify]
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

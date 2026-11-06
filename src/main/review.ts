@@ -7,6 +7,7 @@
  *  5. Delete the private copy, unless you asked to keep it for fixing.
  */
 import { freeServer } from './freellm'
+import { deepAuditStep, ENGINE_NAME } from './deepreview'
 import { spawn, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
@@ -207,13 +208,31 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
     // 3. The AI reviewer.
     if (req.reviewer !== 'none' && !r.cancelled) {
       const name = req.reviewer === 'claude' ? 'Claude Code' : req.reviewer === 'claude-local' ? `Claude Code on ${getSettings().llm.model || 'your model'}` : req.reviewer === 'claude-free' ? 'Claude Code on Free LLM API' : req.reviewer === 'codex' ? 'Codex' : req.reviewer === 'gemini' ? 'Gemini CLI' : getSettings().llm.model || 'Your model'
-      const ai = step({ id: 'ai', label: `${name} reviews the code and checks the findings`, status: 'running', startedAt: new Date().toISOString() })
+      const deepLabel = req.deep ? (req.deep.engine === 'both' ? 'Deep audit: Cloudflare security audit and Claude Code security review' : `Deep audit: ${ENGINE_NAME[req.deep.engine]}`) : ''
+      const ai = step({ id: 'ai', label: req.deep ? `${deepLabel}, run by ${name}` : `${name} reviews the code and checks the findings`, status: 'running', startedAt: new Date().toISOString() })
       const t = Date.now()
       try {
         const prompt = reviewPrompt(info.title, req.focus, req.depth, findings.filter((f) => f.category !== 'dependency'))
         let res: AiResult
         const beat = (): void => set(ai, { detail: `Reading… ${Math.round((Date.now() - t) / 60000)} min` })
-        if (req.reviewer === 'claude' || req.reviewer === 'claude-local' || req.reviewer === 'claude-free') {
+        if (req.deep && (req.reviewer === 'claude' || req.reviewer === 'claude-local' || req.reviewer === 'claude-free')) {
+          const st = getSettings()
+          const deep = await deepAuditStep({
+            workDir: join(dir, 'deep-audit'),
+            root,
+            name: info.title,
+            engine: req.deep.engine,
+            reviewer: req.reviewer,
+            local: req.reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : req.reviewer === 'claude-free' ? freeServer() : undefined,
+            onChild: (c) => r.children.add(c),
+            onStatus: (text) => set(ai, { detail: text })
+          })
+          info.claudeSession = deep.session
+          saveSession(info)
+          res = deep
+          for (const p of deep.problems) log('warn', `Deep audit: ${p}`, id)
+        }
+        else if (req.reviewer === 'claude' || req.reviewer === 'claude-local' || req.reviewer === 'claude-free') {
           // A normal Claude Code session with a known id, so you can continue the conversation later.
           info.claudeSession = randomUUID()
           saveSession(info)

@@ -11,6 +11,7 @@
  */
 import { execFile } from 'child_process'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
 import { join } from 'path'
 
 export interface SkillPack {
@@ -183,13 +184,13 @@ function wrapSkills(pack: SkillPack, root: string, names: string[]): void {
 }
 
 /** Clones (or refreshes) a pack into the app's folder and records the commit. */
-export async function installPack(root: string, id: string): Promise<PackState> {
+export async function installPack(root: string, id: string, base = 'https://github.com/'): Promise<PackState> {
   const pack = known(id)
   const dir = packDir(root, id)
   mkdirSync(dir, { recursive: true })
   const staging = join(dir, 'repo.new')
   rmSync(staging, { recursive: true, force: true })
-  await git(['clone', '--depth', '1', '--single-branch', `https://github.com/${pack.repo}.git`, staging], dir)
+  await git(['clone', '--depth', '1', '--single-branch', `${base}${pack.repo}.git`, staging], dir)
   const commit = await git(['rev-parse', 'HEAD'], staging)
   // Git's own files are not needed to load skills.
   rmSync(join(staging, '.git'), { recursive: true, force: true })
@@ -230,4 +231,81 @@ export function packSkillFolders(root: string): { name: string; dir: string }[] 
   }
   // Two packs can use the same name (Sentry's and Anthropic's security-review): the first one keeps it.
   return out.filter((f, i) => out.findIndex((g) => g.name === f.name) === i)
+}
+
+/** One installed pack's plugin folder, or null when it is not installed. */
+export function packPluginDir(root: string, id: string): string | null {
+  const pack = known(id)
+  const st = packState(root, id)
+  if (!st.installed) return null
+  const dir = pack.layout === 'plugins' ? repoDir(root, id) : join(packDir(root, id), 'plugin')
+  return existsSync(dir) ? dir : null
+}
+
+/** A file inside a pack's repository, for example a skill's report-schema.json. */
+export function packFile(root: string, id: string, ...parts: string[]): string | null {
+  const p = join(repoDir(root, id), ...parts)
+  return existsSync(p) ? p : null
+}
+
+// ---------------------------------------------------------------- Updates
+
+export interface PackUpdate {
+  id: string
+  /** The version installed (a commit). */
+  current: string | null
+  /** The newest version upstream. */
+  latest: string | null
+  available: boolean
+  checkedAt: string | null
+  /** A page that shows what changed. */
+  changes: string | null
+  error?: string
+}
+
+const updatesFile = (root: string): string => join(root, 'updates.json')
+type Cache = Record<string, { latest: string | null; checkedAt: string; error?: string }>
+const readCache = (root: string): Cache => {
+  try {
+    return JSON.parse(readFileSync(updatesFile(root), 'utf8')) as Cache
+  } catch {
+    return {}
+  }
+}
+
+/** The newest commit of a pack's default branch, without downloading it. */
+export async function latestCommit(id: string, base = 'https://github.com/'): Promise<string> {
+  const pack = known(id)
+  const out = await git(['ls-remote', `${base}${pack.repo}.git`, 'HEAD'], tmpdir())
+  const sha = out.split(/\s+/)[0]
+  if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('Could not read the latest version.')
+  return sha
+}
+
+/** What is known about updates for every installed pack, without the network. */
+export function packUpdates(root: string): PackUpdate[] {
+  const cache = readCache(root)
+  return SKILL_PACKS.filter((p) => packState(root, p.id).installed).map((p) => {
+    const st = packState(root, p.id)
+    const c = cache[p.id]
+    const latest = c?.latest ?? null
+    const available = !!latest && !!st.commit && latest !== st.commit
+    return { id: p.id, current: st.commit, latest, available, checkedAt: c?.checkedAt ?? null, changes: available && st.commit ? `https://github.com/${p.repo}/compare/${st.commit.slice(0, 12)}...${latest!.slice(0, 12)}` : null, ...(c?.error ? { error: c.error } : {}) }
+  })
+}
+
+/** Asks GitHub for the newest version of each installed pack and remembers the answer. */
+export async function checkPackUpdates(root: string, base = 'https://github.com/'): Promise<PackUpdate[]> {
+  mkdirSync(root, { recursive: true })
+  const cache = readCache(root)
+  for (const p of SKILL_PACKS) {
+    if (!packState(root, p.id).installed) continue
+    try {
+      cache[p.id] = { latest: await latestCommit(p.id, base), checkedAt: new Date().toISOString() }
+    } catch (e) {
+      cache[p.id] = { latest: cache[p.id]?.latest ?? null, checkedAt: new Date().toISOString(), error: (e as Error).message.slice(0, 200) }
+    }
+  }
+  writeFileSync(updatesFile(root), JSON.stringify(cache, null, 2))
+  return packUpdates(root)
 }

@@ -141,7 +141,7 @@ export function parseAiOutput(text: string, tool: string): AiResult {
   return { report, findings, verdicts, details }
 }
 
-function runCli(bin: string, args: string[], cwd: string, onChild: (c: ChildProcess) => void, timeoutMs: number, onActivity: () => void, extraEnv: Record<string, string> = {}): Promise<{ code: number | null; out: string; err: string }> {
+export function runCli(bin: string, args: string[], cwd: string, onChild: (c: ChildProcess) => void, timeoutMs: number, onActivity: () => void, extraEnv: Record<string, string> = {}): Promise<{ code: number | null; out: string; err: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(bin, args, { cwd, env: { ...agentEnv(), ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] })
     onChild(child)

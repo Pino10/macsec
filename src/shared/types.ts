@@ -155,9 +155,34 @@ export interface ApiScanRequest {
 export type ReviewDepth = 'quick' | 'standard' | 'deep'
 export type ReviewFocus = 'security' | 'bugs' | 'all'
 
+export type DeepEngine = 'cloudflare' | 'anthropic' | 'both'
+export type DeepReviewerKind = 'claude' | 'claude-local' | 'claude-free' | 'claude-desktop'
+
+export interface DeepPlanRequest {
+  engine: DeepEngine
+  reviewer: DeepReviewerKind
+}
+
+export interface DeepPlanLine {
+  label: string
+  text: string
+}
+
+export interface PackUpdateInfo {
+  id: string
+  current: string | null
+  latest: string | null
+  available: boolean
+  checkedAt: string | null
+  changes: string | null
+  error?: string
+}
+
 export interface ReviewRequest {
   source: ReviewSource
   reviewer: Reviewer
+  /** A deep audit (Cloudflare's and Anthropic's security reviews) in place of the standard AI review. */
+  deep?: { engine: DeepEngine }
   depth: ReviewDepth
   focus: ReviewFocus
   /** Keep the downloaded code after the review, to fix it. Remote sources only. */
@@ -329,6 +354,8 @@ export interface AppSettings {
   webhook?: { kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all' }
   /** Skill packs you removed: they are not added back by themselves. */
   packsDeclined?: string[]
+  /** The newest skill pack version already announced, so each update is announced once. */
+  packsNotified?: Record<string, string>
 }
 
 export interface FreeLlmInfo {
@@ -449,6 +476,12 @@ export interface Channels {
   'azure:projects': { args: [string]; result: AzureProject[] }
 
   'review:start': { args: [ReviewRequest]; result: SessionInfo }
+  'review:deep-plan': { args: [DeepPlanRequest]; result: DeepPlanLine[] }
+  'review:deep-handoff': { args: [{ engine: DeepEngine; path: string }]; result: { copied: boolean; opened: boolean } }
+  'packs:updates': { args: []; result: PackUpdateInfo[] }
+  'packs:check-updates': { args: []; result: PackUpdateInfo[] }
+  'desktop:status': { args: []; result: { app: boolean; connected: boolean; path: string } }
+  'desktop:connect': { args: []; result: { connected: boolean; path: string } }
   'review:skill-plan': { args: [string | null]; result: SkillPlan }
   'watch:get': { args: []; result: WatchInfo }
   'watch:set': { args: [{ packages?: boolean; retest?: boolean }]; result: WatchInfo }
@@ -532,6 +565,8 @@ export interface Events {
   'logs:line': LogLine
   'app:update': UpdateInfo
   'watch:alert': { title: string; body: string }
+  /** A message for the notification toasts and history. */
+  notice: { kind: 'info' | 'success' | 'error'; title: string; body?: string }
 }
 
 export interface MacSecApi {

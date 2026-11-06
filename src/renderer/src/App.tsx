@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Download, Plus } from 'lucide-react'
 import type { UpdateInfo } from '@shared/types'
 import { AppProvider, useApp } from './store'
+import { NotificationLayer } from './components/Notifications'
 import Rail, { PAGE_ORDER } from './components/Rail'
 import ThisMac from './pages/ThisMac'
 import JobsBar from './components/JobsBar'
@@ -79,7 +80,7 @@ function UpdateBar(): React.JSX.Element | null {
 }
 
 function Shell(): React.JSX.Element {
-  const { page, setPage, toast } = useApp()
+  const { page, setPage } = useApp()
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return
@@ -122,11 +123,7 @@ function Shell(): React.JSX.Element {
         </main>
       </div>
       <JobsBar />
-      {toast && (
-        <div className="toast" data-kind={toast.kind} role="status">
-          {toast.text}
-        </div>
-      )}
+      <NotificationLayer />
     </>
   )
 }
