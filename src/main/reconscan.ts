@@ -14,10 +14,10 @@ import { runTool } from './engine'
 import { installTool, isInstalled, toolDef, toolPath } from './toolbox'
 import { log } from './logs'
 
-const CATEGORY: Record<ReconFinding['kind'], FindingCategory> = { secret: 'secret', exposure: 'web', sourcemap: 'web', headers: 'web', takeover: 'network', subdomain: 'recon', endpoint: 'recon', tech: 'recon' }
+const CATEGORY: Record<ReconFinding['kind'], FindingCategory> = { secret: 'secret', exposure: 'web', sourcemap: 'web', headers: 'web', takeover: 'network', subdomain: 'recon', endpoint: 'recon', tech: 'recon', listing: 'web', errorpage: 'web', cors: 'web', methods: 'web', cdn: 'recon', version: 'recon' }
 
 export function toFinding(f: ReconFinding): Finding {
-  return { id: f.id, tool: f.kind === 'sourcemap' ? 'Source map check' : f.kind === 'takeover' ? 'Takeover check' : f.kind === 'secret' ? 'JavaScript keys' : f.kind === 'exposure' ? 'Exposed files' : 'Recon', category: CATEGORY[f.kind], severity: f.severity, title: f.title, url: f.url, description: f.description, fix: f.fix }
+  return { id: f.id, tool: f.kind === 'version' ? 'Version match' : f.kind === 'listing' ? 'Folder listing' : f.kind === 'errorpage' ? 'Error page' : f.kind === 'cors' ? 'Cross-origin check' : f.kind === 'cdn' ? 'CDN or firewall' : f.kind === 'methods' ? 'Methods' : f.kind === 'sourcemap' ? 'Source map check' : f.kind === 'takeover' ? 'Takeover check' : f.kind === 'secret' ? 'JavaScript keys' : f.kind === 'exposure' ? 'Exposed files' : 'Recon', category: CATEGORY[f.kind], severity: f.severity, title: f.title, url: f.url, description: f.description, fix: f.fix, confidence: f.confidence, proof: f.proof }
 }
 
 export const isLocalDomain = (d: string): boolean => /\.(test|localhost)$/.test(d) || d === 'localhost'

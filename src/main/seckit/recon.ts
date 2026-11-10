@@ -14,6 +14,7 @@
  */
 import { promises as dns } from 'dns'
 import { createHash } from 'crypto'
+import { advertisedMethods, bannersOf, corsReflection, detectWaf, dirListing, errorLeak, fileShows, libsIn, LISTING_DIRS, matchNvd, nvdUrl, proofOf, TEST_ORIGIN, versionSeverity, type Confidence, type Proof, type Product } from './confirm'
 
 export type ReconDepth = 'passive' | 'standard' | 'deep'
 export type Sev = 'critical' | 'high' | 'medium' | 'low' | 'info'
@@ -26,7 +27,11 @@ export interface ReconFinding {
   description?: string
   fix?: string
   /** What kind of check found it. */
-  kind: 'subdomain' | 'sourcemap' | 'secret' | 'exposure' | 'headers' | 'takeover' | 'endpoint' | 'tech'
+  kind: 'subdomain' | 'sourcemap' | 'secret' | 'exposure' | 'headers' | 'takeover' | 'endpoint' | 'tech' | 'listing' | 'errorpage' | 'cors' | 'methods' | 'cdn' | 'version'
+  /** Confirmed: the problem itself was seen. Possible: the evidence points at it but does not prove it. */
+  confidence?: Confidence
+  /** The request, the answer's size and fingerprint, and what in it proves the finding. */
+  proof?: Proof
 }
 
 export interface HostInfo {
@@ -41,6 +46,8 @@ export interface JsInfo {
   url: string
   bytes: number
   sourceMap?: { url: string; files: number; sample: string[] }
+  /** Library versions the script states about itself. */
+  libs?: Product[]
   endpoints: string[]
   secrets: { kind: string; masked: string }[]
 }
@@ -526,24 +533,16 @@ export function parseSourceMap(text: string): { files: number; sample: string[];
 
 // ---------------------------------------------------------------- Files that should not be public
 
+/** More fixed paths that should never answer. Checked on fewer hosts, and always with a validator for the real file. */
+export const MORE_EXPOSURE_PATHS = ['.git/config', '.svn/entries', '.svn/wc.db', '.hg/requires', '.env.local', '.env.production', '.env.backup', '.htpasswd', 'id_rsa', '.ssh/id_rsa', 'credentials.json', 'secrets.json', '.npmrc', 'composer.json', 'package.json', 'Dockerfile', 'docker-compose.yml', '.gitlab-ci.yml', 'web.config', 'storage/logs/laravel.log', 'wp-config.php.bak', 'wp-config.php.old', 'wp-config.php~', 'wp-config.php.save', 'backup.sql', 'db.sql', 'dump.sql', 'database.sql', 'backup.zip', 'site.zip', 'actuator/heapdump', 'actuator/mappings', 'swagger-ui.html', 'adminer.php', 'phpmyadmin/', 'telescope', 'horizon', '_profiler', 'elmah.axd', 'trace.axd', 'console', 'server-info']
+
 export const EXPOSURE_PATHS = ['.git/HEAD', '.env', '.DS_Store', 'server-status', 'phpinfo.php', '.well-known/security.txt', 'robots.txt', 'sitemap.xml', 'swagger.json', 'openapi.json', 'v2/api-docs', 'api/swagger.json', 'graphql', 'actuator', 'actuator/env', 'crossdomain.xml', 'wp-json/wp/v2/users']
 
 /** Only content that really is the file counts, never a "not found" page that answers 200. */
 export function exposureReal(path: string, status: number, body: string, notFound: { status: number; length: number } | null): boolean {
   if (status !== 200) return false
-  const b = body.slice(0, 4000)
   if (notFound && notFound.status === 200 && Math.abs(notFound.length - body.length) < 60) return false
-  if (path === '.git/HEAD') return /^ref: refs\//.test(b)
-  if (path === '.env') return /^[A-Z][A-Z0-9_]+=/m.test(b) && !/<html/i.test(b)
-  if (path === '.DS_Store') return b.includes('Bud1')
-  if (path === 'server-status') return /Apache Server Status/i.test(b)
-  if (path === 'phpinfo.php') return /phpinfo\(\)|PHP Version/i.test(b)
-  if (/swagger|openapi|api-docs/.test(path)) return /"(openapi|swagger)"\s*:/.test(b)
-  if (path === 'graphql') return /graphql|"errors"\s*:/i.test(b) && !/<html/i.test(b)
-  if (path.startsWith('actuator')) return /"(_links|activeProfiles|propertySources)"/.test(b)
-  if (path === 'wp-json/wp/v2/users') return /^\s*\[\s*\{\s*"id"/.test(b)
-  if (path === 'crossdomain.xml') return /<cross-domain-policy/i.test(b)
-  return !/<html/i.test(b.slice(0, 200)) || /robots|sitemap|security\.txt/.test(path)
+  return fileShows(path, body) !== null
 }
 
 const EXPOSURE_RATING: Record<string, [Sev, string, string]> = {
@@ -561,6 +560,48 @@ const EXPOSURE_RATING: Record<string, [Sev, string, string]> = {
   'actuator/env': ['high', 'Spring Boot /actuator/env is public', 'It can reveal configuration and secrets. Turn off the env endpoint.'],
   'crossdomain.xml': ['low', 'A Flash cross-domain policy exists', 'Remove it if it allows "*".'],
   'wp-json/wp/v2/users': ['low', 'WordPress lists its users', 'User names help password guessing. Limit the users endpoint to signed-in users.'],
+  '.git/config': ['high', 'The Git configuration can be downloaded', 'It names the repository and can hold a password in the address. Block the .git folder and redeploy without it.'],
+  '.svn/entries': ['high', 'Subversion metadata can be downloaded', 'It reveals file names and paths of the source. Block .svn and redeploy without it.'],
+  '.svn/wc.db': ['high', 'The Subversion database can be downloaded', 'It lists the source files. Block .svn and redeploy without it.'],
+  '.hg/requires': ['high', 'Mercurial metadata can be downloaded', 'Block .hg and redeploy without it.'],
+  '.env.local': ['critical', 'A .env.local file is public', 'It usually holds keys. Remove it from the web root and change every key in it.'],
+  '.env.production': ['critical', 'A .env.production file is public', 'It usually holds keys. Remove it from the web root and change every key in it.'],
+  '.env.backup': ['critical', 'A .env.backup file is public', 'It usually holds keys. Remove it from the web root and change every key in it.'],
+  '.htpasswd': ['high', 'A .htpasswd file is public', 'It holds password hashes that can be cracked offline. Remove it and change those passwords.'],
+  id_rsa: ['critical', 'A private SSH key is public', 'Anyone can use it to sign in. Remove it, then replace the key everywhere it was trusted.'],
+  '.ssh/id_rsa': ['critical', 'A private SSH key is public', 'Anyone can use it to sign in. Remove it, then replace the key everywhere it was trusted.'],
+  'credentials.json': ['high', 'A credentials file is public', 'Remove it from the web root and revoke what it holds.'],
+  'secrets.json': ['high', 'A secrets file is public', 'Remove it from the web root and revoke what it holds.'],
+  '.npmrc': ['high', 'An .npmrc file is public', 'It can hold a registry token. Remove it and revoke the token.'],
+  'composer.json': ['info', 'composer.json is public', 'It lists your PHP packages and versions. Fine to hide: deny it in the web server.'],
+  'package.json': ['info', 'package.json is public', 'It lists your JavaScript packages and versions. Fine to hide: deny it in the web server.'],
+  Dockerfile: ['low', 'A Dockerfile is public', 'It shows how the server is built. Remove it from the web root.'],
+  'docker-compose.yml': ['medium', 'A Docker Compose file is public', 'It names services and sometimes passwords. Remove it from the web root.'],
+  '.gitlab-ci.yml': ['low', 'A GitLab CI file is public', 'It shows how you build and deploy. Remove it from the web root.'],
+  'web.config': ['medium', 'web.config is public', 'It can hold connection strings. Deny it in the web server.'],
+  'storage/logs/laravel.log': ['high', 'The Laravel log is public', 'Logs hold errors, paths and sometimes data. Move storage out of the web root and deny it.'],
+  'wp-config.php.bak': ['critical', 'A WordPress config backup is public', 'It holds the database password in plain text. Remove it and change the password and keys.'],
+  'wp-config.php.old': ['critical', 'A WordPress config backup is public', 'It holds the database password in plain text. Remove it and change the password and keys.'],
+  'wp-config.php~': ['critical', 'A WordPress config backup is public', 'It holds the database password in plain text. Remove it and change the password and keys.'],
+  'wp-config.php.save': ['critical', 'A WordPress config backup is public', 'It holds the database password in plain text. Remove it and change the password and keys.'],
+  'backup.sql': ['critical', 'A database dump is public', 'It holds your data. Remove it and treat the data as leaked.'],
+  'db.sql': ['critical', 'A database dump is public', 'It holds your data. Remove it and treat the data as leaked.'],
+  'dump.sql': ['critical', 'A database dump is public', 'It holds your data. Remove it and treat the data as leaked.'],
+  'database.sql': ['critical', 'A database dump is public', 'It holds your data. Remove it and treat the data as leaked.'],
+  'backup.zip': ['high', 'A backup archive is public', 'It can hold the whole site and its keys. Remove it and change what it held.'],
+  'site.zip': ['high', 'A site archive is public', 'It can hold the whole site and its keys. Remove it and change what it held.'],
+  'actuator/heapdump': ['critical', 'A Java heap dump can be downloaded', 'It holds everything in memory, including passwords and tokens. Turn the endpoint off.'],
+  'actuator/mappings': ['medium', 'Spring Boot request mappings are public', 'They list every route of the app. Expose only health.'],
+  'swagger-ui.html': ['info', 'A Swagger UI page is public', 'Fine if intended. Check every endpoint in it needs sign-in where it should.'],
+  'adminer.php': ['medium', 'Adminer (a database tool) is public', 'Remove it or allow only your address.'],
+  'phpmyadmin/': ['medium', 'phpMyAdmin is public', 'Allow only your address, or remove it.'],
+  telescope: ['high', 'Laravel Telescope is public', 'It shows requests, queries and data. Restrict it to signed-in admins.'],
+  horizon: ['medium', 'Laravel Horizon is public', 'Restrict it to signed-in admins.'],
+  _profiler: ['high', 'The Symfony profiler is public', 'It shows requests, settings and data. Turn it off in production.'],
+  'elmah.axd': ['high', 'The ELMAH error log is public', 'Restrict it to admins.'],
+  'trace.axd': ['medium', 'The ASP.NET trace page is public', 'Turn tracing off in production.'],
+  console: ['high', 'An interactive console page is public', 'A debugger console can run code. Turn it off in production.'],
+  'server-info': ['medium', 'Apache server-info is public', 'Allow it only from localhost.'],
   'robots.txt': ['info', 'robots.txt', 'Read it: it often names private areas.'],
   'sitemap.xml': ['info', 'sitemap.xml', 'A list of pages to include in the map.'],
   '.well-known/security.txt': ['info', 'security.txt', 'Contact details for reporting problems.']
@@ -581,10 +622,25 @@ export async function runRecon(target: string, ctx: ReconContext): Promise<Recon
   }
   addHost(domain, 'target')
   addHost(new URL(startUrl).hostname, 'target')
-  const get = async (u: string, ms = 12000, extra: Record<string, string> = {}): Promise<{ status: number; headers: Headers; text: string; location?: string }> => {
-    const r = await fetch(u, { redirect: 'manual', headers: { ...UA, ...extra }, signal: AbortSignal.timeout(ms) })
-    const text = r.status >= 300 && r.status < 400 ? '' : (await r.text()).slice(0, 3_000_000)
-    return { status: r.status, headers: r.headers, text, location: r.headers.get('location') ?? undefined }
+  /** Reads at most `max` bytes of an answer and hangs up, so a server that ignores a byte range cannot send a whole backup. */
+  const readCapped = async (r: Response, max: number): Promise<string> => {
+    if (!r.body) return ''
+    const reader = r.body.getReader()
+    const chunks: Uint8Array[] = []
+    let n = 0
+    while (n < max) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+      n += value.length
+    }
+    void reader.cancel().catch(() => undefined)
+    return Buffer.concat(chunks).subarray(0, max).toString('utf8')
+  }
+  const get = async (u: string, ms = 12000, extra: Record<string, string> = {}, method = 'GET', max = 3_000_000): Promise<{ status: number; headers: Headers; text: string; location?: string; url: string }> => {
+    const r = await fetch(u, { method, redirect: 'manual', headers: { ...UA, ...extra }, signal: AbortSignal.timeout(ms) })
+    const text = method === 'HEAD' || method === 'OPTIONS' || (r.status >= 300 && r.status < 400) ? '' : await readCapped(r, max)
+    return { status: r.status, headers: r.headers, text, location: r.headers.get('location') ?? undefined, url: u }
   }
   const step = async (id: string, label: string, fn: () => Promise<string | void>): Promise<void> => {
     if (ctx.cancelled()) return ctx.step(id, label, 'skipped')
@@ -752,17 +808,17 @@ export async function runRecon(target: string, ctx: ReconContext): Promise<Recon
           if (r.status !== 200) return
           // Framework and library bundles name their own internals: only the app's own code is mined for endpoints.
           const vendor = /node_modules|vendor|chunk-vendors|framework-|polyfills|webpack-runtime|turbopack/i.test(u)
-          const info: JsInfo = { url: u, bytes: r.text.length, endpoints: vendor ? [] : endpointsIn(r.text), secrets: [] }
+          const info: JsInfo = { url: u, bytes: r.text.length, endpoints: vendor ? [] : endpointsIn(r.text), secrets: [], libs: libsIn(u, r.text).map((l) => ({ ...l, proof: proofOf({ url: u, status: r.status, headers: r.headers, body: r.text.slice(0, 200000), shows: [l.from] }) })) }
           for (const s of secretsIn(r.text)) {
             info.secrets.push({ kind: s.kind, masked: s.masked })
-            res.findings.push({ id: fid('key', u, s.kind, s.masked), kind: 'secret', severity: s.severity, title: `${s.kind} in public JavaScript`, url: u, description: `Starts with ${s.masked}. Anyone can read this file.`, fix: s.severity === 'info' ? 'Meant to be public: make sure the rules behind it (Row Level Security, Firebase rules, API restrictions) are strict.' : 'Revoke the key at its provider, move it to the server side, and redeploy.' })
+            res.findings.push({ id: fid('key', u, s.kind, s.masked), kind: 'secret', severity: s.severity, title: `${s.kind} in public JavaScript`, url: u, description: `Starts with ${s.masked}. Anyone can read this file.`, confidence: 'confirmed', proof: proofOf({ url: u, status: r.status, headers: r.headers, body: r.text, shows: [`a ${s.kind} that starts with ${s.masked} is in the file (the rest is not kept)`] }), fix: s.severity === 'info' ? 'Meant to be public: make sure the rules behind it (Row Level Security, Firebase rules, API restrictions) are strict.' : 'Revoke the key at its provider, move it to the server side, and redeploy.' })
           }
           const mapUrl = sourceMapUrl(r.text, u, r.headers.get('sourcemap') ?? r.headers.get('x-sourcemap')) ?? `${u.replace(/\?.*$/, '')}.map`
           const m = await get(mapUrl, 15000).catch(() => null)
           const parsed = m && m.status === 200 ? parseSourceMap(m.text) : null
           if (parsed) {
             info.sourceMap = { url: mapUrl, files: parsed.files, sample: parsed.sample }
-            res.findings.push({ id: fid('map', mapUrl), kind: 'sourcemap', severity: parsed.hasContent ? 'medium' : 'low', title: `Source map public: ${parsed.files} original files`, url: mapUrl, description: `The original source code${parsed.hasContent ? ', including its full text,' : ''} can be rebuilt from this file. Files include: ${parsed.sample.join(', ')}.`, fix: 'Stop uploading .map files to production (productionBrowserSourceMaps: false in Next.js, build.sourcemap: false in Vite), or upload them only to your error tracker.' })
+            res.findings.push({ id: fid('map', mapUrl), kind: 'sourcemap', severity: parsed.hasContent ? 'medium' : 'low', title: `Source map public: ${parsed.files} original files`, url: mapUrl, description: `The original source code${parsed.hasContent ? ', including its full text,' : ''} can be rebuilt from this file. Files include: ${parsed.sample.join(', ')}.`, confidence: 'confirmed', proof: proofOf({ url: mapUrl, status: m!.status, headers: m!.headers, body: m!.text.slice(0, 200000), shows: [`the map downloaded without signing in and parses as a version ${'3'} source map`, `it lists ${parsed.files} original files`, parsed.hasContent ? 'it includes the full text of the source files' : 'it lists file names only', `for example ${parsed.sample.slice(0, 5).join(', ')}`] }), fix: 'Stop uploading .map files to production (productionBrowserSourceMaps: false in Next.js, build.sourcemap: false in Vite), or upload them only to your error tracker.' })
             ctx.line(`Source map: ${mapUrl} (${parsed.files} files)`)
           }
           res.js.push(info)
@@ -786,12 +842,14 @@ export async function runRecon(target: string, ctx: ReconContext): Promise<Recon
       if (ctx.cancelled()) break
       const base = h.live!.url.replace(/\/$/, '')
       const nf = await get(`${base}/laramac-recon-${Date.now().toString(36)}-404`, 10000).then((r) => ({ status: r.status, length: r.text.length })).catch(() => null)
-      for (const p of EXPOSURE_PATHS) {
+      const paths = live.indexOf(h) < (ctx.depth === 'deep' ? 40 : 6) ? [...EXPOSURE_PATHS, ...MORE_EXPOSURE_PATHS] : EXPOSURE_PATHS
+      for (const p of paths) {
         try {
-          const r = await get(`${base}/${p}`, 10000, { Range: 'bytes=0-65535' })
-          if (!exposureReal(p, r.status === 206 ? 200 : r.status, r.text, nf)) continue
+          const r = await get(`${base}/${p}`, 10000, { Range: 'bytes=0-65535' }, 'GET', 70000)
+          const status = r.status === 206 ? 200 : r.status
+          if (!exposureReal(p, status, r.text, nf)) continue
           const [severity, title, fix] = EXPOSURE_RATING[p] ?? ['info', p, '']
-          res.findings.push({ id: fid('exp', base, p), kind: 'exposure', severity, title: `${title} (${h.host})`, url: `${base}/${p}`, fix })
+          res.findings.push({ id: fid('exp', base, p), kind: 'exposure', severity, title: `${title} (${h.host})`, url: `${base}/${p}`, fix, confidence: 'confirmed', proof: proofOf({ url: `${base}/${p}`, status: r.status, headers: r.headers, body: r.text, shows: fileShows(p, r.text) ?? [], sent: { Range: 'bytes=0-65535' } }) })
           found++
           ctx.line(`${base}/${p}: ${title}`)
         } catch {
@@ -801,6 +859,112 @@ export async function runRecon(target: string, ctx: ReconContext): Promise<Recon
       }
     }
     return `${found} found`
+  })
+
+  // 9. Confirm more with ordinary requests. Every finding here carries its proof, or says it is only possible.
+  await step('confirm', 'Confirm more: folder listings, CDN or firewall, error pages, cross-origin sharing, versions', async () => {
+    const live = [...hostMap.values()].filter((h) => h.live).slice(0, ctx.depth === 'deep' ? 40 : 12)
+    const versions = new Map<string, { product: Product; host: string; proof: Proof }>()
+    const noteVersion = (p: Product, host: string, proof: Proof): void => {
+      const k = `${p.name}|${p.version}`
+      if (!versions.has(k)) versions.set(k, { product: p, host, proof })
+    }
+    let found = 0
+    const push = (f: ReconFinding): void => {
+      res.findings.push(f)
+      found++
+      ctx.line(`${f.title}`)
+    }
+    for (const h of live) {
+      if (ctx.cancelled()) break
+      const base = h.live!.url.replace(/\/$/, '')
+      try {
+        const home = await get(`${base}/`, 12000)
+        const homeUrl = `${base}/`
+        for (const w of detectWaf(home.headers, home.headers.get('set-cookie') ?? '')) {
+          push({ id: fid('cdn', h.host, w.name), kind: 'cdn', severity: 'info', confidence: 'confirmed', title: `${w.name} answers for ${h.host}`, url: homeUrl, description: `The headers show a ${w.name} CDN or firewall in front of this host. Findings that depend on reaching the server directly may not apply, and the real server may have another address.`, proof: proofOf({ url: homeUrl, status: home.status, headers: home.headers, body: home.text.slice(0, 200000), shows: w.shows }) })
+        }
+        for (const p of bannersOf(home.headers, home.text)) noteVersion(p, h.host, proofOf({ url: homeUrl, status: home.status, headers: home.headers, body: home.text.slice(0, 200000), shows: [p.from] }))
+      } catch {
+        // Unreachable: nothing to confirm on this host.
+      }
+      if (ctx.cancelled()) break
+      try {
+        const missing = `${base}/macsec-confirm-${Date.now().toString(36)}`
+        const nf = await get(missing, 10000)
+        const leak = errorLeak(nf.status, nf.text)
+        if (leak) push({ id: fid('err', h.host, leak.stack), kind: 'errorpage', severity: 'medium', confidence: 'confirmed', title: `${h.host} shows its ${leak.stack} error details`, url: missing, description: 'Asking for a page that does not exist returned the application’s own debug or error page. It reveals file paths, the framework and sometimes settings.', fix: 'Turn off debug mode in production (APP_DEBUG=false, DEBUG=False, customErrors on) and show a plain error page.', proof: proofOf({ url: missing, status: nf.status, headers: nf.headers, body: nf.text.slice(0, 200000), shows: leak.shows }) })
+      } catch {
+        // Skip.
+      }
+      try {
+        const co = await get(`${base}/`, 10000, { Origin: TEST_ORIGIN }, 'GET', 20000)
+        const c = corsReflection(TEST_ORIGIN, co.headers)
+        if (c) push({ id: fid('cors', h.host), kind: 'cors', severity: c.severity, confidence: 'confirmed', title: `${h.host} allows other websites to read its answers`, url: `${base}/`, description: 'The server repeated an origin we made up in Access-Control-Allow-Origin. Only send this header for the websites you trust.', fix: 'Replace the reflected origin with a fixed list of your own sites, and never combine it with Access-Control-Allow-Credentials for others.', proof: proofOf({ url: `${base}/`, status: co.status, headers: co.headers, body: '', shows: c.shows, sent: { Origin: TEST_ORIGIN } }) })
+      } catch {
+        // Skip.
+      }
+      try {
+        const op = await get(`${base}/`, 10000, {}, 'OPTIONS')
+        const m = advertisedMethods(op.headers.get('allow'))
+        if (m.length) push({ id: fid('methods', h.host), kind: 'methods', severity: 'low', confidence: 'possible', title: `${h.host} says it allows ${m.join(', ')}`, url: `${base}/`, description: 'This is only what the server says it allows. We did not try those methods, so it is not proven that they work. Check the application protects them.', fix: 'Turn off TRACE and TRACK, and make sure PUT and DELETE need sign-in.', proof: proofOf({ method: 'OPTIONS', url: `${base}/`, status: op.status, headers: op.headers, body: '', shows: [`the Allow header lists ${op.headers.get('allow')}`] }) })
+      } catch {
+        // Skip.
+      }
+      if (live.indexOf(h) < (ctx.depth === 'deep' ? 40 : 6)) {
+        for (const d of LISTING_DIRS) {
+          if (ctx.cancelled()) break
+          try {
+            const r = await get(`${base}/${d}`, 8000, {}, 'GET', 70000)
+            const l = r.status === 200 ? dirListing(r.text) : null
+            if (l) push({ id: fid('list', base, d), kind: 'listing', severity: /backup|logs|storage|tmp|old|dev/.test(d) ? 'high' : 'medium', confidence: 'confirmed', title: `The folder /${d} lists its files (${h.host})`, url: `${base}/${d}`, description: 'The web server shows every file in this folder to anyone who asks.', fix: 'Turn off directory listing (Nginx: autoindex off; Apache: Options -Indexes) and check what is in the folder.', proof: proofOf({ url: `${base}/${d}`, status: r.status, headers: r.headers, body: r.text, shows: l.shows }) })
+          } catch {
+            // Skip.
+          }
+          await new Promise((r2) => setTimeout(r2, 120))
+        }
+      }
+    }
+    for (const j of res.js) for (const p of j.libs ?? []) if (p.proof) noteVersion(p, new URL(j.url).hostname, p.proof)
+    // Known flaws for each version, from the public NVD database. NVD's search is wide, so every answer is checked again for the same product and a version range that holds this version.
+    const cap = ctx.depth === 'deep' ? 20 : 10
+    let looked = 0
+    let nvdNote = ''
+    for (const { product, host, proof } of versions.values()) {
+      if (ctx.cancelled() || looked >= cap || nvdNote) break
+      const matches = new Map<string, ReturnType<typeof matchNvd>[number]>()
+      for (const pair of product.cpe) {
+        if (ctx.cancelled()) break
+        if (looked++ > 0) await new Promise((r2) => setTimeout(r2, 6500))
+        try {
+          const r = await fetch(nvdUrl(pair, product.version), { headers: { 'User-Agent': UA['User-Agent'], Accept: 'application/json' }, signal: AbortSignal.timeout(25000) })
+          if (r.status === 403 || r.status === 429) {
+            nvdNote = 'The vulnerability database asked us to slow down, so version matching stopped early.'
+            break
+          }
+          if (!r.ok) continue
+          for (const m of matchNvd(await readCapped(r, 8_000_000), product)) matches.set(m.id, m)
+        } catch {
+          nvdNote = 'The vulnerability database could not be reached, so versions were not matched.'
+          break
+        }
+      }
+      if (!matches.size) continue
+      const list = [...matches.values()].sort((a, b) => Number(b.kev) - Number(a.kev) || (b.score ?? 0) - (a.score ?? 0))
+      const kev = list.filter((m) => m.kev).length
+      push({
+        id: fid('ver', product.name, product.version),
+        kind: 'version',
+        severity: versionSeverity(list),
+        confidence: 'possible',
+        title: `${product.name} ${product.version} matches ${list.length} known flaw${list.length === 1 ? '' : 's'}${kev ? `, ${kev} on CISA's exploited list` : ''}`,
+        url: proof.request.replace(/^GET /, ''),
+        description: `The version comes from ${product.from}, and the known flaws below list a version range that includes it: ${list.slice(0, 5).map((m) => `${m.id}${m.score ? ` (score ${m.score})` : ''}${m.kev ? ', exploited' : ''}${m.conditional ? ', needs other conditions too' : ''}`).join('; ')}${list.length > 5 ? `; and ${list.length - 5} more` : ''}. This is possible, not proven: the number can be old while the fixes are in${product.distro ? ` (${product.distro} fixes problems without changing the number)` : ''}, and some flaws need a setting we cannot see. Seen on ${host}.`,
+        fix: 'Update to the newest release, or ask your provider whether these fixes are included in the build you run.',
+        proof: { ...proof, shows: [...proof.shows, `the public NVD database lists ${list.length} flaw${list.length === 1 ? '' : 's'} whose affected range includes ${product.version}`] }
+      })
+    }
+    return `${found} confirmed or possible${nvdNote ? `. ${nvdNote}` : ''}`
   })
 
   res.hosts = [...hostMap.values()].sort((a, b) => a.host.localeCompare(b.host))

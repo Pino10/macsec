@@ -1,3 +1,4 @@
+import ProofBlock, { ConfidenceTag } from '../components/ProofBlock'
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw } from 'lucide-react'
@@ -96,6 +97,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [sevs, setSevs] = useState<Set<Severity>>(new Set(['critical', 'high', 'medium', 'low']))
   const [cat, setCat] = useState<FindingCategory | 'all'>('all')
   const [showFp, setShowFp] = useState(false)
+  const [onlyProven, setOnlyProven] = useState(false)
   const [tab, setTab] = useState<'findings' | 'owasp' | 'report' | 'run' | 'surface'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const live = sessions.find((s) => s.id === id)
@@ -109,7 +111,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
       .catch(() => setDetail(null))
   }, [api, id, stamp])
 
-  const findings = useMemo(() => (detail?.findings ?? []).filter((f) => sevs.has(f.severity) && (cat === 'all' || f.category === cat) && (showFp || f.verdict !== 'false-positive')), [detail, sevs, cat, showFp])
+  const findings = useMemo(() => (detail?.findings ?? []).filter((f) => sevs.has(f.severity) && (cat === 'all' || f.category === cat) && (showFp || f.verdict !== 'false-positive') && (!onlyProven || f.confidence === 'confirmed')), [detail, sevs, cat, showFp, onlyProven])
   useEffect(() => {
     if (!findings.some((f) => f.id === sel)) setSel(findings[0]?.id ?? null)
   }, [findings, sel])
@@ -287,6 +289,11 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
                 ))}
               </select>
             )}
+            {detail.findings.some((f) => f.confidence) && (
+              <label className="check" style={{ fontSize: 12.5 }}>
+                <input type="checkbox" checked={onlyProven} onChange={(e) => setOnlyProven(e.target.checked)} /> Confirmed only ({detail.findings.filter((f) => f.confidence === 'confirmed').length})
+              </label>
+            )}
             {fp > 0 && (
               <label className="check" style={{ fontSize: 12.5 }}>
                 <input type="checkbox" checked={showFp} onChange={(e) => setShowFp(e.target.checked)} /> {fp} ruled out by AI
@@ -373,6 +380,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
                 <button key={f.id} className="f-row" role="option" data-sev={f.severity} data-fp={f.verdict === 'false-positive' || !!f.triage} aria-selected={f.id === sel} onClick={() => setSel(f.id)}>
                   <Sev s={f.severity} />
                   <span className="t">{f.title}</span>
+                  {f.confidence === 'possible' && <span className="tag tag-warn" style={{ flex: 'none' }}>Possible</span>}
                   <span className="w">{f.file ? `${f.file}${f.line ? `:${f.line}` : ''}` : (f.advisory ?? f.tool)}</span>
                 </button>
               ))}
@@ -397,6 +405,7 @@ function Detail({ f, id, canOpen, onChange }: { f: Finding; id: string; canOpen:
         <Sev s={f.severity} />
         {f.verdict === 'confirmed' && <span className="tag tag-ok">Confirmed by AI</span>}
         {f.verdict === 'false-positive' && <span className="tag tag-warn">Ruled out by AI</span>}
+        <ConfidenceTag f={f} />
         <span className="tag">{f.tool}</span>
         {f.cwe && (
           <button className="tag" style={{ border: 0, cursor: 'pointer' }} onClick={() => void api.invoke('app:open-external', `https://cwe.mitre.org/data/definitions/${f.cwe!.replace('CWE-', '')}.html`)}>
@@ -419,6 +428,7 @@ function Detail({ f, id, canOpen, onChange }: { f: Finding; id: string; canOpen:
           <pre>{f.snippet}</pre>
         </>
       ) : null}
+      <ProofBlock f={f} />
       {(f.why || f.aiNote) && (
         <div className="ai-note">
           <b style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>{f.verdict === 'false-positive' ? 'Why the AI ruled it out' : `Why it is ${f.severity}`}</b>

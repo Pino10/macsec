@@ -1,0 +1,30 @@
+{
+  "resultsPerPage": 4, "startIndex": 0, "totalResults": 4, "format": "NVD_CVE", "version": "2.0",
+  "vulnerabilities": [
+    { "cve": { "id": "CVE-2021-23017", "cisaExploitAdd": "2022-01-01",
+      "descriptions": [{ "lang": "en", "value": "A security issue in nginx resolver was identified, which might allow an attacker who is able to forge UDP packets from the DNS server to cause 1-byte memory overwrite." }],
+      "metrics": { "cvssMetricV31": [{ "cvssData": { "baseScore": 8.1 } }] },
+      "configurations": [{ "nodes": [{ "operator": "OR", "cpeMatch": [
+        { "vulnerable": true, "criteria": "cpe:2.3:a:f5:nginx:*:*:*:*:*:*:*:*", "versionStartIncluding": "0.6.18", "versionEndExcluding": "1.20.1" } ] }] }] } },
+    { "cve": { "id": "CVE-2022-41741",
+      "descriptions": [{ "lang": "en", "value": "NGINX ngx_http_mp4_module memory corruption." }],
+      "metrics": { "cvssMetricV31": [{ "cvssData": { "baseScore": 7.8 } }] },
+      "configurations": [{ "nodes": [{ "operator": "OR", "cpeMatch": [
+        { "vulnerable": true, "criteria": "cpe:2.3:a:f5:nginx:*:*:*:*:*:*:*:*", "versionStartIncluding": "1.0.7", "versionEndIncluding": "1.23.1" } ] }] }] } },
+    { "cve": { "id": "CVE-2099-0001",
+      "descriptions": [{ "lang": "en", "value": "Fixed before this version: must not match." }],
+      "metrics": { "cvssMetricV31": [{ "cvssData": { "baseScore": 9.8 } }] },
+      "configurations": [{ "nodes": [{ "operator": "OR", "cpeMatch": [
+        { "vulnerable": true, "criteria": "cpe:2.3:a:f5:nginx:*:*:*:*:*:*:*:*", "versionStartIncluding": "1.0.0", "versionEndExcluding": "1.18.0" } ] }] }] } },
+    { "cve": { "id": "CVE-2099-0002",
+      "descriptions": [{ "lang": "en", "value": "Another product with a similar name: must not match." }],
+      "metrics": { "cvssMetricV31": [{ "cvssData": { "baseScore": 9.8 } }] },
+      "configurations": [{ "nodes": [{ "operator": "OR", "cpeMatch": [
+        { "vulnerable": true, "criteria": "cpe:2.3:a:other:nginx-plugin:*:*:*:*:*:*:*:*", "versionStartIncluding": "1.0.0", "versionEndExcluding": "2.0.0" } ] }] }] } },
+    { "cve": { "id": "CVE-2099-0003",
+      "descriptions": [{ "lang": "en", "value": "No version bound at all: a product name alone must not match." }],
+      "metrics": { "cvssMetricV31": [{ "cvssData": { "baseScore": 9.8 } }] },
+      "configurations": [{ "nodes": [{ "operator": "OR", "cpeMatch": [
+        { "vulnerable": true, "criteria": "cpe:2.3:a:f5:nginx:*:*:*:*:*:*:*:*" } ] }] }] } }
+  ]
+}

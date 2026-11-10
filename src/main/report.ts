@@ -86,10 +86,11 @@ function contextHtml(f: Finding): string {
 
 function findingHtml(f: Finding): string {
   return `<div class="finding" style="--c:${COLOR[f.severity]}">
-  <div class="fh"><span class="sev">${f.severity.toUpperCase()}</span><h4>${esc(f.title)}</h4>${f.verdict === 'confirmed' ? '<span class="ok">Confirmed by AI</span>' : ''}</div>
+  <div class="fh"><span class="sev">${f.severity.toUpperCase()}</span><h4>${esc(f.title)}</h4>${f.verdict === 'confirmed' ? '<span class="ok">Confirmed by AI</span>' : ''}${f.confidence === 'confirmed' ? '<span class="ok">Confirmed</span>' : f.confidence === 'possible' ? '<span class="ok" style="color:#b45309">Possible</span>' : ''}</div>
   <div class="meta">${f.file ? `<code>${esc(f.file)}${f.line ? `:${f.line}` : ''}</code>` : ''}<span>${esc(f.tool)}</span>${f.cwe ? `<span>${esc(f.cwe)}</span>` : ''}${f.advisory ? `<span>${esc(f.advisory)}</span>` : ''}</div>
   ${f.description ? `<p>${esc(f.description).slice(0, 1500)}</p>` : ''}
   ${contextHtml(f)}
+  ${f.proof ? `<div class="fix" style="background:#f1f5f9"><b>${f.confidence === 'possible' ? 'The evidence (not proof)' : 'The proof'}</b><ul>${f.proof.shows.map((s) => `<li>${esc(s)}</li>`).join('')}</ul><p><code>${esc(f.proof.request)}</code> answered HTTP ${f.proof.status}, ${f.proof.bytes} bytes, SHA-256 <code>${esc(f.proof.sha256.slice(0, 16))}…</code>, seen ${esc(f.proof.at)}.</p><p><code>${esc(f.proof.reproduce)}</code></p></div>` : ''}
   ${f.why || f.aiNote ? `<p><b>Why it is rated ${f.severity}:</b> ${esc(f.why ?? f.aiNote)}</p>` : ''}
   ${f.impact ? `<p><b>Impact:</b> ${esc(f.impact)}</p>` : ''}
   ${f.fix || f.fixCode ? `<div class="fix"><b>How to fix</b>${f.fix ? `<p>${esc(f.fix)}</p>` : ''}${f.fixCode ? `<pre class="code">${esc(f.fixCode)}</pre>` : ''}</div>` : ''}

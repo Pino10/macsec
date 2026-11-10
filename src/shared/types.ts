@@ -89,6 +89,10 @@ export interface Finding {
   /** AI's view after reading the code: real, likely false positive, or not checked. */
   verdict?: 'confirmed' | 'false-positive' | 'unreviewed'
   url?: string
+  /** Confirmed: the problem itself was seen. Possible: the evidence points at it but does not prove it. */
+  confidence?: 'confirmed' | 'possible'
+  /** The request, the size and fingerprint of the answer, and what in it proves the finding. */
+  proof?: { request: string; reproduce: string; status: number; contentType?: string; bytes: number; sha256: string; at: string; shows: string[] }
   /** The lines around the problem, with secrets masked. */
   context?: { start: number; lines: string[]; at: number }
   /** The AI's explanation: why it has this severity. */

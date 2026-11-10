@@ -2601,3 +2601,12 @@ div + .pick-item {
   background: rgba(255, 201, 74, 0.18);
   color: #ffc94a;
 }
+
+/* Proof: what shows that a finding is really there. */
+.proof { margin: 14px 0; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--ok, #3ecf8e) 7%, transparent); border: 1px solid color-mix(in srgb, var(--ok, #3ecf8e) 28%, transparent); }
+.proof h5 { margin: 0 0 8px; }
+.proof-shows { margin: 0 0 10px; padding-left: 18px; font-size: 13px; line-height: 1.55; }
+.proof-meta { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0 0 10px; font-size: 12px; opacity: 0.85; }
+.proof-meta dt { opacity: 0.65; }
+.proof-meta dd { margin: 0; word-break: break-all; }
+.proof .tag svg, .tag svg { vertical-align: -1px; margin-right: 3px; }
