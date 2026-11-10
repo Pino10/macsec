@@ -14,7 +14,7 @@ const AUDITS: { id: Kind; g: string; icon: React.ReactNode; title: string; text:
   { id: 'portfolio', g: '#38e1ff', icon: <Layers3 size={24} />, title: 'Portfolio sweep', text: 'Every project in your www folder at once: keys and passwords in files and Git history, and packages with known flaws.' },
   { id: 'changes', g: '#8b6cff', icon: <GitCompareArrows size={24} />, title: 'Change review', text: 'Claude Code’s own /security-review of the changes on a project’s current branch, before you merge or deploy.' },
   { id: 'cloud', g: '#ff8a3d', icon: <Cloud size={24} />, title: 'Cloud account', text: 'Your Azure or AWS account against best practice (ScoutSuite), what it exposes (CloudFox) and, on AWS, who could raise their own access (PMapper). Only reads.' },
-  { id: 'server', g: '#ff3d7f', icon: <Server size={24} />, title: 'Server and ports', text: 'The open ports on a server you own and the service behind each one, with the ones that should not be reachable from the internet.' }
+  { id: 'server', g: '#ff3d7f', icon: <Server size={24} />, title: 'Servers and ports', text: 'The open ports on a server, a list of servers or a network you own, and the service behind each one, with the ones that should not be reachable.' }
 ]
 
 /**
@@ -58,9 +58,12 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
 
   const project = projects.find((p) => p.path === path)
   const validSite = /^https?:\/\/[^\s]+$/.test(site.trim())
-  const cleanHost = host.trim().replace(/^[a-z]+:\/\//i, '').replace(/[/:].*$/, '')
-  const validHost = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i.test(cleanHost)
-  const localHost = /^(localhost|127\.\d+\.\d+\.\d+)$/.test(cleanHost) || /\.(test|localhost)$/.test(cleanHost)
+  // One server, a list (one per line or separated by commas) or a small network such as 192.168.1.0/28.
+  const typedHosts = host.split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean)
+  const multi = typedHosts.length > 1 || /^[\d.]+\/\d+$/.test(host.trim()) || /^[\d.]+-\d+$/.test(host.trim())
+  const cleanHost = multi ? typedHosts.join('\n') : host.trim().replace(/^[a-z]+:\/\//i, '').replace(/[/:].*$/, '')
+  const validHost = multi ? typedHosts.every((t) => /^[a-z0-9]([a-z0-9./-]*[a-z0-9])?$/i.test(t)) : /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i.test(cleanHost)
+  const localHost = !multi && (/^(localhost|127\.\d+\.\d+\.\d+)$/.test(cleanHost) || /\.(test|localhost)$/.test(cleanHost))
   const needsOk = (kind === 'full' && validSite && !isLocal(site.trim())) || (kind === 'server' && validHost && !localHost)
   const signedIn = cloud?.[provider]
   const ready =
@@ -122,8 +125,9 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
 
         {kind === 'server' && (
           <>
-            <FlowStep n={1} title="Which server" help="A name or IP address. Only connections are opened: nothing is logged into, guessed or changed. Install Nmap (brew install nmap) to also name the service on each port." state={validHost ? 'done' : 'current'}>
-              <input className="input mono" value={host} onChange={(e) => setHost(e.target.value)} placeholder="example.com or 203.0.113.10" aria-label="Server" />
+            <FlowStep n={1} title="Which servers" help="One server, a list, or a small network: a name or IP address per line, a range such as 192.168.1.10-20, or a network such as 192.168.1.0/28 (up to 64 servers at a time). Only connections are opened: nothing is logged into, guessed or changed. Install Nmap (brew install nmap) to also name the service on each port." state={validHost ? 'done' : 'current'}>
+              <textarea className="input mono" rows={3} value={host} onChange={(e) => setHost(e.target.value)} placeholder={'example.com\n203.0.113.10\n192.168.1.0/28'} aria-label="Servers" />
+              {multi && validHost && <span className="hint">{typedHosts.length} {typedHosts.length === 1 ? 'entry' : 'entries'}. Ranges and networks are expanded when the check starts.</span>}
             </FlowStep>
             <FlowStep n={2} title="How many ports" state="current">
               <div className="choices" role="radiogroup" aria-label="Ports">
@@ -142,7 +146,7 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
               <label className="consent">
                 <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
                 <span>
-                  <strong style={{ color: 'var(--ink)' }}>I own this server, or have written permission to test it.</strong> Port checks of servers you do not own may break the provider’s rules or the law.
+                  <strong style={{ color: 'var(--ink)' }}>I own these servers, or have written permission to test them.</strong> Port checks of servers you do not own may break the provider’s rules or the law.
                 </span>
               </label>
             )}

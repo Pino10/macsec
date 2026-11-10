@@ -16,7 +16,7 @@ import { basename, extname, join, relative } from 'path'
 import type { Finding, MobileScanRequest, SessionInfo } from '../shared/types'
 import { beginOp, endOp, runTool, SessionRun } from './engine'
 import { createSession, saveAiReport, sessionDir } from './sessions'
-import { checkAndroidManifest, checkInfoPlist, hardening, hardeningFindings, parseMobsfscan, type Hardening } from './scanners/mobile'
+import { checkAndroidManifest, checkFirebaseConfig, checkInfoPlist, checkNetworkSecurityConfig, checkProvisioning, checkTargetSdk, hardening, hardeningFindings, parseMobsfscan, type Hardening } from './scanners/mobile'
 import { parseGitleaks } from './scanners/parse'
 import { addEvidence } from './evidence'
 import { installTool, isInstalled, toolDef } from './toolbox'
@@ -149,12 +149,28 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
         await ensure('androguard', note)
         const out = join(s.raw, 'AndroidManifest.xml')
         await runTool({ name: 'androguard', bin: 'androguard', args: ['axml', '-o', out, req.path], timeoutMs: 5 * 60_000, output: out }, op, s.raw, line)
-        found.push(...checkAndroidManifest(readFileSync(out, 'utf8')))
+        found.push(...checkAndroidManifest(readFileSync(out, 'utf8')), ...checkTargetSdk(readFileSync(out, 'utf8')))
+        // The app's network rules are a binary XML file inside it: decode that too.
+        for (const f of findFiles(unpacked, (n) => n.endsWith('.xml'), 300).filter((p) => /\/res\/xml\/[^/]*network[^/]*config[^/]*\.xml$/i.test(p)).slice(0, 3)) {
+          const dec = join(s.raw, `nsc-${found.length}.xml`)
+          try {
+            await runTool({ name: 'androguard', bin: 'androguard', args: ['axml', '-o', dec, f], timeoutMs: 2 * 60_000, output: dec }, op, s.raw, line)
+            found.push(...checkNetworkSecurityConfig(readFileSync(dec, 'utf8'), relative(unpacked, f)))
+          } catch {
+            // Not decodable: skip it.
+          }
+        }
+        for (const f of findFiles(unpacked, (n) => n === 'google-services.json', 5)) found.push(...checkFirebaseConfig(readFileSync(f, 'utf8'), relative(unpacked, f)))
       } else {
         const manifests = kind === 'source' ? findFiles(root, (n) => n === 'AndroidManifest.xml') : []
         const plists = findFiles(root, (n) => n === 'Info.plist').filter((p) => kind === 'source' || /Payload\/[^/]+\.app\/Info\.plist$/.test(p))
-        for (const m of manifests) found.push(...checkAndroidManifest(readFileSync(m, 'utf8'), relative(root, m), mobsfRules))
+        for (const m of manifests) found.push(...checkAndroidManifest(readFileSync(m, 'utf8'), relative(root, m), mobsfRules), ...checkTargetSdk(readFileSync(m, 'utf8'), relative(root, m)))
         for (const p of plists) found.push(...checkInfoPlist(await plistXml(p), relative(root, p), mobsfRules))
+        // Source projects keep the network rules and the Firebase settings as plain files.
+        for (const f of findFiles(root, (n) => /^network[_-]?security[_-]?config\.xml$/i.test(n), 10)) found.push(...checkNetworkSecurityConfig(readFileSync(f, 'utf8'), relative(root, f)))
+        for (const f of findFiles(root, (n) => n === 'google-services.json' || n === 'GoogleService-Info.plist', 10)) found.push(...checkFirebaseConfig(readFileSync(f, 'utf8'), relative(root, f)))
+        // A built iOS app carries its signing profile: it shows whether this is a development build.
+        if (kind === 'ipa') for (const f of findFiles(unpacked, (n) => n === 'embedded.mobileprovision', 3)) found.push(...checkProvisioning(readFileSync(f, 'latin1'), relative(unpacked, f)))
         note(`${manifests.length + plists.length} settings ${manifests.length + plists.length === 1 ? 'file' : 'files'} read`)
       }
       return found

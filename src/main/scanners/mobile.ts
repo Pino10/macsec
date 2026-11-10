@@ -119,6 +119,54 @@ export function checkInfoPlist(xml: string, file = 'Info.plist', mobsf = new Set
   return out
 }
 
+
+// ---------------------------------------------------------------- More mobile checks (read-only, from files in the app)
+
+const mk = (tool: string, key: string, severity: Severity, title: string, file: string, description: string, fix: string): Finding => ({ id: fid(tool, key, file), tool, category: 'mobile', severity, title, file, description, fix })
+
+/** res/xml/network_security_config.xml: where the app allows plain HTTP, or trusts certificates you added. */
+export function checkNetworkSecurityConfig(xml: string, file = 'network_security_config.xml'): Finding[] {
+  const out: Finding[] = []
+  const t = 'MacSec network config check'
+  const clear = [...xml.matchAll(/<(base-config|domain-config)\b([^>]*)>/g)].filter((m) => /cleartextTrafficPermitted\s*=\s*"true"/.test(m[2]))
+  for (const m of clear) {
+    const base = m[1] === 'base-config'
+    const domains = base ? [] : [...xml.slice(m.index ?? 0).split(/<\/domain-config>/)[0].matchAll(/<domain\b[^>]*>([^<]+)<\/domain>/g)].map((d) => d[1].trim())
+    out.push(mk(t, `clear-${base ? 'all' : domains.join(',')}`, base ? 'medium' : 'low', base ? 'The network config allows plain HTTP for every server' : `The network config allows plain HTTP for ${domains.join(', ') || 'some domains'}`, file, 'Traffic over plain HTTP can be read and changed by anyone on the same network.', base ? 'Set cleartextTrafficPermitted to false in the base config, and allow HTTP only for named test domains.' : 'Move these servers to HTTPS and remove the exception.'))
+  }
+  if (/<certificates\s+src\s*=\s*"user"/.test(xml.replace(/<debug-overrides>[\s\S]*?<\/debug-overrides>/g, ''))) out.push(mk(t, 'user-ca', 'medium', 'The app trusts certificates the phone owner added', file, 'Any certificate authority added to the phone, by the user or by an attacker who tricked them, can be used to read this app’s secure traffic.', 'Remove <certificates src="user"/> from release builds. Keep it inside <debug-overrides> only.'))
+  if (/<debug-overrides>/.test(xml) && /<debug-overrides>[\s\S]*?<certificates\s+src\s*=\s*"user"/.test(xml)) out.push(mk(t, 'debug-ca', 'info', 'Debug builds trust added certificates', file, 'This is normal for testing with a proxy and has no effect on release builds.', 'Nothing to do, as long as it stays inside debug-overrides.'))
+  if (/<pin-set\b/.test(xml)) {
+    const exp = /<pin-set\b[^>]*expiration\s*=\s*"(\d{4}-\d{2}-\d{2})"/.exec(xml)?.[1]
+    if (exp && new Date(`${exp}T00:00:00Z`).getTime() < Date.now()) out.push(mk(t, 'pin-expired', 'medium', `Certificate pinning expired on ${exp}`, file, 'Android ignores an expired pin set, so pinning no longer protects this app.', 'Update the pins and the expiration date, and ship the app update before the next expiry.'))
+  }
+  return out
+}
+
+/** embedded.mobileprovision (read as text): a build meant for development on a real phone. */
+export function checkProvisioning(text: string, file = 'embedded.mobileprovision'): Finding[] {
+  const out: Finding[] = []
+  const t = 'MacSec provisioning check'
+  if (/<key>get-task-allow<\/key>\s*<true\s*\/>/.test(text)) out.push(mk(t, 'task-allow', 'high', 'A debugger can attach to this build (get-task-allow)', file, 'This build is signed for development. Anyone with the phone and a Mac can attach a debugger, read its memory and change what it does.', 'Archive the release build with a distribution profile, where get-task-allow is false.'))
+  if (/<key>ProvisionsAllDevices<\/key>\s*<true\s*\/>/.test(text)) out.push(mk(t, 'enterprise', 'info', 'Signed with an enterprise profile', file, 'Enterprise builds install outside the App Store and run on any device. Make sure it is only given to people who should have it.', 'Use the App Store or TestFlight for wider distribution.'))
+  if (/<key>aps-environment<\/key>\s*<string>development<\/string>/.test(text)) out.push(mk(t, 'aps-dev', 'low', 'Push notifications point at the development server', file, 'A release build should use the production push environment.', 'Set aps-environment to production in the release entitlements.'))
+  return out
+}
+
+/** google-services.json or GoogleService-Info.plist: tells you there is a Firebase database to check, without reading it. */
+export function checkFirebaseConfig(text: string, file: string): Finding[] {
+  const url = /https:\/\/([a-z0-9-]+)(?:-default-rtdb)?\.(?:firebaseio\.com|[a-z0-9-]+\.firebasedatabase\.app)/i.exec(text)?.[0]
+  if (!url) return []
+  return [mk('MacSec Firebase check', 'url', 'info', `The app uses a Firebase database (${url})`, file, 'Anyone can find this address in the app. What matters is the database rules: if they allow reads or writes without signing in, the data is public. MacSec did not read the database.', 'In the Firebase console open Realtime Database or Firestore, Rules, and make sure access needs a signed-in user and checks who owns each record.')]
+}
+
+/** An old targetSdkVersion keeps old, weaker Android behaviour for the app. */
+export function checkTargetSdk(xml: string, file = 'AndroidManifest.xml', minimum = 33): Finding[] {
+  const v = Number(/<uses-sdk\b[^>]*targetSdkVersion\s*=\s*"?(\d+)/.exec(xml)?.[1])
+  if (!v || v >= minimum) return []
+  return [mk('MacSec manifest check', 'targetsdk', 'low', `The app targets an old Android version (${v})`, file, `Apps that target Android below ${minimum} keep older, weaker rules for storage, intents and background work, and Google Play no longer accepts new apps that old.`, 'Raise targetSdkVersion to the current level, test, and release.')]
+}
+
 // ---------------------------------------------------------------- Binary hardening (checksec-style)
 
 export interface Hardening {

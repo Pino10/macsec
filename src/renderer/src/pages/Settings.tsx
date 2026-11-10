@@ -8,8 +8,10 @@ export default function Settings(): React.JSX.Element {
   const { settings, updateSettings, setSettings, act, appInfo } = useApp()
   const [check, setCheck] = useState<string | null>(null)
   const [eds, setEds] = useState<{ found: { id: string; name: string }[]; current: string | null } | null>(null)
+  const [have, setHave] = useState<string[] | null>(null)
   useEffect(() => {
     void window.macsec.invoke('editors:list').then(setEds)
+    void window.macsec.invoke('ai:agents').then((a) => setHave(a.filter((x) => x.installed).map((x) => x.id)))
   }, [])
   const api = window.macsec
   if (!settings) return <></>
@@ -41,12 +43,15 @@ export default function Settings(): React.JSX.Element {
             label="Default reviewer"
             value={settings.reviewer}
             onChange={(r) => void updateSettings({ reviewer: r })}
-            options={[
-              ['claude', 'Claude Code'],
-              ['codex', 'Codex'],
-              ['model', 'Your model'],
-              ['none', 'Scanners only']
-            ]}
+            options={(
+              [
+                ['claude', 'Claude Code'],
+                ['codex', 'Codex'],
+                ['gemini', 'Gemini CLI'],
+                ['model', 'Your model'],
+                ['none', 'Scanners only']
+              ] as [Reviewer, string][]
+            ).filter(([id]) => id === 'none' || id === settings.reviewer || id === 'model' || (have ?? []).includes(id))}
           />
         </div>
         <div className="ms-row">

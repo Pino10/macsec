@@ -132,6 +132,10 @@ Pick the areas this project has, then work through the matching skill for each. 
 | Backend as a service | cloud-baas-review | Supabase, Firebase, S3, Azure Storage, Cosmos DB |
 | AI features | ai-app-review | calls to an LLM, RAG, agents, tools |
 | Desktop apps | electron-review | Electron, Tauri |
+| Mobile apps | mobile-app-review, android-app-review, ios-app-review | Android or iOS source, .apk, .ipa, React Native, Flutter |
+| GraphQL | graphql-review | a GraphQL endpoint or schema |
+| Cloud accounts | cloud-iam-review | AWS, Azure or Google Cloud access |
+| Servers and networks | network-server-review | hosts, open ports, internal services |
 | Secrets | secrets-triage | any key, token or password in files or history |
 | Understanding first | audit-context, entry-points, threat-model | deep reviews and assessments |
 | Defaults and gotchas | insecure-defaults, sharp-edges | always |
@@ -331,6 +335,92 @@ Report each with the exact steps a normal user could take and the business impac
 - **Updates:** signed, over HTTPS, checked against a signature or checksum.
 - **Secrets:** stored with \`safeStorage\`/Keychain, not in plain JSON; not logged.
 - **Tauri:** allowlist and capabilities minimal; \`dangerousRemoteDomainIpcAccess\` unused; CSP set.`
+  },
+  'mobile-app-review': {
+    description: 'Security review of a mobile app (Android or iOS) against OWASP MASVS: storage, crypto, sign-in, network, platform use, code quality and resilience. Use for any mobile app, built or as source.',
+    body: `# Mobile app review (OWASP MASVS)
+
+Work through each area. For every finding give the file and line, or the manifest or plist key, and what an attacker with the phone, or with the same Wi-Fi, could do.
+
+1. **Storage (MASVS-STORAGE).** Tokens, passwords, personal data in SharedPreferences, UserDefaults, plain SQLite, files, logs, the clipboard, screenshots, keyboard caches or backups. Secrets belong in the Keystore or Keychain. Check what ends up in logs (\`Log.d\`, \`print\`, \`NSLog\`).
+2. **Crypto (MASVS-CRYPTO).** Hard-coded keys or IVs, ECB mode, MD5 or SHA-1 for security, \`Random\` instead of a secure random, home-made encryption, keys derived from fixed strings.
+3. **Sign-in (MASVS-AUTH).** Authorization only in the app (the server must check again), biometrics that only return a boolean and do not unlock a key, long-lived tokens with no way to revoke, no re-check for sensitive actions.
+4. **Network (MASVS-NETWORK).** HTTP allowed, certificate checks turned off (trust-all managers, \`allowsArbitraryLoads\`, \`allowInvalidCertificates\`), no pinning where the data is sensitive (medium, not critical), user-added certificate authorities trusted.
+5. **Platform (MASVS-PLATFORM).** Exported Android components with no permission, deep links and URL schemes that act without asking, WebViews with JavaScript and file access, \`addJavascriptInterface\`, content providers that can be read by other apps, pasteboard use, sensitive screens without \`FLAG_SECURE\`.
+6. **Code (MASVS-CODE).** Debug builds shipped (\`debuggable\`, \`get-task-allow\`), test endpoints, old minimum OS versions, third-party SDKs with known problems, untrusted data parsed unsafely (deserialisation, XML, path from intent).
+7. **Resilience (MASVS-RESILIENCE).** Treated as a hardening layer, not a vulnerability. Missing root or jailbreak detection and obfuscation are low or informational unless the app protects money or identity.
+8. **Backend.** The app is only the front. List every API host it talks to, and say which ones to test next with the API review.
+
+Rank by what is reachable without owning the phone first.`
+  },
+  'android-app-review': {
+    description: 'Android specific checks: manifest, exported components, intents, WebView, storage, network security config and native libraries. Use together with mobile-app-review for an Android app or .apk.',
+    body: `# Android app review
+
+- **Manifest.** \`debuggable\`, \`allowBackup\`, \`usesCleartextTraffic\`, \`testOnly\`, a low \`minSdkVersion\` (below 24 keeps old, weaker behaviour) and a low \`targetSdkVersion\`. Every component with \`exported="true"\` or an intent filter and no permission: who can start it, and what does it do with the intent's extras?
+- **Intents and links.** App links and custom schemes: does the handler check the host, the path and the caller? Pending intents that are mutable. Broadcast receivers that act on a spoofable action. Content providers: \`grantUriPermissions\`, path traversal in \`openFile\`, SQL built from the URI.
+- **Network security config.** \`cleartextTrafficPermitted="true"\`, \`<certificates src="user"/>\` in release builds (any user-installed certificate is trusted), a long or missing pin expiry, debug-overrides left on.
+- **WebView.** \`setJavaScriptEnabled(true)\` with remote content, \`addJavascriptInterface\`, \`setAllowFileAccessFromFileURLs\`, \`setWebContentsDebuggingEnabled(true)\`, \`shouldOverrideUrlLoading\` that accepts any host.
+- **Storage.** \`MODE_WORLD_READABLE\`, files in external storage, secrets in SharedPreferences, databases without encryption for sensitive data, \`Log\` calls that print tokens.
+- **Native code.** Libraries without stack canaries, NX or RELRO; old OpenSSL or zlib bundled in; debug symbols left in.
+- **Firebase.** A \`firebaseio.com\` URL or \`google-services.json\` means: check the database and storage rules belong to signed-in users. Say so, but do not read the database.`
+  },
+  'ios-app-review': {
+    description: 'iOS specific checks: Info.plist, App Transport Security, URL schemes, Keychain use, entitlements, provisioning and binary hardening. Use together with mobile-app-review for an iOS app or .ipa.',
+    body: `# iOS app review
+
+- **Info.plist.** \`NSAppTransportSecurity\` with \`NSAllowsArbitraryLoads\` or broad exceptions; \`UIFileSharingEnabled\` and \`LSSupportsOpeningDocumentsInPlace\` (files visible in Files and over USB); usage descriptions for every permission the app asks for (camera, location, contacts) and whether the app really needs each.
+- **URL schemes and universal links.** \`CFBundleURLTypes\` are claimed by any app, so a scheme must never carry a token or perform an action without asking. Prefer universal links. Does the handler validate the host and parameters?
+- **Keychain.** \`kSecAttrAccessibleAlways\` or \`...AlwaysThisDeviceOnly\` (readable while locked) instead of \`WhenUnlockedThisDeviceOnly\`. Secrets in \`UserDefaults\`, plists, Core Data or files without data protection.
+- **Provisioning and entitlements.** \`get-task-allow\` true in a release build means a debugger can attach. Broad keychain access groups, associated domains that include test hosts, background modes the app does not need.
+- **Network.** Certificate validation turned off (\`AFSecurityPolicy allowInvalidCertificates\`, \`URLSession\` delegates that trust everything), HTTP URLs, UIWebView (deprecated) or WKWebView with injected tokens in URLs.
+- **Binary.** PIE, stack canaries and ARC present; no private API use; no bundled test servers or staging URLs; strings with keys (the secret scanner covers these).
+- **Privacy.** A privacy manifest that matches the SDKs inside; analytics SDKs receiving personal data.`
+  },
+  'graphql-review': {
+    description: 'Security review of a GraphQL API: introspection, authorisation per field and object, query depth and cost, batching, aliases, subscriptions and file uploads. Use whenever an API exposes GraphQL.',
+    body: `# GraphQL review
+
+1. **Introspection and the playground** on in production: lists every type, query and mutation for an attacker. Low alone, and a map for the rest.
+2. **Authorisation per field and object.** Is the check in the resolver (or a directive, policy or middleware), or only on the route? Every resolver that loads an object by id must check the caller owns it (object level), and sensitive fields (email, role, token) must check on their own (property level). Nested access: \`user { orders { customer { ... } } }\` reaching data the first level hides.
+3. **Query cost.** No depth limit, no complexity limit, no pagination caps, circular fragments, expensive fields with no timeout: one request can take the server down.
+4. **Batching and aliases.** Arrays of operations, or 100 aliases of \`login(...)\` in one request, get around rate limits and make password or OTP guessing cheap. Limit both, and count the aliases when rate limiting.
+5. **Mutations.** Mass assignment through input types (\`role\`, \`isAdmin\`, \`ownerId\`), no CSRF protection on cookie-authenticated GraphQL over GET or form posts, side effects in queries.
+6. **Errors.** Stack traces, SQL and file paths in \`errors[].extensions\`; field suggestions ("Did you mean...") that leak the schema when introspection is off.
+7. **Subscriptions and uploads.** The sign-in check on the WebSocket handshake and on every event; upload size, type and storage location.
+
+Confirm a finding only from what the code or the response shows. Do not guess that a field is unprotected.`
+  },
+  'network-server-review': {
+    description: 'Review of servers and services inside a network from what a read-only check found: open ports, service versions, remote login, file sharing, databases, TLS and patch level. Use for a server, a range of servers or an internal network.',
+    body: `# Network and server review
+
+Start from the evidence: the list of hosts, ports, banners and versions the check collected. Do not assume anything that is not in it.
+
+1. **What should be reachable.** For each host, which ports answer, and which of them should only be reachable from an admin network (SSH 22, RDP 3389, VNC 5900, SMB 445, databases, Docker 2375, Kubernetes 6443 and 10250, etcd 2379, Redis 6379, Elasticsearch 9200, Memcached 11211)?
+2. **Versions.** A banner version older than the supported lines, or matching a known vulnerability (state the CVE and say "possible": a distribution may have patched it without changing the version). End-of-life systems are findings on their own.
+3. **Remote access.** SSH with passwords allowed or root login, old protocol versions or weak ciphers, RDP exposed beyond the admin network, telnet and FTP in use.
+4. **File sharing.** SMB signing not required, SMBv1 on, anonymous or guest shares, NFS exports to everyone, rsync modules without a password.
+5. **Databases and caches.** Reachable from user networks, no password, default accounts. Say what was seen (a banner, an unauthenticated handshake), never try passwords.
+6. **TLS.** Expired or self-signed certificates on services people use, TLS 1.0 or 1.1, weak ciphers, names that do not match.
+7. **Web consoles.** Admin panels, dashboards and management interfaces (iDRAC, iLO, routers, hypervisors, Jenkins, Grafana) reachable from user networks.
+8. **Segmentation.** Which networks can reach which. A server network reachable from guest Wi-Fi is a finding even when each service is fine.
+
+Rank by who can reach it (internet, any user, admins only) and what it gives (data, control, a step to the next host). Fix advice must say what to change on the host and how to check afterwards.`
+  },
+  'cloud-iam-review': {
+    description: 'Review of cloud accounts (AWS, Azure, Google Cloud): who can do what, public storage and databases, network rules, keys, logging and backups. Use with the cloud account check results.',
+    body: `# Cloud account review
+
+1. **Identity.** The root or owner account has no keys and uses multi-factor sign-in. Every person and service has its own identity. Administrator access is granted to few. Wildcards (\`*:*\`, Owner at subscription level, Editor on a project) are findings. Unused users, access keys older than 90 days, keys that were never used.
+2. **Public exposure.** Storage buckets and containers open to the world, databases and caches with public addresses, snapshots and images shared publicly, load balancers and functions open with no authentication.
+3. **Network.** Security groups and firewall rules open to 0.0.0.0/0 on SSH, RDP, databases or management ports; default networks still in use; no flow logs.
+4. **Data.** Encryption at rest and in transit, customer keys where required, backups that exist and are tested, deletion protection on the important databases, no secrets in function settings or instance metadata scripts.
+5. **Logging and detection.** Audit logs on in every region and sent somewhere that cannot be changed by the same admins; alerts on root use, policy changes and failed sign-ins.
+6. **Services.** Metadata service version 2 only, containers not privileged, clusters with private control planes, no public container registries with private images.
+7. **Cost as security.** No budget alert means a stolen key can mine for days unnoticed.
+
+Report what the check actually saw (resource name, setting, value). A setting that could not be read is "unknown", not "fine".`
   },
   'security-code-review': {
     description: 'Methodical security code review of a whole project: entry points, trust boundaries, authentication, authorization, injection, data exposure. Use for any security code review.',

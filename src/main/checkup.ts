@@ -8,6 +8,7 @@ import { execFile } from 'child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
+import { runMoreChecks } from './machecks'
 
 export type CheckStatus = 'ok' | 'warn' | 'bad' | 'info'
 
@@ -17,6 +18,8 @@ export interface Check {
   status: CheckStatus
   detail: string
   fix?: string
+  /** The section it is shown under. */
+  group?: string
 }
 
 export interface LoginItem {
@@ -311,6 +314,8 @@ export async function runCheckup(): Promise<CheckupResult> {
   checks.push({ id: 'extensions', title: 'Browser extensions', status: everySite.length > 3 ? 'warn' : 'info', detail: ext.length ? `${ext.length} installed; ${everySite.length} can read every website you open.` : 'No extensions found in Chrome, Brave, Edge, Arc or Vivaldi.', fix: everySite.length ? 'Remove the ones you do not use: an extension that reads every site sees your passwords and sessions.' : undefined })
   const unknown = items.filter((i) => i.status === 'warn')
   checks.push({ id: 'login', title: 'Programs that start on their own', status: unknown.length ? 'warn' : 'ok', detail: `${items.length} launch agents and daemons${unknown.length ? `, ${unknown.length} unsigned or pointing at missing programs` : ', all signed'}. Malware often hides here.`, fix: unknown.length ? 'Look at each one marked below. If you do not recognise it, search its name before removing it.' : undefined })
+  checks.forEach((c) => (c.group ??= ['filevault', 'gatekeeper', 'sip', 'firewall', 'updates'].includes(c.id) ? 'Protection built into macOS' : c.id === 'ports' ? 'Reachable from other devices' : 'Programs and commands'))
+  checks.push(...(await runMoreChecks(ports)))
   const base = { at: new Date().toISOString(), macos: ver.trim(), checks, loginItems: items, ports, sshKeys: keys, extensions: ext }
   return { ...base, score: scoreOf(base) }
 }

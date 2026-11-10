@@ -1,3 +1,20 @@
+## MacSec 0.14.0
+
+### This Mac: many more checks, in sections
+Settings are now grouped and about a dozen new read-only checks were added: password after the screen locks, guest user, automatic login, Find My Mac, backups, AirDrop visibility, sharing services (SSH, screen sharing, file sharing), databases open to the network, network proxy, the hosts file, extra trusted certificates, last update check, device management, and PATH folders others can write to. All of them only read. Each says what it found and how you can fix it yourself in System Settings.
+
+### Mobile apps: more checks
+Android network security config (plain HTTP, certificates the phone owner added, expired pins), old target Android version, iOS development builds (get-task-allow, development push), and Firebase addresses (noted, never read). New Android, iOS and MASVS review skills guide the AI report.
+
+### Servers and networks
+The server check now takes a list, a range (192.168.1.10-20) or a small network (192.168.1.0/28), up to 64 servers at a time, with each server's open ports and services named separately. Only connections are opened.
+
+### Only what is installed
+The list of who writes the report now shows only the AI tools that are ready to use (Claude Code, Codex, Gemini CLI, your model). Others appear by themselves once they are set up. The default reviewer in Settings follows the same rule.
+
+### Skills
+Six new review skills: mobile apps, Android, iOS, GraphQL, servers and networks, and cloud accounts. The AI report for web, API, mobile, cloud and server checks now follows the skills that fit it.
+
 ## MacSec 0.13.0
 
 ### Recon now shows proof

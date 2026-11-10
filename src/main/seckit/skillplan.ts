@@ -117,7 +117,7 @@ export function skillCatalog(o: { app: string; ownDir: string; mineDir?: string;
 export type StackTag =
   | 'php' | 'laravel' | 'wordpress' | 'symfony' | 'js' | 'ts' | 'react' | 'vue' | 'next' | 'node-api' | 'electron' | 'ai'
   | 'python' | 'django' | 'go' | 'rust' | 'c' | 'solidity' | 'android' | 'ios' | 'docker' | 'terraform' | 'gha'
-  | 'supabase' | 'firebase' | 'claude' | 'mobile' | 'tailwind' | 'pennant'
+  | 'supabase' | 'firebase' | 'claude' | 'mobile' | 'tailwind' | 'pennant' | 'graphql'
 
 /** What a project is made of, from the files at its top (and a few known places). */
 export function detectStack(root: string): StackTag[] {
@@ -158,6 +158,7 @@ export function detectStack(root: string): StackTag[] {
   }
   const composer = read('composer.json').toLowerCase()
   if (composer.includes('"laravel/pennant"')) t.add('pennant')
+  if (/graphql/i.test(pkg + composer + read('requirements.txt') + read('pyproject.toml')) || top.some((n) => /\.graphqls?$/.test(n)) || has('schema.graphql')) t.add('graphql')
   const py = read('requirements.txt') + read('pyproject.toml')
   if (py || top.some((n) => n.endsWith('.py'))) t.add('python')
   if (/django/i.test(py) || has('manage.py')) t.add('django')
@@ -202,6 +203,11 @@ export function recommend(items: SkillItem[], stack: StackTag[], o: { changesOnl
       else if (name === 'cloud-baas-review' && any('supabase', 'firebase')) on.add(i.id)
       else if (name === 'ai-app-review' && any('ai')) on.add(i.id)
       else if (name === 'electron-review' && any('electron')) on.add(i.id)
+      else if (name === 'mobile-app-review' && any('android', 'ios', 'mobile')) on.add(i.id)
+      else if (name === 'android-app-review' && any('android')) on.add(i.id)
+      else if (name === 'ios-app-review' && any('ios')) on.add(i.id)
+      else if (name === 'graphql-review' && any('graphql')) on.add(i.id)
+      else if (name === 'cloud-iam-review' && any('terraform')) on.add(i.id)
       else if (name === 'change-review' && o.changesOnly) on.add(i.id)
     } else if (kind === 'pack') {
       if (a === 'anthropic' || a === 'cloudflare') on.add(i.id)

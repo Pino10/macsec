@@ -24,9 +24,16 @@ export default function ReviewerChoice({ value, onChange, what }: { value: Revie
     { id: 'model', icon: <Cpu size={18} />, title: model ? model.split('/').pop()! : 'Your model', text: model ? 'LM Studio on this Mac: reads the riskiest files and every scanner result.' : 'Choose a model on Tools first.', ok: !!model },
     { id: 'none', icon: <Layers size={18} />, title: 'Scanners only', text: 'No AI. Findings still come with their code and fixes.', ok: true }
   ]
+  // Only what is ready to use is offered. Anything else appears here by itself once it is set up on Tools.
+  const ready = list.filter((r) => r.ok)
+  const hidden = list.length - ready.length
+  useEffect(() => {
+    if (agents.length && !ready.some((r) => r.id === value)) onChange('none')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agents, free, model])
   return (
     <div className="choices" role="radiogroup" aria-label="AI reviewer">
-      {list.map((r) => (
+      {ready.map((r) => (
         <button key={r.id} className="choice" role="radio" aria-checked={value === r.id} disabled={!r.ok} onClick={() => onChange(r.id)} title={!r.ok ? 'Set it up on the Tools page' : undefined}>
           <span className="ci" style={{ ['--g' as string]: G[r.id] }}>
             {r.icon}
@@ -51,6 +58,14 @@ export default function ReviewerChoice({ value, onChange, what }: { value: Revie
           </span>
         </button>
       ))}
+      {hidden > 0 && (
+        <p className="hint" style={{ gridColumn: '1 / -1', margin: '4px 2px 0' }}>
+          More AI options ({hidden}) appear here once they are set up.{' '}
+          <a className="link" onClick={() => setPage('tools')}>
+            Open Tools
+          </a>
+        </p>
+      )}
     </div>
   )
 }

@@ -59,14 +59,21 @@ export default function ThisMac(): React.JSX.Element {
       {!r && tab !== 'images' && <div className="panel empty-state">Press “Check this Mac”. It takes a few seconds.</div>}
       {r && tab === 'checks' && (
         <div className="panel">
-          {r.checks.map((c) => (
-            <div key={c.id} className="row mac-row">
-              {ICON[c.status]}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="row-title">{c.title}</div>
-                <div className="row-sub" style={{ whiteSpace: 'normal' }}>{c.detail}</div>
-                {c.fix && <div className="row-sub fix-line" style={{ whiteSpace: 'normal' }}>How: {c.fix}</div>}
-              </div>
+          {[...new Set(r.checks.map((c) => c.group ?? 'Settings'))].map((g) => (
+            <div key={g}>
+              <div className="mac-group">{g}</div>
+              {r.checks
+                .filter((c) => (c.group ?? 'Settings') === g)
+                .map((c) => (
+                  <div key={c.id} className="row mac-row">
+                    {ICON[c.status]}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="row-title">{c.title}</div>
+                      <div className="row-sub" style={{ whiteSpace: 'normal' }}>{c.detail}</div>
+                      {c.fix && <div className="row-sub fix-line" style={{ whiteSpace: 'normal' }}>How: {c.fix}</div>}
+                    </div>
+                  </div>
+                ))}
             </div>
           ))}
         </div>

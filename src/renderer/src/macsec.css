@@ -2610,3 +2610,5 @@ div + .pick-item {
 .proof-meta dt { opacity: 0.65; }
 .proof-meta dd { margin: 0; word-break: break-all; }
 .proof .tag svg, .tag svg { vertical-align: -1px; margin-right: 3px; }
+
+.mac-group { padding: 14px 16px 6px; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }

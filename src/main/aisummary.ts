@@ -9,9 +9,19 @@ import { agentEnv, findCli } from './agents'
 import { chatWithLlm } from './models'
 import { parseAiOutput, type Verdict } from './aireview'
 import { pluginArgs } from './skills'
+import { skillText } from './seckit/skills'
 import { localModelEnv } from './seckit/reviewers'
 import { getSettings } from './settings'
 import type { Op } from './engine'
+
+/** The review methods that fit each kind of check, so the report judges findings the way an expert in that area would. */
+export const METHOD: Record<'web' | 'api' | 'mobile' | 'cloud' | 'server', string[]> = {
+  web: ['client-side-review', 'infra-config-review', 'false-positive-check'],
+  api: ['api-security-review', 'graphql-review', 'auth-session-review', 'false-positive-check'],
+  mobile: ['mobile-app-review', 'android-app-review', 'ios-app-review', 'false-positive-check'],
+  cloud: ['cloud-iam-review', 'cloud-baas-review', 'false-positive-check'],
+  server: ['network-server-review', 'infra-config-review', 'false-positive-check']
+}
 
 const WHAT = { web: ['web', 'site'], api: ['API', 'API'], mobile: ['mobile app', 'app'], cloud: ['cloud account', 'cloud account'], server: ['server and open ports', 'server'] } as const
 
@@ -35,6 +45,9 @@ For each problem worth fixing, "### [SEVERITY] Title" (CRITICAL, HIGH, MEDIUM or
 Items that look alarming but are not, and why.
 
 End with one fenced json block: {"verdicts":[{"id":"<id>","verdict":"confirmed" or "false-positive","severity":"high","reason":"one sentence"}]} for the items you judged.
+
+Use this method to judge what matters and what is noise:
+${skillText(METHOD[kind])}
 
 Findings (${findings.length}):
 ${list || '(none)'}`

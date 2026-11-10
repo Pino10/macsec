@@ -20,6 +20,8 @@ import { parseNaabu, parseNmapXml, parsePmapper, parseScoutSuite, portFindings, 
 import { appPath, installTool, isInstalled, toolDef, toolEnv, toolPath } from './toolbox'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
 import { log } from './logs'
+import { isPrivateTarget } from './targets'
+import { writeFileSync } from 'fs'
 
 type Cloud = Extract<AuditRequest, { kind: 'cloud' }>
 type Server = Extract<AuditRequest, { kind: 'server' }>
@@ -165,8 +167,10 @@ async function server(id: string, req: Server): Promise<void> {
   const op = beginOp(id)
   const s = new SessionRun(id, op)
   const nmap = appPath('nmap')
+  const hosts = req.hosts?.length ? req.hosts : [req.host]
+  const many = hosts.length > 1
   const st = {
-    ports: s.step('naabu', `Find open ports (the ${req.ports === 'top100' ? '100' : '1,000'} most common)`),
+    ports: s.step('naabu', `Find open ports${many ? ` on ${hosts.length} servers` : ''} (the ${req.ports === 'top100' ? '100' : '1,000'} most common)`),
     nmap: s.step('nmap', nmap ? 'Name the service on each open port (Nmap)' : 'Name the services (install Nmap to add this)'),
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what should not be reachable and how to close it') : null
   }
@@ -175,7 +179,10 @@ async function server(id: string, req: Server): Promise<void> {
     await s.run(st.ports, async (note, line) => {
       await ensure('naabu', note)
       const out = join(s.raw, 'naabu.jsonl')
-      await runTool({ name: 'naabu', bin: 'naabu', args: ['-host', req.host, '-top-ports', req.ports === 'top100' ? '100' : '1000', '-scan-type', 'c', '-json', '-silent', '-duc', '-rate', '300', '-o', out, '-stats', '-si', '5'], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
+      // Several servers go in a file, one per line, so nothing typed is ever read as an option.
+      const list = join(s.raw, 'targets.txt')
+      writeFileSync(list, `${hosts.join('\n')}\n`)
+      await runTool({ name: 'naabu', bin: 'naabu', args: [...(many ? ['-list', list] : ['-host', req.host]), '-top-ports', req.ports === 'top100' ? '100' : '1000', '-scan-type', 'c', '-json', '-silent', '-duc', '-rate', '300', '-o', out, '-stats', '-si', '5'], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
         if (!existsSync(out)) throw e
         return ''
       })
@@ -186,15 +193,23 @@ async function server(id: string, req: Server): Promise<void> {
     await s.run(st.nmap, async (note, line) => {
       if (!nmap) return note('Skipped: Nmap is not installed (brew install nmap)')
       if (!open.length) return note('Nothing to look at')
-      const out = join(s.raw, 'nmap.xml')
       // Version detection only: no NSE scripts (-sC / --script), no OS fingerprinting, plain TCP connections.
-      await runTool({ name: 'nmap', bin: nmap, absolute: true, args: ['-sT', '-sV', '--version-light', '-Pn', '-n', '-p', open.map((p) => p.port).join(','), '-oX', out, req.host], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line)
-      const named = parseNmapXml(readFileSync(out, 'utf8'))
-      open = open.map((p) => ({ ...p, ...named.find((n) => n.port === p.port), host: p.host }))
+      // One run per server, with only the ports that server answered on.
+      const byHost = [...new Set(open.map((p) => p.host))]
+      let all: OpenPort[] = []
+      for (const [i, h] of byHost.entries()) {
+        const mine = open.filter((p) => p.host === h)
+        const out = join(s.raw, `nmap-${i}.xml`)
+        note(`Nmap: ${h} (${i + 1} of ${byHost.length})`)
+        await runTool({ name: 'nmap', bin: nmap, absolute: true, args: ['-sT', '-sV', '--version-light', '-Pn', '-n', '-p', mine.map((p) => p.port).join(','), '-oX', out, h], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line)
+        const named = parseNmapXml(readFileSync(out, 'utf8'))
+        all = all.concat(mine.map((p) => ({ ...p, ...named.find((n) => n.port === p.port), host: p.host })))
+      }
+      open = all
     })
-    s.add(portFindings(open, isLocalHost(req.host)))
+    s.add([...new Set(open.map((p) => p.host))].flatMap((h) => portFindings(open.filter((p) => p.host === h), !many && isLocalHost(req.host))))
 
-    await aiStep(s, st.ai, req.reviewer, 'server', req.host, `Open ports and services on ${req.host}${isLocalHost(req.host) ? ' (this Mac or a local development host)' : ''}. Give firewall commands for the likely platform.`)
+    await aiStep(s, st.ai, req.reviewer, 'server', req.host, `Open ports and services on ${many ? `${hosts.length} servers (${hosts.slice(0, 12).join(', ')}${hosts.length > 12 ? ', and more' : ''}), ${hosts.every(isPrivateTarget) ? 'all on a private network' : 'some reachable from the internet'}` : req.host}${!many && isLocalHost(req.host) ? ' (this Mac or a local development host)' : ''}. Say which hosts should not expose each service. Give firewall commands for the likely platform.`)
     s.finish()
   } catch (e) {
     s.finish((e as Error).message)

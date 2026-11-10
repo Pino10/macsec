@@ -219,7 +219,8 @@ export type AuditRequest =
   | { kind: 'portfolio' }
   | { kind: 'changes'; path: string }
   | { kind: 'cloud'; provider: 'azure' | 'aws'; reviewer: Reviewer }
-  | { kind: 'server'; host: string; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean }
+  /** `host` names the check; `hosts` is every server in it (one, a list, or a small network). */
+  | { kind: 'server'; host: string; hosts?: string[]; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean }
 
 /** A mobile app: its source folder, or a built .apk or .ipa file. */
 export interface ReconRequest {
@@ -397,7 +398,7 @@ export interface CheckupResult {
   at: string
   macos: string
   score: number
-  checks: { id: string; title: string; status: 'ok' | 'warn' | 'bad' | 'info'; detail: string; fix?: string }[]
+  checks: { id: string; title: string; status: 'ok' | 'warn' | 'bad' | 'info'; detail: string; fix?: string; group?: string }[]
   loginItems: { plist: string; label: string; program: string | null; where: string; signer: string | null; status: 'ok' | 'warn' | 'bad' | 'info'; note: string }[]
   ports: { command: string; pid: number; address: string; port: number; everyone: boolean }[]
   sshKeys: { file: string; kind: string; protectedByPassphrase: boolean | null; permissionsOk: boolean }[]

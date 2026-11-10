@@ -39,6 +39,7 @@ import { readRequest, saveRequest, stripSecrets, triageFinding } from './session
 import { checkForUpdate, installUpdate, releaseNotes, updateStatus } from './updater'
 import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
+import { expandTargets } from './targets'
 import { optionalTools } from './optional'
 import { startAudit } from './audit'
 import { cancelOp, finishEvents } from './engine'
@@ -790,9 +791,14 @@ function registerIpc(): void {
       }
       if (r.kind === 'cloud') return startAudit({ kind: 'cloud', provider: pick((r as { provider?: unknown }).provider, ['azure', 'aws'] as const, 'azure'), reviewer: pick(r.reviewer, REVIEWERS, 'none') })
       if (r.kind === 'server') {
-        const host = validHost((r as { host?: unknown }).host)
-        if (!isLocalHost(host) && r.authorized !== true) throw new ValidationError('Confirm that you own this server or have permission to test it.')
-        return startAudit({ kind: 'server', host, ports: pick((r as { ports?: unknown }).ports, ['top100', 'top1000'] as const, 'top100'), reviewer: pick(r.reviewer, REVIEWERS, 'none'), authorized: r.authorized === true })
+        const typed = (r as { host?: unknown }).host
+        // One server, a list, or a small network: every name is checked, nothing is passed on as typed.
+        const text = typeof typed === 'string' ? typed.trim() : ''
+        const multi = /[\s,;]/.test(text) || /^[\d.]+\/\d+$/.test(text) || /^[\d.]+-\d+$/.test(text)
+        const hosts = multi ? expandTargets(text) : [validHost(typed)]
+        const host = hosts.length === 1 ? hosts[0] : `${hosts.length} servers`
+        if (!hosts.every(isLocalHost) && r.authorized !== true) throw new ValidationError('Confirm that you own these servers or have permission to test them.')
+        return startAudit({ kind: 'server', host, ...(hosts.length > 1 ? { hosts } : {}), ports: pick((r as { ports?: unknown }).ports, ['top100', 'top1000'] as const, 'top100'), reviewer: pick(r.reviewer, REVIEWERS, 'none'), authorized: r.authorized === true })
       }
       throw new ValidationError('Choose an audit.')
     } catch (e) {
