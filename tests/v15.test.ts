@@ -24,7 +24,7 @@ describe('recon delta', () => {
 
 describe('new skills', () => {
   it('exist and every method list points at real skills', () => {
-    for (const n of ['cicd-pipeline-review', 'smart-contract-review', 'identity-surface-review', 'evidence-gate-review', 'standards-mapping-catalog', 'untrusted-content-guard']) expect(SKILLS[n]).toBeTruthy()
+    for (const n of ['cicd-pipeline-review', 'smart-contract-review', 'identity-surface-review', 'evidence-gate-review', 'standards-mapping-catalog', 'untrusted-content-guard', 'file-upload-review', 'http-cache-review']) expect(SKILLS[n]).toBeTruthy()
     for (const list of Object.values(METHOD)) for (const n of list) expect(SKILLS[n], n).toBeTruthy()
   })
   it('the guard rides along in every method and has no em dashes', () => {

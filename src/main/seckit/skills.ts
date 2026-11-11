@@ -136,6 +136,8 @@ Pick the areas this project has, then work through the matching skill for each. 
 | GraphQL | graphql-review | a GraphQL endpoint or schema |
 | Cloud accounts | cloud-iam-review | AWS, Azure or Google Cloud access |
 | Servers and networks | network-server-review | hosts, open ports, internal services |
+| File uploads | file-upload-review | upload folders, file handling |
+| Caching and proxies | http-cache-review | CDN, reverse proxy, cache headers |
 | Pipelines | cicd-pipeline-review | GitHub Actions, GitLab CI, Jenkins files |
 | Smart contracts | smart-contract-review | Solidity source |
 | Secrets | secrets-triage | any key, token or password in files or history |
@@ -522,6 +524,39 @@ Tag each finding with one primary standard entry, and add others only when they 
 Rules: choose the entry that names the root cause, not the symptom (an exposed \`.env\` is A05, with CWE-538, not "information disclosure" alone). If nothing fits, write "none" instead of forcing a match.
 
 When asked for coverage: list the entries in the relevant standard that no finding and no check touched, and say plainly that "no finding" is not the same as "tested".`
+  },
+  'file-upload-review': {
+    description: 'Review of file upload and download code and settings: type checks, storage location, names, image and document processing, and who can fetch the files. Use when a project accepts files from users.',
+    body: `# File upload review
+
+Read the code and settings. Do not upload anything to a live site.
+
+1. **Where it lands.** Is the upload folder inside the web root and able to run scripts (PHP, JSP, ASPX)? Safer: outside the web root, or served from separate storage with scripts turned off for that folder.
+2. **Names.** Is the stored name chosen by the server (random) or taken from the user? Look for path pieces (\`../\`, backslashes, null bytes), double extensions, and names that overwrite another user's file.
+3. **Type checks.** Is the type decided from the extension only, the browser's \`Content-Type\` only, or the real content? Allow-lists beat block-lists. Check that the check and the use agree (checked as an image, stored with the user's extension).
+4. **Active content.** SVG, HTML, XML and PDF files can carry script or external references. Are they served with \`Content-Disposition: attachment\`, a safe \`Content-Type\` and \`X-Content-Type-Options: nosniff\`, ideally from another domain?
+5. **Processing.** Image resizers, document converters, archive extractors and XML parsers: unpacked archives that can write outside the target (zip slip), decompression bombs, parsers that load external entities, old converter versions with known flaws.
+6. **Limits.** Size, count and rate limits; temporary files cleaned up; space quotas per user.
+7. **Access.** Can another user guess a file's address? Are private files behind a permission check, or only behind a hard-to-guess name? Are signed links short-lived?
+8. **Scanning.** Is there malware scanning where files are shared with others?
+
+Report the code location, what a user could upload or fetch, and the result. The code is the evidence: do not test with real files on a live system.`
+  },
+  'http-cache-review': {
+    description: 'Passive review of how a site is cached and routed: shared caches, cache keys, Vary and Cache-Control on private pages, proxy and CDN rules, URL and header handling. Use for sites behind a CDN or reverse proxy. Reads headers and config only.',
+    body: `# HTTP cache and proxy review
+
+Work from response headers the person can already see, and from CDN, proxy and application config. Do not send smuggling, poisoning or malformed requests.
+
+1. **Private pages in shared caches.** Pages with account data, tokens or personal content should say \`Cache-Control: private\` or \`no-store\`. Look at what the CDN is told to cache by extension or path rules (\`*.css\`, \`/static/\`): can a private page be reached under a path that looks static, such as \`/account/anything.css\`? Compare how the CDN and the application read the same path.
+2. **Cache keys.** Which parts of the request change the page (host, \`X-Forwarded-*\` headers, cookies, language, query parameters) but are not part of the cache key? A header that changes the page and is not in the key lets one visitor's request shape what others see. Check \`Vary\`.
+3. **Trusted headers.** Does the application build links, redirects or password reset addresses from \`Host\` or \`X-Forwarded-Host\`? Is there an allow-list of hosts?
+4. **Two servers, two readings.** A CDN or proxy in front of an application server: do they agree on where a request ends (\`Content-Length\` and \`Transfer-Encoding\`), on how paths are normalised (encoded slashes, backslashes, \`;\` parameters, dot segments) and on which HTTP version is used to the back end? Name software versions and settings that are known to differ, from vendor notes. Do not probe.
+5. **Access rules in the proxy.** Rules that block a path at the proxy only: can the same page be reached by another spelling of the path?
+6. **Error and debug pages.** Cached error pages, stack traces, internal host names in headers (\`Via\`, \`X-Served-By\`).
+7. **TLS settings.** 0-RTT early data accepted on endpoints that change state.
+
+Report the header or rule, who could be affected, and what a fix looks like (cache rules by content type, \`Vary\`, host allow-list, same parsing in both layers). Mark anything that needs a live test as "possible".`
   },
   'security-code-review': {
     description: 'Methodical security code review of a whole project: entry points, trust boundaries, authentication, authorization, injection, data exposure. Use for any security code review.',

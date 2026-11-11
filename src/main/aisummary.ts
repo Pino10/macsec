@@ -16,7 +16,7 @@ import type { Op } from './engine'
 
 /** The review methods that fit each kind of check, so the report judges findings the way an expert in that area would. */
 export const METHOD: Record<'web' | 'api' | 'mobile' | 'cloud' | 'server', string[]> = {
-  web: ['client-side-review', 'infra-config-review', 'identity-surface-review', 'standards-mapping-catalog', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
+  web: ['client-side-review', 'infra-config-review', 'identity-surface-review', 'http-cache-review', 'standards-mapping-catalog', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
   api: ['api-security-review', 'standards-mapping-catalog', 'graphql-review', 'auth-session-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
   mobile: ['mobile-app-review', 'android-app-review', 'ios-app-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
   cloud: ['cloud-iam-review', 'cloud-baas-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],

@@ -1,7 +1,7 @@
 {
   "name": "macsec",
   "productName": "MacSec",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "A free security workbench for macOS: deep code review, web and API scanning for your own projects, with AI.",
   "main": "./out/main/index.js",
   "author": "MacSec contributors",
