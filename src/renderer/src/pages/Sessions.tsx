@@ -497,6 +497,31 @@ function Detail({ f, id, canOpen, onChange }: { f: Finding; id: string; canOpen:
 
 type SurfaceData = NonNullable<Awaited<ReturnType<typeof window.macsec.invoke<'recon:data'>>>>
 
+/** What is different from the last recon of the same domain. */
+function ReconChanges({ delta }: { delta: NonNullable<SurfaceData['delta']> }): React.JSX.Element {
+  const none = !delta.newHosts.length && !delta.goneHosts.length && !delta.newEndpoints.length && !delta.newFindings.length && !delta.fixedFindings.length
+  const list = (title: string, items: string[]): React.JSX.Element | null =>
+    items.length ? (
+      <div style={{ padding: '4px 18px' }}>
+        <div className="row-title">{title} ({items.length})</div>
+        <div className="row-sub mono" style={{ wordBreak: 'break-all' }}>{items.slice(0, 12).join(', ')}{items.length > 12 ? `, and ${items.length - 12} more` : ''}</div>
+      </div>
+    ) : null
+  return (
+    <div className="panel" style={{ paddingBottom: 12 }}>
+      <div style={{ padding: '14px 18px 4px' }} className="section-title">
+        What changed since the recon on {delta.since.at.slice(0, 10)}
+      </div>
+      {none && <div className="hint" style={{ padding: '4px 18px' }}>Nothing changed: the same hosts, endpoints and findings.</div>}
+      {list('New hosts', delta.newHosts)}
+      {list('Hosts no longer seen', delta.goneHosts)}
+      {list('New endpoints', delta.newEndpoints)}
+      {list('New findings', delta.newFindings.map((f) => `${f.severity}: ${f.title}`))}
+      {list('Findings no longer seen', delta.fixedFindings.map((f) => `${f.severity}: ${f.title}`))}
+    </div>
+  )
+}
+
 /** A recon's hosts, scripts, endpoints and parameters. */
 function Surface({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<SurfaceData | null>(null)
@@ -506,6 +531,7 @@ function Surface({ id }: { id: string }): React.JSX.Element {
   if (!d) return <div className="panel" style={{ padding: 20 }}><span className="hint">The map appears when the recon has collected it.</span></div>
   return (
     <div style={{ display: 'grid', gap: 14 }}>
+      {d.delta && <ReconChanges delta={d.delta} />}
       {d.pages && <ReconPages pages={d.pages} />}
       <div className="panel">
         <div style={{ padding: '14px 18px 4px' }} className="section-title">

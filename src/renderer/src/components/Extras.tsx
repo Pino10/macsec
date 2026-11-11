@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bell, Command, MonitorUp, Copy, Download, ExternalLink, Network, Plug, RefreshCw, Trash2, Users, Workflow } from 'lucide-react'
-import type { FreeLlmInfo, IntegrationsInfo, PackUpdateInfo, SkillPackInfo } from '@shared/types'
+import type { FreeLlmInfo, IntegrationsInfo, ModelApi, ModelServer, PackUpdateInfo, SkillPackInfo } from '@shared/types'
 import { useApp } from '../store'
 import { Switch } from '../ui'
 
@@ -279,6 +279,103 @@ export function FreeLlmPanel(): React.JSX.Element {
             </button>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Ready-made addresses, so the address never has to be typed or remembered. The model list is read from the server itself. */
+const SERVER_PRESETS: { id: string; name: string; baseUrl: string; api: ModelApi; hint: string }[] = [
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', api: 'openai', hint: 'Key from platform.deepseek.com. Your code and findings are sent to DeepSeek.' },
+  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', api: 'openai', hint: 'One key for many models.' },
+  { id: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', api: 'openai', hint: 'Fast, with a free tier.' },
+  { id: 'custom', name: '', baseUrl: '', api: 'openai', hint: 'Any server that speaks the OpenAI or Anthropic format, on this Mac, your network or https.' }
+]
+
+/** Model servers you add yourself (DeepSeek, OpenRouter, your own). Keys go to the Keychain and never to the window. */
+export function ModelServersPanel({ onChange }: { onChange?: () => void }): React.JSX.Element {
+  const { act, busy, notify } = useApp()
+  const api = window.macsec
+  const [list, setList] = useState<ModelServer[]>([])
+  const [preset, setPreset] = useState('deepseek')
+  const [name, setName] = useState('DeepSeek')
+  const [url, setUrl] = useState('https://api.deepseek.com')
+  const [format, setFormat] = useState<ModelApi>('openai')
+  const [key, setKey] = useState('')
+  useEffect(() => {
+    void api.invoke('ai:servers').then(setList)
+  }, [api])
+  const pick = (id: string): void => {
+    const p = SERVER_PRESETS.find((x) => x.id === id)!
+    setPreset(id)
+    setName(p.name)
+    setUrl(p.baseUrl)
+    setFormat(p.api)
+  }
+  const add = async (): Promise<void> => {
+    const r = await act('addserver', () => api.invoke('ai:save-server', { name, baseUrl: url, api: format, ...(key.trim() ? { key: key.trim() } : {}) }))
+    if (!r) return
+    setList(r)
+    setKey('')
+    notify({ kind: 'info', text: `${name} was added. Choose its model in the list above.` })
+    onChange?.()
+  }
+  const hint = SERVER_PRESETS.find((x) => x.id === preset)?.hint
+  return (
+    <div className="panel">
+      {list.map((m) => (
+        <div key={m.id} className="arsenal-row" data-on>
+          <span className="glyph" style={{ ['--g' as string]: '#7cc4ff' }}>
+            <Network size={18} />
+          </span>
+          <div>
+            <div className="row-title">
+              {m.name} {m.hasKey && <span className="tag tag-ok">Key saved</span>}
+            </div>
+            <div className="row-sub mono">{m.baseUrl}</div>
+          </div>
+          <button
+            className="btn btn-sm"
+            onClick={async () => {
+              setList((await act(`delserver-${m.id}`, () => api.invoke('ai:delete-server', m.id))) ?? list)
+              onChange?.()
+            }}
+          >
+            <Trash2 size={13} /> Remove
+          </button>
+        </div>
+      ))}
+      <div className="arsenal-row">
+        <span className="glyph" style={{ ['--g' as string]: '#7cc4ff' }}>
+          <Plug size={18} />
+        </span>
+        <div>
+          <div className="row-title">Add a model server</div>
+          <div className="row-sub" style={{ whiteSpace: 'normal' }}>
+            {hint} Servers outside your network must use https. The key is stored in the macOS Keychain.
+          </div>
+          <div className="int-form">
+            <select className="input" value={preset} onChange={(e) => pick(e.target.value)} aria-label="Provider">
+              {SERVER_PRESETS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.id === 'custom' ? 'Another server' : p.name}
+                </option>
+              ))}
+            </select>
+            {preset === 'custom' && <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Name" />}
+            <input className="input mono" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://api.example.com/v1" aria-label="Address" spellCheck={false} />
+            {preset === 'custom' && (
+              <select className="input" value={format} onChange={(e) => setFormat(e.target.value as ModelApi)} aria-label="Format">
+                <option value="openai">OpenAI format</option>
+                <option value="anthropic">Anthropic format</option>
+              </select>
+            )}
+            <input className="input mono" type="password" placeholder="API key" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" aria-label="API key" />
+          </div>
+        </div>
+        <button className="btn btn-sm" disabled={busy.has('addserver') || !name.trim() || !url.trim()} onClick={() => void add()}>
+          Add
+        </button>
       </div>
     </div>
   )

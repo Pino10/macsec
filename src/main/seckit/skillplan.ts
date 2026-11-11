@@ -208,6 +208,8 @@ export function recommend(items: SkillItem[], stack: StackTag[], o: { changesOnl
       else if (name === 'ios-app-review' && any('ios')) on.add(i.id)
       else if (name === 'graphql-review' && any('graphql')) on.add(i.id)
       else if (name === 'cloud-iam-review' && any('terraform')) on.add(i.id)
+      else if (name === 'cicd-pipeline-review' && any('gha')) on.add(i.id)
+      else if (name === 'smart-contract-review' && any('solidity')) on.add(i.id)
       else if (name === 'change-review' && o.changesOnly) on.add(i.id)
     } else if (kind === 'pack') {
       if (a === 'anthropic' || a === 'cloudflare') on.add(i.id)

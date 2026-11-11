@@ -7,7 +7,8 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Finding, FindingCategory, ReconRequest, SessionInfo, SessionStep } from '../shared/types'
 import { beginOp, endOp, SessionRun } from './engine'
-import { createSession, saveAiReport, sessionDir } from './sessions'
+import { createSession, listSessions, readSession, saveAiReport, sessionDir } from './sessions'
+import { reconDelta, type ReconSnapshot } from './seckit/recondelta'
 import { normalizeTarget, reconPrompt, runRecon, type ReconFinding, type ReconResult } from './seckit/recon'
 import { summarizeWithAi } from './aisummary'
 import { runTool } from './engine'
@@ -61,6 +62,12 @@ async function run(id: string, req: ReconRequest): Promise<void> {
     })
     writeFileSync(join(s.raw, 'recon.json'), JSON.stringify({ hosts: result.hosts, js: result.js, endpoints: result.endpoints, params: result.params, urls: result.urls.length, pages: result.pages ?? [] }))
     writeFileSync(join(s.raw, 'urls.txt'), result.urls.join('\n'))
+    try {
+      const prev = previousRecon(id, result.domain)
+      if (prev) writeFileSync(join(s.raw, 'delta.json'), JSON.stringify(reconDelta(prev, { hosts: result.hosts.map((h) => h.host), endpoints: result.endpoints, findings: result.findings.map((f) => ({ id: f.id, title: f.title, severity: f.severity })) })))
+    } catch {
+      /* the comparison is a bonus: never let it stop a recon */
+    }
     s.add(result.findings.map(toFinding))
     if (req.reviewer !== 'none' && !s.cancelled) {
       const ai = s.step('ai', 'AI: the attack surface and where to look first')
@@ -85,7 +92,25 @@ async function run(id: string, req: ReconRequest): Promise<void> {
   }
 }
 
+/** The newest earlier recon of the same domain that finished and saved its results. */
+function previousRecon(currentId: string, domain: string): ReconSnapshot | null {
+  for (const info of listSessions()) {
+    if (info.kind !== 'recon' || info.id === currentId || info.createdAt >= readSession(currentId).createdAt) continue
+    const raw = join(sessionDir(info.id), 'raw', 'recon.json')
+    const fnd = join(sessionDir(info.id), 'findings.json')
+    if (!existsSync(raw) || !existsSync(fnd) || !info.target.toLowerCase().includes(domain.toLowerCase())) continue
+    const r = JSON.parse(readFileSync(raw, 'utf8')) as { hosts?: { host: string }[]; endpoints?: string[] }
+    const f = JSON.parse(readFileSync(fnd, 'utf8')) as { id: string; title: string; severity: string }[]
+    return { session: info.id, at: info.createdAt, hosts: (r.hosts ?? []).map((h) => h.host), endpoints: r.endpoints ?? [], findings: f.map((x) => ({ id: x.id, title: x.title, severity: x.severity })) }
+  }
+  return null
+}
+
 export function reconData(id: string): unknown {
   const f = join(sessionDir(id), 'raw', 'recon.json')
-  return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : null
+  if (!existsSync(f)) return null
+  const data = JSON.parse(readFileSync(f, 'utf8')) as Record<string, unknown>
+  const d = join(sessionDir(id), 'raw', 'delta.json')
+  if (existsSync(d)) data.delta = JSON.parse(readFileSync(d, 'utf8'))
+  return data
 }

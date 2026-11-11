@@ -178,7 +178,7 @@ export async function reviewWithClaude(root: string, prompt: string, depth: Revi
   // With a local model, Claude Code talks to LM Studio's Anthropic-compatible API instead of Anthropic.
   const env = local ? localModelEnv(local) : {}
   // Free LLM API routes to big hosted models: they get the full method, not the short local one.
-  const method = local ? `\n\nFollow this method:\n${skillText(['review-vectors', 'security-code-review', free ? 'false-positive-check' : 'local-model-review', 'security-report'])}` : ''
+  const method = local ? `\n\nFollow this method:\n${skillText(['untrusted-content-guard', 'review-vectors', 'security-code-review', free ? 'false-positive-check' : 'local-model-review', 'security-report'])}` : ''
   if (local && !free) {
     const ctx = await ensureLmContext(local.baseUrl, local.model, local.token)
     if (!ctx.ok) throw new Error(ctx.note)

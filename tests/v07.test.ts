@@ -126,6 +126,6 @@ describe('MCP and the macsec command', () => {
     expect(sh).toContain('http://127.0.0.1:53537/mcp')
   })
   it('ships 29 skills', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(35)
+    expect(Object.keys(SKILLS)).toHaveLength(41)
   })
 })

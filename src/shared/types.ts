@@ -223,6 +223,15 @@ export type AuditRequest =
   | { kind: 'server'; host: string; hosts?: string[]; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean }
 
 /** A mobile app: its source folder, or a built .apk or .ipa file. */
+export interface ReconDeltaInfo {
+  since: { session: string; at: string }
+  newHosts: string[]
+  goneHosts: string[]
+  newEndpoints: string[]
+  newFindings: { id: string; title: string; severity: string }[]
+  fixedFindings: { id: string; title: string; severity: string }[]
+}
+
 export interface ReconRequest {
   target: string
   depth: 'passive' | 'standard' | 'deep'
@@ -512,7 +521,7 @@ export interface Channels {
   'app:update-status': { args: []; result: UpdateStatus }
   'app:changelog': { args: []; result: ReleaseNote[] }
   'recon:start': { args: [ReconRequest]; result: SessionInfo }
-  'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number; pages?: ReconPage[] } | null }
+  'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number; pages?: ReconPage[]; delta?: ReconDeltaInfo } | null }
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
   'sessions:list': { args: []; result: SessionInfo[] }
   'sessions:get': { args: [string]; result: SessionDetail }

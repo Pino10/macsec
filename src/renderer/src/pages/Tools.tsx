@@ -3,7 +3,7 @@ import { Cloud, Microscope, Server, Smartphone, Swords } from 'lucide-react'
 import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
 import type { AgentInfo, LocalLlm, OptionalTool, ToolCategory, ToolInfo } from '@shared/types'
 import { useApp } from '../store'
-import { FreeLlmPanel, Integrations, SkillPacks } from '../components/Extras'
+import { FreeLlmPanel, Integrations, ModelServersPanel, SkillPacks } from '../components/Extras'
 import { PageHead, Seg } from '../ui'
 
 const GROUPS: { id: ToolCategory; title: string; icon: React.ReactNode }[] = [
@@ -216,6 +216,9 @@ export default function Tools(): React.JSX.Element {
           </button>
         </div>
       </div>
+
+      <h2 className="section-title">Model servers</h2>
+      <ModelServersPanel onChange={() => void api.invoke('ai:detect').then(setLlms)} />
 
       <h2 className="section-title">Free LLM API</h2>
       <FreeLlmPanel />
