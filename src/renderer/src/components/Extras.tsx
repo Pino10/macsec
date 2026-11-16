@@ -380,3 +380,31 @@ export function ModelServersPanel({ onChange }: { onChange?: () => void }): Reac
     </div>
   )
 }
+
+/** Asked once: nothing is downloaded from other teams until you say yes. */
+export function PacksAsk(): React.JSX.Element | null {
+  const { act, busy } = useApp()
+  const api = window.macsec
+  const [asked, setAsked] = useState<'yes' | 'no' | null | undefined>(undefined)
+  useEffect(() => {
+    void api.invoke('packs:asked').then(setAsked)
+  }, [api])
+  if (asked !== null) return null
+  const answer = async (yes: boolean): Promise<void> => {
+    setAsked(yes ? 'yes' : 'no')
+    await act('packs-answer', () => api.invoke('packs:answer', yes))
+  }
+  return (
+    <div className="notice info" style={{ alignItems: 'center' }}>
+      <span className="grow">
+        <b>Add free skill sets from security teams?</b> Trail of Bits, Sentry, Cloudflare and Anthropic publish review skills that make reviews more thorough. They are downloaded from GitHub into the MacSec folder, and reviews stay read-only whatever a skill asks for.
+      </span>
+      <button className="btn btn-sm" disabled={busy.has('packs-answer')} onClick={() => void answer(false)}>
+        Not now
+      </button>
+      <button className="btn btn-sm btn-primary" disabled={busy.has('packs-answer')} onClick={() => void answer(true)}>
+        Add them
+      </button>
+    </div>
+  )
+}

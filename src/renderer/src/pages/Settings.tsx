@@ -5,7 +5,7 @@ import { useApp } from '../store'
 import { PageHead, Seg, Switch } from '../ui'
 
 export default function Settings(): React.JSX.Element {
-  const { settings, updateSettings, setSettings, act, appInfo } = useApp()
+  const { settings, updateSettings, setSettings, act, appInfo, setPage } = useApp()
   const [check, setCheck] = useState<string | null>(null)
   const [eds, setEds] = useState<{ found: { id: string; name: string }[]; current: string | null } | null>(null)
   const [have, setHave] = useState<string[] | null>(null)
@@ -18,6 +18,67 @@ export default function Settings(): React.JSX.Element {
   return (
     <>
       <PageHead title="Settings" />
+      <h2 className="section-title" style={{ marginTop: 0 }}>Appearance</h2>
+      <div className="panel">
+        <div className="ms-row">
+          <div className="grow">
+            <div className="row-title">Look</div>
+            <div className="row-sub">Dark is MacSec’s own look. Light is easier in a bright room.</div>
+          </div>
+          <Seg<'dark' | 'light' | 'auto'>
+            label="Look"
+            value={settings.look ?? 'dark'}
+            onChange={(v) => void updateSettings({ look: v })}
+            options={[
+              ['dark', 'Dark'],
+              ['light', 'Light'],
+              ['auto', 'Like my Mac']
+            ]}
+          />
+        </div>
+        <div className="ms-row">
+          <div className="grow">
+            <div className="row-title">Accent colour</div>
+            <div className="row-sub">For buttons, the page you are on and highlights. Severity colours stay the same.</div>
+          </div>
+          <div className="swatches" role="radiogroup" aria-label="Accent colour">
+            {(
+              [
+                ['ion', 'Ion blue', '#38e1ff'],
+                ['violet', 'Violet', '#a78bfa'],
+                ['green', 'Green', '#3ef0a8'],
+                ['amber', 'Amber', '#ffc94a'],
+                ['rose', 'Rose', '#ff7aa8']
+              ] as const
+            ).map(([id, name, c]) => (
+              <button key={id} className="swatch" role="radio" aria-checked={(settings.accent ?? 'ion') === id} aria-label={name} title={name} style={{ ['--sw' as string]: c }} onClick={() => void updateSettings({ accent: id })} />
+            ))}
+          </div>
+        </div>
+        <div className="ms-row">
+          <div className="grow">
+            <div className="row-title">Text size</div>
+            <div className="row-sub">Larger makes everything a little bigger.</div>
+          </div>
+          <Seg<'normal' | 'large'>
+            label="Text size"
+            value={settings.textSize ?? 'normal'}
+            onChange={(v) => void updateSettings({ textSize: v })}
+            options={[
+              ['normal', 'Normal'],
+              ['large', 'Larger']
+            ]}
+          />
+        </div>
+        <div className="ms-row">
+          <div className="grow">
+            <div className="row-title">Explain findings simply</div>
+            <div className="row-sub">Leads with what could happen and what to do, in everyday words. Scanner names and reference numbers are folded away.</div>
+          </div>
+          <Switch on={!!settings.explainSimply} label="Explain findings simply" onChange={() => void updateSettings({ explainSimply: !settings.explainSimply })} />
+        </div>
+      </div>
+      <h2 className="section-title">General</h2>
       <div className="panel">
         <div className="ms-row">
           <div className="grow">
@@ -51,7 +112,7 @@ export default function Settings(): React.JSX.Element {
                 ['model', 'Your model'],
                 ['none', 'Scanners only']
               ] as [Reviewer, string][]
-            ).filter(([id]) => id === 'none' || id === settings.reviewer || id === 'model' || (have ?? []).includes(id))}
+            ).filter(([id]) => id === 'none' || id === settings.reviewer || (id === 'model' ? !!settings.llm.model : (have ?? []).includes(id)))}
           />
         </div>
         <div className="ms-row">
@@ -105,6 +166,15 @@ export default function Settings(): React.JSX.Element {
           </div>
           <button className="btn btn-sm" onClick={() => void api.invoke('app:open-folder', 'extensions')}>
             <FolderOpen size={13} /> Open
+          </button>
+        </div>
+        <div className="ms-row">
+          <div className="grow">
+            <div className="row-title">Logs for support</div>
+            <div className="row-sub">Everything MacSec did, line by line. Useful when something fails and you want to know why.</div>
+          </div>
+          <button className="btn btn-sm" onClick={() => setPage('logs')}>
+            Open logs
           </button>
         </div>
       </div>

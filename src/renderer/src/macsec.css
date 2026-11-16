@@ -2612,3 +2612,113 @@ div + .pick-item {
 .proof .tag svg, .tag svg { vertical-align: -1px; margin-right: 3px; }
 
 .mac-group { padding: 14px 16px 6px; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+
+/* ---------- 1.0: honest score, fix-first, trends ---------- */
+.coverage { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+.fix-first-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: 0.02em; }
+.launch-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 14px 0 4px; }
+.launch-chip { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; border-radius: 18px; border: 1px solid var(--line); color: var(--ink); cursor: pointer; }
+.launch-chip .row-sub { white-space: normal; }
+.trend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.trend { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 14px 16px; }
+.trend-change { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.trend-change[data-dir='up'] { color: var(--ok); }
+.trend-change[data-dir='down'] { color: var(--sev-high); }
+.f-note { padding: 9px 14px; font-size: 12px; color: var(--ink-3); border-bottom: 1px solid var(--line); }
+.page { padding-bottom: 96px; }
+.swatches { display: flex; gap: 8px; }
+.swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; background: var(--sw); cursor: pointer; box-shadow: 0 0 0 1px var(--line-2); }
+.swatch[aria-checked='true'] { border-color: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw) 40%, transparent); }
+
+/* Accent colours: buttons, the page you are on, highlights. Severity colours never change. */
+html[data-accent='violet'] { --ion: #a78bfa; --accent-text: #c4b5fd; --accent-soft: rgba(167, 139, 250, 0.16); }
+html[data-accent='green'] { --ion: #3ef0a8; --accent-text: #7df5c4; --accent-soft: rgba(62, 240, 168, 0.14); }
+html[data-accent='amber'] { --ion: #ffc94a; --accent-text: #ffd97a; --accent-soft: rgba(255, 201, 74, 0.14); }
+html[data-accent='rose'] { --ion: #ff7aa8; --accent-text: #ff9dbe; --accent-soft: rgba(255, 122, 168, 0.14); }
+html[data-text='large'] body { font-size: 15px; }
+html[data-text='large'] .row-sub, html[data-text='large'] .hint { font-size: 13.5px; }
+
+/* ---------- Light look ---------- */
+html[data-tone='light'] {
+  --void: #eef1f8;
+  --ivory: #131a2e;
+  --slate: #5b6482;
+  --ink: #131a2e;
+  --ink-2: rgba(19, 26, 46, 0.78);
+  --ink-3: rgba(19, 26, 46, 0.58);
+  --line: rgba(40, 60, 120, 0.13);
+  --line-2: rgba(40, 60, 120, 0.22);
+  --glass: rgba(255, 255, 255, 0.78);
+  --glass-2: rgba(255, 255, 255, 0.9);
+  --well: rgba(228, 233, 246, 0.9);
+  --hover: rgba(40, 70, 160, 0.07);
+  --ok: #0f9d6b;
+  --warn: #b97a00;
+  --bad: #d81b5c;
+  --sev-critical: #d81b5c;
+  --sev-high: #d9601a;
+  --sev-medium: #b97a00;
+  --sev-low: #1a73d9;
+  --sev-info: #5b6482;
+  --ion: #0a84c4;
+  --accent-text: #0a6fa6;
+  --accent-soft: rgba(10, 132, 196, 0.12);
+  color-scheme: light;
+}
+html[data-tone='light'][data-accent='violet'] { --ion: #6d4fd6; --accent-text: #5a3fc0; --accent-soft: rgba(109, 79, 214, 0.12); }
+html[data-tone='light'][data-accent='green'] { --ion: #0f9d6b; --accent-text: #0b7f56; --accent-soft: rgba(15, 157, 107, 0.12); }
+html[data-tone='light'][data-accent='amber'] { --ion: #b97a00; --accent-text: #946100; --accent-soft: rgba(185, 122, 0, 0.12); }
+html[data-tone='light'][data-accent='rose'] { --ion: #d6336c; --accent-text: #b82558; --accent-soft: rgba(214, 51, 108, 0.12); }
+html[data-tone='light'] .space {
+  background:
+    radial-gradient(48% 42% at 8% 0%, rgba(56, 190, 255, 0.22), transparent 70%),
+    radial-gradient(40% 46% at 100% 12%, rgba(139, 108, 255, 0.18), transparent 70%),
+    radial-gradient(42% 40% at 72% 110%, rgba(255, 120, 160, 0.14), transparent 70%),
+    var(--void);
+}
+html[data-tone='light'] .space::after { background-image: linear-gradient(rgba(40, 70, 160, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(40, 70, 160, 0.05) 1px, transparent 1px); }
+html[data-tone='light'] .glass,
+html[data-tone='light'] .panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), transparent 40%), var(--glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 18px 44px -28px rgba(30, 50, 110, 0.35);
+}
+html[data-tone='light'] .rail-item[aria-current='page'] { background: linear-gradient(90deg, color-mix(in srgb, var(--ion) 16%, transparent), color-mix(in srgb, var(--ion) 5%, transparent)); }
+html[data-tone='light'] .rail-item[aria-current='page']::before { box-shadow: none; }
+html[data-tone='light'] .sev::before { box-shadow: none; }
+html[data-tone='light'] .btn-primary { color: #fff; }
+html[data-accent]:not([data-accent='ion']) .btn-primary, html[data-tone='light'] .btn-primary { background: linear-gradient(135deg, color-mix(in srgb, var(--ion) 82%, #fff), var(--ion)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) inset, 0 10px 28px -12px color-mix(in srgb, var(--ion) 70%, transparent); }
+html[data-accent]:not([data-accent='ion']) .btn-primary:hover:not(:disabled), html[data-tone='light'] .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, color-mix(in srgb, var(--ion) 70%, #fff), color-mix(in srgb, var(--ion) 92%, #fff)); }
+.skill-names { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 18px 16px 70px; }
+.choices.two-up { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
+.f-detail .tech > summary { cursor: pointer; color: var(--ink-3); font-size: 12.5px; margin: 6px 0 10px; }
+.f-detail .tech:not([open]) { margin-bottom: 8px; }
+.f-detail[data-simple='false'] .tech > summary { display: none; }
+.f-detail .tech { display: grid; gap: inherit; }
+.f-detail .plain { display: grid; gap: 8px; }
+.f-detail .plain p { font-size: 14.5px; line-height: 1.6; margin: 0; }
+.welcome { padding: 26px 28px; border-radius: var(--r-panel); display: grid; gap: 14px; margin-bottom: 14px; }
+.welcome h2 { margin: 0; font: 600 22px/1.2 var(--display); }
+.welcome-steps { margin: 0; padding-left: 20px; display: grid; gap: 10px; color: var(--ink-2); }
+.welcome-steps b { color: var(--ink); margin-right: 4px; }
+.inner-well { background: rgba(5, 8, 20, 0.4); }
+.fix-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; text-align: left; }
+.fix-row .row-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.two .row .grow { min-width: 0; overflow: hidden; }
+.two .row .row-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.two .row .sev-counts { flex-shrink: 0; }
+html[data-tone='light'] .inner-well { background: rgba(236, 240, 250, 0.75); }
+html[data-tone='light'] .choice, html[data-tone='light'] .kpi { background: rgba(240, 243, 251, 0.85); }
+html[data-tone='light'] .choice:hover:not(:disabled) { background: rgba(228, 234, 248, 0.95); }
+html[data-tone='light'] .choice[aria-checked='true'] { background: color-mix(in srgb, var(--ion) 10%, #fff); }
+html[data-tone='light'] .toast, html[data-tone='light'] .note, html[data-tone='light'] .note-detail, html[data-tone='light'] .note-history { background: rgba(255, 255, 255, 0.97); }
+html[data-tone='light'] [data-tip]:hover::after { background: #1b2238; color: #eaf0ff; }
+html[data-tone='light'] .note-scrim { background: rgba(60, 70, 110, 0.35); }
+html[data-tone='light'] .note-scrim-soft { background: rgba(60, 70, 110, 0.18); }
+/* Code stays on a dark panel in the light look, so syntax colours and contrast do not change. */
+html[data-tone='light'] .f-detail pre, html[data-tone='light'] .answer pre, html[data-tone='light'] .terminal, html[data-tone='light'] .codeview, html[data-tone='light'] .md pre, html[data-tone='light'] .console, html[data-tone='light'] .leakkit-code {
+  --ink: #eaf0ff; --ink-2: rgba(222, 230, 255, 0.78); --ink-3: rgba(190, 200, 235, 0.6); --line: rgba(150, 170, 255, 0.14);
+  background: #0f1428; color: var(--ink);
+}
+.f-detail .tech { display: block; }
+.f-detail .tech-body { display: grid; gap: 14px; align-content: start; }
+.f-detail[data-simple='true'] .tech h3 { display: none; }

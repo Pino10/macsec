@@ -14,9 +14,13 @@ export default function ThisMac(): React.JSX.Element {
   const [tab, setTab] = useState<'checks' | 'login' | 'ports' | 'ssh' | 'ext' | 'images'>('checks')
   const [images, setImages] = useState<{ running: boolean; images: { ref: string; size: string; created: string }[] } | null>(null)
   const [scan, setScan] = useState<{ ref: string; findings: Finding[] } | null>(null)
+  // The check only reads and takes seconds, so the first visit runs it. After that, the last result is shown with its date.
   useEffect(() => {
-    void api.invoke('checkup:last').then(setR)
-  }, [api])
+    void api.invoke('checkup:last').then((last) => {
+      if (last) setR(last)
+      else void act('checkup', () => api.invoke('checkup:run')).then((x) => x && setR(x))
+    })
+  }, [api]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (tab === 'images' && !images) void api.invoke('docker:images').then(setImages)
   }, [api, tab, images])
@@ -36,7 +40,7 @@ export default function ThisMac(): React.JSX.Element {
             <span className="hint">macOS {r.macos} · checked {new Date(r.at).toLocaleString()}</span>
           </div>
           <span className="hint" style={{ marginLeft: 'auto' }}>
-            {r.checks.filter((c) => c.status === 'bad').length} to fix now · {r.checks.filter((c) => c.status === 'warn').length} to look at
+            {r.checks.filter((c) => c.status === 'ok').length} fine · {r.checks.filter((c) => c.status === 'bad').length} to fix now · {r.checks.filter((c) => c.status === 'warn').length} to look at
           </span>
         </div>
       )}
@@ -56,7 +60,7 @@ export default function ThisMac(): React.JSX.Element {
           </button>
         ))}
       </div>
-      {!r && tab !== 'images' && <div className="panel empty-state">Press “Check this Mac”. It takes a few seconds.</div>}
+      {!r && tab !== 'images' && <div className="panel empty-state">{busy.has('checkup') ? 'Checking this Mac. It takes a few seconds, and it only reads.' : 'Press “Check this Mac”. It takes a few seconds.'}</div>}
       {r && tab === 'checks' && (
         <div className="panel">
           {[...new Set(r.checks.map((c) => c.group ?? 'Settings'))].map((g) => (

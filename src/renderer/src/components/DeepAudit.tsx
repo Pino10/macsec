@@ -43,9 +43,22 @@ export default function DeepAudit({ engine, onEngine, ai, onAi, projectPath }: {
   ]
   return (
     <div className="deep">
-      <label className="check">
-        <input type="checkbox" checked={!!engine} onChange={(e) => onEngine(e.target.checked ? 'cloudflare' : null)} /> <Microscope size={14} /> <strong>Deep audit</strong>: run a published security review instead of the standard AI step
-      </label>
+      <div className="choices two-up" role="radiogroup" aria-label="How thorough">
+        <button className="choice" role="radio" aria-checked={!engine} onClick={() => onEngine(null)}>
+          <span className="ci" style={{ ['--g' as string]: '#38e1ff' }}>
+            <Sparkles size={18} />
+          </span>
+          <strong>Standard review</strong>
+          <span>One careful read by the AI you pick below. Minutes.</span>
+        </button>
+        <button className="choice" role="radio" aria-checked={!!engine} onClick={() => onEngine(engine ?? 'cloudflare')}>
+          <span className="ci" style={{ ['--g' as string]: '#8b6cff' }}>
+            <Microscope size={18} />
+          </span>
+          <strong>Deep audit</strong>
+          <span>A published security review, step by step. Slower and far more thorough.</span>
+        </button>
+      </div>
       {engine && (
         <>
           <div className="choices" role="radiogroup" aria-label="Method">

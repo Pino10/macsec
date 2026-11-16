@@ -19,7 +19,7 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
       { id: 'mac', label: 'This Mac', icon: <Laptop size={I} /> }
     ]
   },
-  { label: 'Results', items: [{ id: 'sessions', label: 'Sessions', icon: <History size={I} /> }, { id: 'logs', label: 'Logs', icon: <ScrollText size={I} /> }] }
+  { label: 'Results', items: [{ id: 'sessions', label: 'Results', icon: <History size={I} /> }] }
 ]
 const FOOT: Item[] = [
   { id: 'tools', label: 'Tools', icon: <Wrench size={I} /> },

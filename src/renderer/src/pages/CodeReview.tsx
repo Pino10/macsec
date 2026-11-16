@@ -24,7 +24,18 @@ export default function CodeReview(): React.JSX.Element {
   const [depth, setDepth] = useState<ReviewDepth>('standard')
   const [focus, setFocus] = useState<ReviewFocus>('security')
   const [keep, setKeep] = useState(false)
-  const [mode, setMode] = useState<'project' | 'changes' | 'full'>('project')
+  const [mode, setMode] = useState<'project' | 'changes' | 'full'>(() => {
+    // The Overview's "Test a project fully" lands here with that choice made.
+    try {
+      if (sessionStorage.getItem('macsec.reviewMode') === 'full') {
+        sessionStorage.removeItem('macsec.reviewMode')
+        return 'full'
+      }
+    } catch {
+      // Not available: start with the whole project.
+    }
+    return 'project'
+  })
   const [skills, setSkills] = useState<string[] | undefined>(undefined)
   const [deep, setDeep] = useState<DeepEngine | null>(null)
   const [deepAi, setDeepAi] = useState<DeepReviewerKind>('claude')
@@ -53,7 +64,7 @@ export default function CodeReview(): React.JSX.Element {
           options={[
             ['project', 'Whole project'],
             ['changes', 'Just my changes'],
-            ['full', 'Code and its live site']
+            ['full', 'Test it fully: code and live site']
           ]}
         />
         <span className="hint">

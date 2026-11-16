@@ -5,7 +5,7 @@ import { useApp } from '../store'
 import { PageHead, Seg } from '../ui'
 
 export default function Logs(): React.JSX.Element {
-  const { showSession } = useApp()
+  const { showSession, setPage } = useApp()
   const api = window.macsec
   const [lines, setLines] = useState<LogLine[]>([])
   const [level, setLevel] = useState<'all' | 'problems'>('all')
@@ -22,6 +22,9 @@ export default function Logs(): React.JSX.Element {
   const shown = lines.filter((l) => level === 'all' || l.level !== 'info')
   return (
     <>
+      <button className="link" onClick={() => setPage('settings')} style={{ marginBottom: 10 }}>
+        ← Settings
+      </button>
       <PageHead title="Logs" desc="What MacSec and its scanners did. Tokens are hidden before anything is written.">
         <Seg<'all' | 'problems'> label="Show" value={level} onChange={setLevel} options={[['all', 'Everything'], ['problems', 'Problems']]} />
         <button

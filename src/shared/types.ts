@@ -368,6 +368,17 @@ export interface AppSettings {
   webhook?: { kind: 'slack' | 'teams' | 'discord' | 'generic'; events: 'errors' | 'all' }
   /** Skill packs you removed: they are not added back by themselves. */
   packsDeclined?: string[]
+  /** Dark (the default), light, or follow the Mac. */
+  look?: 'dark' | 'light' | 'auto'
+  /** The colour of buttons and highlights. */
+  accent?: 'ion' | 'violet' | 'green' | 'amber' | 'rose'
+  textSize?: 'normal' | 'large'
+  /** Findings explained in everyday words first, with the technical detail folded away. */
+  explainSimply?: boolean
+  /** The first-run welcome was answered. */
+  welcomed?: boolean
+  /** Whether the person agreed to download the skill packs. Unset until they are asked. */
+  packsAsk?: 'yes' | 'no'
   /** The newest skill pack version already announced, so each update is announced once. */
   packsNotified?: Record<string, string>
 }
@@ -524,6 +535,7 @@ export interface Channels {
   'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number; pages?: ReconPage[]; delta?: ReconDeltaInfo } | null }
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
   'sessions:list': { args: []; result: SessionInfo[] }
+  'overview:top': { args: []; result: import('./insights').TopFinding[] }
   'sessions:get': { args: [string]; result: SessionDetail }
   'sessions:owasp': { args: [string]; result: OwaspChecklistInfo }
   'sessions:compare': { args: [string]; result: SessionCompare }
@@ -535,6 +547,8 @@ export interface Channels {
   'docker:images': { args: []; result: { running: boolean; images: { ref: string; size: string; created: string }[] } }
   'docker:scan': { args: [string]; result: Finding[] }
   'packs:list': { args: []; result: SkillPackInfo[] }
+  'packs:asked': { args: []; result: 'yes' | 'no' | null }
+  'packs:answer': { args: [boolean]; result: SkillPackInfo[] }
   'packs:install': { args: [string]; result: SkillPackInfo[] }
   'packs:remove': { args: [string]; result: SkillPackInfo[] }
   'editors:list': { args: []; result: { found: { id: string; name: string }[]; current: string | null } }
@@ -552,7 +566,7 @@ export interface Channels {
   'sessions:delete': { args: [string]; result: SessionInfo[] }
   'sessions:cancel': { args: [string]; result: void }
   'sessions:pdf': { args: [string]; result: string | null }
-  'sessions:open': { args: [string, 'folder' | 'code' | 'claude' | 'codex' | 'file', string?, number?]; result: void }
+  'sessions:open': { args: [string, 'folder' | 'code' | 'claude' | 'claude-one' | 'codex' | 'file', string?, number?]; result: void }
   'sessions:discard-code': { args: [string]; result: SessionInfo }
 
   'ai:agents': { args: []; result: AgentInfo[] }
@@ -572,6 +586,8 @@ export interface Channels {
 }
 
 export interface Events {
+  /** From the menu bar: go to a page, or open one result. */
+  'app:navigate': { page: string; session?: string }
   'tools:updates': string[]
   'jobs:changed': JobInfo[]
   'sessions:changed': SessionInfo[]

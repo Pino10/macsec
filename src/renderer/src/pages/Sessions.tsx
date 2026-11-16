@@ -1,7 +1,8 @@
 import ProofBlock, { ConfidenceTag } from '../components/ProofBlock'
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Bot, ChevronRight, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw } from 'lucide-react'
+import { issueText } from '@shared/insights'
+import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw } from 'lucide-react'
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
@@ -21,7 +22,7 @@ export default function Sessions(): React.JSX.Element {
   const list = sessions.filter((s) => (kind === 'all' || s.kind === kind) && (!q.trim() || `${s.title} ${s.target}`.toLowerCase().includes(q.toLowerCase())))
   return (
     <>
-      <PageHead title="Sessions" desc="Every test you ran, kept with its findings, the AI’s report and each tool’s raw output.">
+      <PageHead title="Results" desc="Every test you ran, kept with its findings, the AI’s report and each tool’s raw output.">
         <button className="btn" onClick={() => void window.macsec.invoke('app:open-folder', 'sessions')}>
           <FolderOpen size={14} /> Open folder
         </button>
@@ -123,12 +124,16 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const hasCode = (s.kind === 'code-review' || s.kind === 'audit') && !!s.codePath
   const current = findings.find((f) => f.id === sel) ?? null
   const cats = CATS.filter(([k]) => k === 'all' || detail.findings.some((f) => f.category === k))
-  const total = SEVERITIES.reduce((n, k) => n + s.counts[k], 0)
+  // Open means: not dealt with by you, and not ruled out by the AI. The same rule as the list below, so the numbers agree.
+  const openList = detail.findings.filter((f) => !f.triage && f.verdict !== 'false-positive')
+  const openBy = (k: Severity): number => openList.filter((f) => f.severity === k).length
+  const total = openList.length
+  const hiddenInfo = !sevs.has('info') ? openList.filter((f) => f.severity === 'info' && (cat === 'all' || f.category === cat)).length : 0
 
   return (
     <>
       <button className="link" onClick={onBack} style={{ marginTop: 10 }}>
-        <ArrowLeft size={14} /> All sessions
+        <ArrowLeft size={14} /> All results
       </button>
       <div className="session-head">
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', minWidth: 0 }}>
@@ -234,8 +239,8 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <span>{running ? 'steps done' : 'open findings'}</span>
         </div>
         {SEVERITIES.map((k) => (
-          <div key={k} className="kpi" data-zero={s.counts[k] === 0} style={{ ['--c' as string]: `var(--sev-${k})` }}>
-            <b>{s.counts[k]}</b>
+          <div key={k} className="kpi" data-zero={(running ? s.counts[k] : openBy(k)) === 0} style={{ ['--c' as string]: `var(--sev-${k})` }}>
+            <b>{running ? s.counts[k] : openBy(k)}</b>
             <span>{k}</span>
           </div>
         ))}
@@ -376,6 +381,14 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
         ) : (
           <div className="split">
             <div className="panel f-list" role="listbox" aria-label="Findings">
+              {hiddenInfo > 0 && (
+                <div className="f-note">
+                  {hiddenInfo} info {hiddenInfo === 1 ? 'note is' : 'notes are'} hidden.{' '}
+                  <button className="link" onClick={() => setSevs((x) => new Set([...x, 'info']))}>
+                    Show {hiddenInfo === 1 ? 'it' : 'them'}
+                  </button>
+                </div>
+              )}
               {findings.map((f) => (
                 <button key={f.id} className="f-row" role="option" data-sev={f.severity} data-fp={f.verdict === 'false-positive' || !!f.triage} aria-selected={f.id === sel} onClick={() => setSel(f.id)}>
                   <Sev s={f.severity} />
@@ -385,22 +398,43 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
                 </button>
               ))}
             </div>
-            {current && <Detail f={current} id={id} canOpen={hasCode} onChange={setDetail} />}
+            {current && <Detail f={current} id={id} canOpen={hasCode} canFix={hasCode} from={s.title} onChange={setDetail} />}
           </div>
         ))}
     </>
   )
 }
 
-function Detail({ f, id, canOpen, onChange }: { f: Finding; id: string; canOpen: boolean; onChange: (d: SessionDetail) => void }): React.JSX.Element {
+function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: string; canOpen: boolean; canFix: boolean; from: string; onChange: (d: SessionDetail) => void }): React.JSX.Element {
   const api = window.macsec
-  const { act } = useApp()
+  const { act, settings, notify } = useApp()
+  const simple = !!settings?.explainSimply
   const triage = async (t: Finding['triage'] | null): Promise<void> => {
     const d = await act('triage', () => api.invoke('findings:triage', id, f.id, t ?? null))
     if (d) onChange(d)
   }
   return (
-    <div className="panel f-detail" key={f.id}>
+    <div className="panel f-detail" key={f.id} data-simple={simple}>
+      {simple && (
+        <div className="plain">
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Sev s={f.severity} />
+            {f.verdict === 'false-positive' && <span className="tag tag-warn">Probably not a real problem</span>}
+          </div>
+          <h3>{f.title}</h3>
+          <h5>What could happen</h5>
+          <p>{f.impact ?? f.why ?? f.description ?? 'The check did not say. Open the technical details below.'}</p>
+          {f.fix && (
+            <>
+              <h5>What to do</h5>
+              <p>{f.fix}</p>
+            </>
+          )}
+        </div>
+      )}
+      <details className="tech" open={!simple}>
+      {simple && <summary>Technical details</summary>}
+      <div className="tech-body">
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Sev s={f.severity} />
         {f.verdict === 'confirmed' && <span className="tag tag-ok">Confirmed by AI</span>}
@@ -455,7 +489,22 @@ function Detail({ f, id, canOpen, onChange }: { f: Finding; id: string; canOpen:
           <p>{f.verify}</p>
         </>
       )}
+      </div>
+      </details>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {canFix && !f.triage && (
+          <button className="btn btn-sm btn-primary" data-tip="Opens Claude Code in Terminal, in this project, to fix just this finding with you" onClick={() => void act('fix-one', () => api.invoke('sessions:open', id, 'claude-one', f.id))}>
+            <Sparkles size={13} /> Fix this one with Claude Code
+          </button>
+        )}
+        <button
+          className="btn btn-sm"
+          onClick={() => {
+            void navigator.clipboard.writeText(issueText(f, from)).then(() => notify({ kind: 'info', text: 'Copied. Paste it into GitHub, Jira or wherever you track work. Secrets are left out.' }))
+          }}
+        >
+          <Copy size={13} /> Copy as an issue
+        </button>
         {canOpen && f.file && !/^https?:/.test(f.file) && (
           <button className="btn btn-sm" onClick={() => void api.invoke('sessions:open', id, 'file', f.file, f.line)}>
             <FileSearch size={13} /> Open in editor

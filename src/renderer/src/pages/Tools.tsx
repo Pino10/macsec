@@ -3,7 +3,7 @@ import { Cloud, Microscope, Server, Smartphone, Swords } from 'lucide-react'
 import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
 import type { AgentInfo, LocalLlm, OptionalTool, ToolCategory, ToolInfo } from '@shared/types'
 import { useApp } from '../store'
-import { FreeLlmPanel, Integrations, ModelServersPanel, SkillPacks } from '../components/Extras'
+import { FreeLlmPanel, Integrations, ModelServersPanel, SkillPacks, PacksAsk } from '../components/Extras'
 import { PageHead, Seg } from '../ui'
 
 const GROUPS: { id: ToolCategory; title: string; icon: React.ReactNode }[] = [
@@ -18,7 +18,16 @@ const GROUPS: { id: ToolCategory; title: string; icon: React.ReactNode }[] = [
   { id: 'optional', title: 'Deeper analysis you open yourself', icon: <Microscope size={18} /> }
 ]
 
+/** "ai-app-review" reads better as "AI app review". */
+export const skillTitle = (name: string): string => {
+  const words = name.replace(/-/g, ' ')
+  const fixed = words.replace(/\b(ai|api|iam|js|ios|cicd|http|owasp|baas)\b/g, (w) => ({ ai: 'AI', api: 'API', iam: 'IAM', js: 'JS', ios: 'iOS', cicd: 'CI/CD', http: 'HTTP', owasp: 'OWASP', baas: 'BaaS' })[w] ?? w)
+  return fixed.startsWith('iOS') ? fixed : fixed.charAt(0).toUpperCase() + fixed.slice(1)
+}
+
 export default function Tools(): React.JSX.Element {
+  const [tab, setTab] = useState<'scanners' | 'ai' | 'skills' | 'extras'>('scanners')
+  const [allSkills, setAllSkills] = useState(false)
   const { tools, setTools, act, busy, settings, updateSettings, notify } = useApp()
   const api = window.macsec
   const [agents, setAgents] = useState<AgentInfo[]>([])
@@ -96,6 +105,23 @@ export default function Tools(): React.JSX.Element {
         </div>
       )}
 
+      <div className="seg" role="radiogroup" aria-label="Tools section" style={{ margin: '6px 0 4px' }}>
+        {(
+          [
+            ['scanners', `Scanners (${tools.filter((t) => t.installed).length} of ${tools.length})`],
+            ['ai', 'AI'],
+            ['skills', 'Skills'],
+            ['extras', 'Extras']
+          ] as const
+        ).map(([k, l]) => (
+          <button key={k} role="radio" aria-checked={tab === k} onClick={() => setTab(k)}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'ai' && (
+      <>
       <h2 className="section-title" style={{ marginTop: 6 }}>
         AI and your apps
       </h2>
@@ -171,63 +197,11 @@ export default function Tools(): React.JSX.Element {
         )}
       </div>
 
-      <h2 className="section-title">Skills for Claude Code</h2>
-      <div className="panel">
-        {skills.map((sk) => (
-          <div key={sk.name} className="arsenal-row" data-on>
-            <span className="glyph" style={{ ['--g' as string]: sk.mine ? '#8b6cff' : '#38e1ff' }}>
-              <Sparkles size={18} />
-            </span>
-            <div>
-              <div className="row-title">{sk.name.replace(/-/g, ' ')}</div>
-              <div className="row-sub">{sk.mine ? 'Your skill' : 'Built into MacSec'}. Loaded into every Claude Code review, for MacSec only.</div>
-            </div>
-            <span />
-          </div>
-        ))}
-        <div className="arsenal-row">
-          <span className="glyph" style={{ ['--g' as string]: '#8c95b8' }}>
-            <FolderOpen size={18} />
-          </span>
-          <div>
-            <div className="row-title">Add your own</div>
-            <div className="row-sub">Put a folder with a SKILL.md into MacSec’s extensions/claude/skills. Your normal Claude Code setup is not touched.</div>
-          </div>
-          <button className="btn btn-sm" onClick={() => void api.invoke('app:open-folder', 'extensions')}>
-            Open folder
-          </button>
-        </div>
-        <div className="arsenal-row" data-on={claudeSkills}>
-          <span className="glyph" style={{ ['--g' as string]: '#38e1ff' }}>
-            <Sparkles size={18} />
-          </span>
-          <div>
-            <div className="row-title">Use them everywhere in Claude</div>
-            <div className="row-sub">Copies MacSec’s skills into ~/.claude/skills, so Claude Code in Terminal and in the Claude desktop app can use them in any session.</div>
-          </div>
-          <button
-            className="btn btn-sm"
-            onClick={async () => {
-              const r = await act('cskills', () => api.invoke('ai:claude-skills', !claudeSkills))
-              if (r) setClaudeSkills(r.installed)
-            }}
-          >
-            {claudeSkills ? 'Remove from Claude' : 'Install for Claude'}
-          </button>
-        </div>
-      </div>
-
       <h2 className="section-title">Model servers</h2>
       <ModelServersPanel onChange={() => void api.invoke('ai:detect').then(setLlms)} />
 
       <h2 className="section-title">Free LLM API</h2>
       <FreeLlmPanel />
-
-      <h2 className="section-title">Skills from security teams</h2>
-      <SkillPacks />
-
-      <h2 className="section-title">Use MacSec from everywhere</h2>
-      <Integrations />
 
       <h2 className="section-title">Your model</h2>
       <div className="ms-form glass">
@@ -267,6 +241,79 @@ export default function Tools(): React.JSX.Element {
         </div>
       </div>
 
+      </>
+      )}
+
+      {tab === 'skills' && (
+      <>
+      <h2 className="section-title">Skills for Claude Code</h2>
+      <div className="panel">
+        <div className="arsenal-row" data-on>
+          <span className="glyph" style={{ ['--g' as string]: '#38e1ff' }}>
+            <Sparkles size={18} />
+          </span>
+          <div>
+            <div className="row-title">
+              {skills.length} skills, loaded automatically
+            </div>
+            <div className="row-sub">
+              {skills.filter((x) => !x.mine).length} built into MacSec{skills.some((x) => x.mine) ? `, ${skills.filter((x) => x.mine).length} of your own` : ''}. Each review picks the ones that fit the project. They are used inside MacSec only.
+            </div>
+          </div>
+          <button className="btn btn-sm" onClick={() => setAllSkills(!allSkills)}>
+            {allSkills ? 'Hide' : 'Show all'}
+          </button>
+        </div>
+        {allSkills && (
+          <div className="skill-names">
+            {skills.map((sk) => (
+              <span key={sk.name} className="tag" title={sk.mine ? 'Your skill' : 'Built into MacSec'}>
+                {skillTitle(sk.name)}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="arsenal-row">
+          <span className="glyph" style={{ ['--g' as string]: '#8c95b8' }}>
+            <FolderOpen size={18} />
+          </span>
+          <div>
+            <div className="row-title">Add your own</div>
+            <div className="row-sub">Put a folder with a SKILL.md into MacSec’s extensions/claude/skills. Your normal Claude Code setup is not touched.</div>
+          </div>
+          <button className="btn btn-sm" onClick={() => void api.invoke('app:open-folder', 'extensions')}>
+            Open folder
+          </button>
+        </div>
+        <div className="arsenal-row" data-on={claudeSkills}>
+          <span className="glyph" style={{ ['--g' as string]: '#38e1ff' }}>
+            <Sparkles size={18} />
+          </span>
+          <div>
+            <div className="row-title">Use them everywhere in Claude</div>
+            <div className="row-sub">Copies MacSec’s skills into ~/.claude/skills, so Claude Code in Terminal and in the Claude desktop app can use them in any session.</div>
+          </div>
+          <button
+            className="btn btn-sm"
+            onClick={async () => {
+              const r = await act('cskills', () => api.invoke('ai:claude-skills', !claudeSkills))
+              if (r) setClaudeSkills(r.installed)
+            }}
+          >
+            {claudeSkills ? 'Remove from Claude' : 'Install for Claude'}
+          </button>
+        </div>
+      </div>
+
+      <h2 className="section-title">Skills from security teams</h2>
+      <PacksAsk />
+      <SkillPacks />
+
+      </>
+      )}
+
+      {tab === 'scanners' && (
+      <>
       {GROUPS.map((g) => {
         const list = tools.filter((t) => t.category === g.id)
         if (!list.length) return null
@@ -285,7 +332,17 @@ export default function Tools(): React.JSX.Element {
         )
       })}
 
+      </>
+      )}
+
+      {tab === 'extras' && (
+      <>
+      <h2 className="section-title">Use MacSec from everywhere</h2>
+      <Integrations />
+
       <OptionalList />
+      </>
+      )}
     </>
   )
 }

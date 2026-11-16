@@ -40,7 +40,16 @@ function EngineBar(): React.JSX.Element {
           </>
         ) : (
           <>
-            <b>Engine ready</b> {ready} of {total} scanners installed{updates.length ? `, ${updates.length} with updates` : ''}
+            {ready === 0 ? (
+              <>
+                <b>Scanners not installed</b> install them to start testing
+              </>
+            ) : (
+              <>
+                <b>{ready < total ? 'Ready' : 'Engine ready'}</b> {ready < total ? `${ready} of ${total} scanners installed` : `all ${total} scanners installed`}
+                {updates.length ? `, ${updates.length} with updates` : ''}
+              </>
+            )}
           </>
         )}
       </button>
@@ -80,7 +89,21 @@ function UpdateBar(): React.JSX.Element | null {
 }
 
 function Shell(): React.JSX.Element {
-  const { page, setPage } = useApp()
+  const { page, setPage, settings } = useApp()
+  // The look, the accent colour and the text size, set on the page so the stylesheet can follow.
+  useEffect(() => {
+    const root = document.documentElement
+    const mq = window.matchMedia('(prefers-color-scheme: light)')
+    const apply = (): void => {
+      const look = settings?.look ?? 'dark'
+      root.dataset.tone = look === 'auto' ? (mq.matches ? 'light' : 'dark') : look
+      root.dataset.accent = settings?.accent ?? 'ion'
+      root.dataset.text = settings?.textSize ?? 'normal'
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [settings?.look, settings?.accent, settings?.textSize])
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return

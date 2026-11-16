@@ -133,6 +133,10 @@ export function AppProvider({ children }: { children: React.ReactNode }): React.
       api().on('jobs:changed', setJobs),
       api().on('notice', (n) => notify({ kind: n.kind, title: n.title, text: n.body ?? '' })),
       api().on('tools:updates', setUpdates),
+      api().on('app:navigate', (n) => {
+        if (n.session) showSession(n.session)
+        else if (['overview', 'review', 'sessions', 'tools', 'settings'].includes(n.page)) setPage(n.page as Page)
+      }),
       api().on('app:update', setAppUpdate),
       api().on('session:updated', (s) =>
         setSessions((list) => {
