@@ -68,7 +68,7 @@ export class ConfirmClient {
   }
 
   /** `headers: 'none'` sends the request signed out; an object sends that account instead. */
-  async send(method: 'GET' | 'POST', path: string, o: { headers?: Record<string, string> | 'none'; form?: Record<string, string>; cookie?: string } = {}): Promise<Reply> {
+  async send(method: 'GET' | 'POST', path: string, o: { headers?: Record<string, string> | 'none'; form?: Record<string, string>; cookie?: string; raw?: { contentType: string; body: string } } = {}): Promise<Reply> {
     while (this.o.paused?.() && !this.o.cancelled?.()) await sleep(300)
     if (this.stopped) throw new Stop(this.stopped)
     if (this.o.cancelled?.()) throw new Stop('Cancelled')
@@ -82,6 +82,9 @@ export class ConfirmClient {
     if (o.form) {
       headers['Content-Type'] = 'application/x-www-form-urlencoded'
       body = new URLSearchParams(o.form).toString()
+    } else if (o.raw) {
+      headers['Content-Type'] = o.raw.contentType
+      body = o.raw.body
     }
     const t = Date.now()
     try {
@@ -103,6 +106,16 @@ export class ConfirmClient {
 
   post(path: string, form: Record<string, string>, o: { headers?: Record<string, string> | 'none'; cookie?: string } = {}): Promise<Reply> {
     return this.send('POST', path, { ...o, form })
+  }
+
+  /**
+   * A GraphQL question (a query, never a mutation) as a POST. This is the one POST that is not a login
+   * form: it only asks. A body that contains the word mutation or subscription is refused here, so
+   * nothing that could change data can be sent by mistake.
+   */
+  query(path: string, body: string, o: { headers?: Record<string, string> | 'none'; contentType?: string } = {}): Promise<Reply> {
+    if (/\b(mutation|subscription)\b/i.test(body.replace(/"__typename"|__typename/g, ''))) throw new Error('Only GraphQL queries are sent: no mutations.')
+    return this.send('POST', path, { headers: o.headers, raw: { contentType: o.contentType ?? 'application/json', body } })
   }
 }
 

@@ -1,3 +1,24 @@
+## MacSec 1.7.0
+
+Sign-in protocols, tokens, GraphQL and cross-site checks, an AI autopilot, and Metasploit with approval for every module.
+
+### What is new
+- **OAuth and OpenID Connect checks** (a new switch in the web scan's control confirmations). MacSec reads the sign-in links a site sends and the provider's own settings page, and reports: no state value, a state that never changes, the implicit flow, no PKCE, an http callback, tokens in addresses, "none" signatures, "plain" PKCE and open client registration. On a provider that is on the site itself, it also sends made-up callback addresses (ending in .invalid, which cannot exist) and reports a server that redirects to them. Nothing is signed in and no outside provider is contacted.
+- **Token (JWT) checks.** Tokens from your own sign-in are read for a missing signature, a weak signing secret (the secret is never written down), no expiry or a very long one, secrets in the claims, a token cookie without HttpOnly, tokens in addresses and in public pages. MacSec also sends your own token back with its signature removed and with "alg: none" (claims unchanged, GET only) to a page that treats you differently from a visitor, to see whether the server checks signatures.
+- **GraphQL checks.** Finds endpoints, an open schema (introspection), an open IDE (GraphiQL, Playground), field suggestions when introspection is off, stack traces in errors, mutations accepted over GET, form content types that skip the CORS check, and batching. It only asks questions: mutations are refused in code, and nothing deep, wide or long is sent.
+- **CORS, CSRF and session ids.** CORS that repeats a made-up origin with credentials allowed (higher when signed in), forms with no anti-forgery token (a lead, never submitted), session ids in links, and a server that keeps a session id the visitor made up.
+- **Autopilot.** After the normal steps, the AI reads what was found and picks up to 14 more checks from a fixed menu, in up to three rounds, following leads as they appear. MacSec validates and runs each one with its own rules and proof. The AI never sends a request or writes a finding.
+- **Metasploit with approval.** The server scan now lists every module with what it sends and what could go wrong, and nothing runs unless you tick it. There are two kinds: Metasploit's own checks for known flaws, and look-only scanners that read a version, banner, title, methods or certificate. No exploit, login, brute force or flood module exists in the lists.
+- Your checklist now marks OAuth, JWT, GraphQL and CORS items from these checks. Items these checks can only find (CSRF, session ids) are never marked "clear" for you.
+- New check ids: MS-OAUTH, MS-JWT, MS-GQL, MS-CORS, MS-CSRF, MS-SESS and MS-AI.
+
+### Honest limits
+- Only providers that are part of the site itself get callback tests: a site that signs in with Google, Microsoft or Okta is tested for what it sends, not for what the provider does.
+- CSRF and session fixation after a login need a form to be submitted or a login to be made, so they are leads for you to test by hand.
+- GraphQL depth, size and batching limits are left for you to test on a copy: they can bring a server down.
+- The Metasploit module names and output lines were written from its documentation and not tried against a real install here. A module that is missing or prints something unexpected gives no finding.
+- None of this was run against a real third-party site. It was tested against local servers with a weak and a hardened version of each case.
+
 ## MacSec 1.6.0
 
 Deeper testing everywhere: web scan with black box and white box, a checklist walk, injection tests, a deeper This Mac, deeper recon, deeper server scans and a safe Metasploit check.

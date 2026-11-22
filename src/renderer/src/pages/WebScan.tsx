@@ -36,12 +36,13 @@ export default function WebScan(): React.JSX.Element {
   const [box, setBox] = useState<'black' | 'white'>('black')
   const [code, setCode] = useState<string | null>(null)
   const [checklist, setChecklist] = useState(false)
+  const [autopilot, setAutopilot] = useState(false)
   const [headers, setHeaders] = useState('')
   const [captured, setCaptured] = useState<number | null>(null)
-  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false, logic: false, inject: false })
+  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false, logic: false, inject: false, proto: false })
   const [ccOk, setCcOk] = useState(false)
   const setC = (p: Partial<ConfirmOptions>): void => setCc((x) => ({ ...x, ...p }))
-  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf || cc.logic || cc.inject
+  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf || cc.logic || cc.inject || cc.proto
 
   useEffect(() => {
     void api.invoke('web:sites').then((s) => {
@@ -158,6 +159,13 @@ export default function WebScan(): React.JSX.Element {
             </div>
           )}
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 12 }}>
+            <Switch on={autopilot} onChange={() => setAutopilot(!autopilot)} label="Autopilot" />
+            <div>
+              <strong>Autopilot: the AI chooses what to test next</strong>
+              <div className="hint">After the normal steps, the AI reads what was found and picks up to 14 more checks from a fixed safe menu (read a page, injection markers, hidden parameters, CORS, GraphQL, OAuth, tokens, business logic), in up to three rounds. MacSec runs each one with its own safety rules and proof. The AI never sends requests or writes findings itself. Tick it only for a site you may test. It needs an AI choice in the last step.</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 12 }}>
             <Switch on={checklist} onChange={() => setChecklist(!checklist)} label="Walk my checklist" />
             <div>
               <strong>Walk my checklist</strong>
@@ -184,10 +192,10 @@ export default function WebScan(): React.JSX.Element {
               <span className="hint">Quick choices:</span>
               {(
                 [
-                  ['None', { fuzz: false, waf: false, auth: false, authz: false, logic: false, inject: false }],
-                  ['Public site', { fuzz: true, waf: true, auth: false, authz: false, logic: true, inject: true }],
-                  ['Login and accounts', { fuzz: false, waf: false, auth: true, authz: false, logic: true, inject: true }],
-                  ['Shop or booking flow', { fuzz: true, waf: false, auth: true, authz: false, logic: true, inject: true }]
+                  ['None', { fuzz: false, waf: false, auth: false, authz: false, logic: false, inject: false, proto: false }],
+                  ['Public site', { fuzz: true, waf: true, auth: false, authz: false, logic: true, inject: true, proto: true }],
+                  ['Login and accounts', { fuzz: false, waf: false, auth: true, authz: false, logic: true, inject: true, proto: true }],
+                  ['Shop or booking flow', { fuzz: true, waf: false, auth: true, authz: false, logic: true, inject: true, proto: true }]
                 ] as const
               ).map(([name, set]) => (
                 <button key={name} className="btn btn-sm" onClick={() => setC(set)}>
@@ -200,6 +208,7 @@ export default function WebScan(): React.JSX.Element {
                 ['fuzz', 'Hidden pages and parameters', 'Looks for pages and settings that are not linked, and tells you which are real. Sites that answer yes to everything are detected and ignored.'],
                 ['waf', 'Web firewall tests', 'Finds which firewall answers, what it blocks, and whether a harmless marker gets past it. A way through is reported at once so the owner can tighten the rule.'],
                 ['inject', 'Injection tests on every page and form', 'Sends harmless markers into every parameter and every search-style form it finds (signed in too, if you signed in above) and reads what comes back: unescaped output, database errors, a calculated expression, a line break in a header. It only reads: forms that send data are listed, never submitted.'],
+                ['proto', 'Sign-in protocols, tokens, GraphQL and cross-site checks', 'Checks how the site signs people in and talks to other sites. OAuth and OpenID: a missing or fixed state value, the implicit flow, a callback address the server accepts without checking. Tokens (JWT): no signature, a weak secret, no expiry, and whether the server really checks the signature of your own token. GraphQL: open schema, open IDE, mutations over GET. Other sites: CORS that repeats any origin, forms without an anti-forgery token, session ids in links. All of it only reads, with made-up addresses that cannot exist.'],
                 ['logic', 'Business logic checks', 'Tests for open redirects, a poisoned host header, forms that accept endless wrong codes, price or role fields the browser sends, and steps of a flow that can be skipped. Anything that would change data is listed as a lead for you to test by hand.'],
                 ['auth', 'Login checks', 'Eight wrong guesses for a user that does not exist (to see if anything slows them), and whether the login reveals which usernames exist.'],
                 ['authz', 'Two-account access check', 'Compares what a second account can open with what the first can. Needs you to be signed in above, and a second account below.']
@@ -265,7 +274,7 @@ export default function WebScan(): React.JSX.Element {
             className="btn btn-primary btn-lg"
             disabled={!valid || (needsOk && !ok) || (login !== 'none' && !signedIn) || !ccReady || busy.has('web') || (box === 'white' && where === 'url' && !code)}
             onClick={async () => {
-              const s = await act('web', () => api.invoke('web:start', { target: where === 'local' ? { kind: 'local', name: site } : { kind: 'url', url: target }, mode, authorized: ok, headers: signedIn ? headers : undefined, confirm: ccOn ? cc : undefined, codePath: box === 'white' ? (where === 'local' ? `${settings?.wwwPath ?? ''}/${site}` : (code ?? undefined)) : undefined, checklist: checklist && reviewer !== 'none', reviewer }))
+              const s = await act('web', () => api.invoke('web:start', { target: where === 'local' ? { kind: 'local', name: site } : { kind: 'url', url: target }, mode, authorized: ok, headers: signedIn ? headers : undefined, confirm: ccOn ? cc : undefined, codePath: box === 'white' ? (where === 'local' ? `${settings?.wwwPath ?? ''}/${site}` : (code ?? undefined)) : undefined, checklist: checklist && reviewer !== 'none', autopilot: autopilot && reviewer !== 'none', reviewer }))
               if (s) showSession(s.id)
             }}
           >

@@ -141,6 +141,8 @@ export interface WebScanRequest {
   codePath?: string
   /** Walk the person's web checklist item by item (needs an AI reviewer for the items a scan cannot test). */
   checklist?: boolean
+  /** The AI picks the next checks from a fixed safe menu, and MacSec runs them (needs an AI reviewer). */
+  autopilot?: boolean
   reviewer: Reviewer
 }
 
@@ -155,6 +157,8 @@ export interface ConfirmOptions {
   waf: boolean
   /** Injection tests on every parameter and every GET form, with harmless markers. */
   inject?: boolean
+  /** OAuth, tokens, GraphQL, CORS, CSRF and session id checks. */
+  proto?: boolean
   /** Business logic: open redirects, host header poisoning, code limits, trusted fields, skipped steps. */
   logic?: boolean
   /** Where the sign-in form is, when it is not at an obvious address. */
@@ -259,7 +263,7 @@ export type AuditRequest =
   | { kind: 'changes'; path: string }
   | { kind: 'cloud'; provider: 'azure' | 'aws'; reviewer: Reviewer }
   /** `host` names the check; `hosts` is every server in it (one, a list, or a small network). */
-  | { kind: 'server'; host: string; hosts?: string[]; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean; /** Ask Metasploit's check command (never exploit) about matched known flaws. Needs Metasploit already installed. */ msf?: boolean }
+  | { kind: 'server'; host: string; hosts?: string[]; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean; /** Ask Metasploit's check command (never exploit) about matched known flaws. Needs Metasploit already installed. */ msf?: boolean; /** The Metasploit modules the person approved, one by one. Nothing outside this list runs. */ msfModules?: string[] }
 
 /** A mobile app: its source folder, or a built .apk or .ipa file. */
 export interface ReconDeltaInfo {
@@ -601,6 +605,7 @@ export interface Channels {
   'cloud:status': { args: []; result: { azure: string | null; aws: string | null } }
   'cloud:azure-login': { args: []; result: { azure: string | null; aws: string | null } }
   'tools:optional': { args: []; result: OptionalTool[] }
+  'msf:catalog': { args: []; result: { module: string; kind: 'check' | 'look'; title: string; what: string; risk: string }[] }
   'sessions:rerun': { args: [string]; result: SessionInfo }
   'sessions:rerun-latest': { args: []; result: SessionInfo[] }
   'findings:retest': { args: [string, string]; result: SessionDetail }

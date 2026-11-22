@@ -49,6 +49,8 @@ interface Rule {
   /** The scan step that must have run for "clear" to be said. null means it always runs. */
   step: string | null
   finding: RegExp
+  /** True when a missing finding does not mean "clear" (the check only finds, it does not rule out). */
+  leadOnly?: boolean
 }
 
 export const RULES: Rule[] = [
@@ -66,7 +68,13 @@ export const RULES: Rule[] = [
   { label: 'Web firewall tests', item: /bypass.*waf|waf bypass|web application firewall/i, step: 'waf', finding: /firewall|WAF/i },
   { label: 'Login checks', item: /(user(name)? )?enumerat|lockout|account lock|rate limit|brute|wrong (password|guess)|throttl/i, step: 'login', finding: /usernames exist|emails have an account|does not slow down|wrong (codes|passwords)|rate/i },
   { label: 'Two-account access check', item: /idor|insecure direct object|horizontal|vertical privilege|access control|bola|cross-?tenant|privilege escalation|forced browsing to (admin|private)/i, step: 'authz', finding: /Another account can open|Shows the same content|private|admin|access/i },
-  { label: 'Business logic checks', item: /open redirect|redirect (to|parameter)|host header|forwarded host|\botp\b|one.?time (code|password)|\bpin\b|skip(ping)? (a )?(step|stage)|workflow|password reset poison/i, step: 'logic', finding: /Open redirect|forwarded host|wrong codes|late step|values the server should decide/i }
+  { label: 'Business logic checks', item: /open redirect|redirect (to|parameter)|host header|forwarded host|\botp\b|one.?time (code|password)|\bpin\b|skip(ping)? (a )?(step|stage)|workflow|password reset poison/i, step: 'logic', finding: /Open redirect|forwarded host|wrong codes|late step|values the server should decide/i },
+  { label: 'OAuth and sign-in providers', item: /oauth.*\bstate\b|\bstate (parameter|value)|redirect_uri|\bpkce\b|authorization code (interception|replay)|implicit (flow|grant)|tokens? (in|leak\w*) .*(referr?er|url|address|history)/i, step: 'proto', finding: /Sign-in with|sign-in callback|state value|authorization endpoint|sign-in provider|token travels|travels in (a|an) .*address|Clients can be registered/i },
+  { label: 'Tokens (JWT)', item: /\bjwt\b|json web token|alg(orithm)?.{0,20}none|(token|jwt) signature (stripping|verification|not verified)|weak (jwt|signing|hmac) secret|\bkid\b|\bjku\b/i, step: 'proto', finding: /token in|JWT|signed with a weak secret|never expires|accepts a token|names where to get its key|key id/i },
+  { label: 'GraphQL', item: /introspection|graphiql|playground|graphql.*(ide|endpoint recon|error|stack trace)|batch(ed|ing)? (request|quer)|(get|query string).*mutation|content-?type.*(text\/plain|form)/i, step: 'proto', finding: /GraphQL/i },
+  { label: 'CORS', item: /\bcors\b|cross-origin resource sharing|access-control-allow/i, step: 'proto', finding: /read (private )?answers here|Any website can read/i },
+  { label: 'CSRF protection', item: /\bcsrf\b|anti-?forgery|cross-site request forgery/i, step: 'proto', finding: /anti-forgery token|mutations sent as a GET|bodies:/i, leadOnly: true },
+  { label: 'Session ids', item: /session fixation|session id (in|via) (the )?(url|address)|session (token|id).*(url|address)|accepts? (a )?(session|sid)/i, step: 'proto', finding: /session id|made up/i, leadOnly: true }
 ]
 
 /** Mark items from the scan itself. `ran` lists the steps that ran; findings are the open ones. */
@@ -83,6 +91,7 @@ export function autoMark(findings: Finding[], ran: string[], profile: Profile): 
         if (!r.item.test(text)) continue
         if (r.step && !ran.includes(r.step)) continue
         const hits = open.filter((f) => r.finding.test(f.title)).slice(0, 6)
+        if (!hits.length && r.leadOnly) continue
         item.covered = r.label
         if (hits.length) {
           item.state = 'found'

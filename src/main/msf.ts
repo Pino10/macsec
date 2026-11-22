@@ -8,8 +8,12 @@
  *   - Metasploit must already be installed by you. MacSec never installs it.
  *   - Only modules in the list below are used, chosen because they have a check and do not read
  *     other people's data. A name that is not in the list is refused.
- *   - The only commands ever sent are use, set RHOSTS, set RPORT, check and exit. There is no run,
- *     exploit, set PAYLOAD, set LHOST or anything that opens a session.
+ *   - Nothing runs unless you approved that module for this scan, one by one, after reading what it
+ *     sends. Not ticked means not run.
+ *   - Two kinds of module exist. "Check" modules (known flaws) get only: use, set RHOSTS, set RPORT,
+ *     check, exit. "Look" modules (version, banner and title scanners: auxiliary/scanner only) get only:
+ *     use, set RHOSTS, set RPORT, set THREADS 1, run, exit. There is no exploit, set PAYLOAD, set LHOST,
+ *     no login or brute-force module, nothing that dumps data, floods or opens a session.
  *   - The host is a validated address, the port a number: nothing typed is read as a command.
  *   - It runs as an argument list (no shell), with its own home folder under ~/MacSec, and a time limit.
  *   - It only runs when you ticked it for that scan and the target is yours (or on this Mac).
@@ -50,11 +54,76 @@ export const validModule = (m: string): boolean => /^[a-z0-9_/]+$/.test(m) && MO
 const HOST = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?$|^(\d{1,3}\.){3}\d{1,3}$/i
 export const validTarget = (h: string, p: number): boolean => HOST.test(h) && h.length <= 253 && !h.startsWith('-') && Number.isInteger(p) && p > 0 && p < 65536
 
+export interface LookModule {
+  module: string
+  title: string
+  /** What it sends, in plain words. */
+  what: string
+  /** nmap service names this module fits, and the usual ports when the name is not known. */
+  services: RegExp
+  ports: number[]
+}
+
+/**
+ * Look-only modules: they connect, read what the service says about itself and stop. They are all
+ * auxiliary/scanner modules for banners, versions, titles and methods. No login, no brute force, no
+ * enumeration, no data is read from the service, and THREADS is forced to 1.
+ */
+export const LOOK: LookModule[] = [
+  { module: 'auxiliary/scanner/ssh/ssh_version', title: 'SSH version', what: 'Connects and reads the SSH banner (the version text the server announces).', services: /^ssh/i, ports: [22] },
+  { module: 'auxiliary/scanner/ftp/ftp_version', title: 'FTP version', what: 'Connects and reads the FTP welcome banner.', services: /^ftp/i, ports: [21] },
+  { module: 'auxiliary/scanner/telnet/telnet_version', title: 'Telnet banner', what: 'Connects and reads the Telnet banner. It does not log in.', services: /^telnet/i, ports: [23] },
+  { module: 'auxiliary/scanner/smtp/smtp_version', title: 'SMTP banner', what: 'Connects and reads the mail server greeting.', services: /^smtp/i, ports: [25, 587] },
+  { module: 'auxiliary/scanner/imap/imap_version', title: 'IMAP banner', what: 'Connects and reads the IMAP greeting.', services: /^imap/i, ports: [143] },
+  { module: 'auxiliary/scanner/pop3/pop3_version', title: 'POP3 banner', what: 'Connects and reads the POP3 greeting.', services: /^pop3/i, ports: [110] },
+  { module: 'auxiliary/scanner/http/http_version', title: 'Web server version', what: 'Sends one GET / and reads the Server header.', services: /^http/i, ports: [80, 8080, 8000, 8008] },
+  { module: 'auxiliary/scanner/http/title', title: 'Web page title', what: 'Sends one GET / and reads the page title.', services: /^http/i, ports: [80, 8080, 8000, 8008] },
+  { module: 'auxiliary/scanner/http/options', title: 'Web methods advertised', what: 'Sends one OPTIONS request and reads which methods the server says it allows. It does not use them.', services: /^http/i, ports: [80, 8080, 8000, 8008] },
+  { module: 'auxiliary/scanner/http/robots_txt', title: 'robots.txt', what: 'Sends one GET /robots.txt and shows what it lists.', services: /^http/i, ports: [80, 8080, 8000, 8008] },
+  { module: 'auxiliary/scanner/http/cert', title: 'Web certificate', what: 'Opens a TLS connection and reads the certificate (name, issuer, dates).', services: /(^https|ssl\/http|http.*ssl)/i, ports: [443, 8443] },
+  { module: 'auxiliary/scanner/smb/smb_version', title: 'SMB version', what: 'Starts an SMB session without logging in and reads the version and signing settings.', services: /(microsoft-ds|netbios-ssn|^smb)/i, ports: [445, 139] },
+  { module: 'auxiliary/scanner/smb/smb2', title: 'SMB 2 support', what: 'Sends an SMB2 negotiate message and reads whether SMB 2 is supported.', services: /(microsoft-ds|^smb)/i, ports: [445] },
+  { module: 'auxiliary/scanner/mysql/mysql_version', title: 'MySQL version', what: 'Connects and reads the MySQL handshake (version text). It does not log in.', services: /^mysql/i, ports: [3306] },
+  { module: 'auxiliary/scanner/postgres/postgres_version', title: 'PostgreSQL version', what: 'Starts a connection and reads the version the server reports. It tries no passwords.', services: /^postgres/i, ports: [5432] },
+  { module: 'auxiliary/scanner/rdp/rdp_scanner', title: 'Remote Desktop detection', what: 'Sends a Remote Desktop connection request and reads whether it speaks RDP and requires network-level authentication. It does not log in.', services: /(ms-wbt-server|^rdp)/i, ports: [3389] }
+]
+
+export const validLook = (m: string): boolean => /^auxiliary\/scanner\/[a-z0-9_]+\/[a-z0-9_]+$/.test(m) && LOOK.some((x) => x.module === m)
+
+export interface CatalogEntry {
+  module: string
+  kind: 'check' | 'look'
+  title: string
+  what: string
+  /** What could go wrong, honestly. */
+  risk: string
+}
+
+/** What the person is asked to approve: every module MacSec could use, in plain words. */
+export function catalog(): CatalogEntry[] {
+  const seen = new Set<string>()
+  const checks: CatalogEntry[] = []
+  for (const m of MODULES) {
+    if (seen.has(m.module)) continue
+    seen.add(m.module)
+    checks.push({ module: m.module, kind: 'check', title: m.label, what: `Metasploit's own check for ${MODULES.filter((x) => x.module === m.module).map((x) => x.cve).join(', ')}. It sends a harmless probe and the module says "vulnerable" or "safe". It does not attack, does not read files, and opens no session. Runs only when MacSec matched a version it saw to that flaw.`, risk: 'Low. A check sends a probe that real attackers also send. Very old or fragile servers have occasionally reacted badly to such probes, so run it in a quiet period on servers you own.' })
+  }
+  const looks: CatalogEntry[] = LOOK.map((l) => ({ module: l.module, kind: 'look', title: l.title, what: l.what, risk: 'Very low. One ordinary connection to a port that is already open, the same as a browser or a mail program would make.' }))
+  return [...looks, ...checks]
+}
+
 /** The arguments for msfconsole: a fixed script of five commands around values that were validated. */
 export function checkArgs(module: string, host: string, port: number): string[] {
   if (!validModule(module)) throw new Error('That Metasploit module is not on the check-only list.')
   if (!validTarget(host, port)) throw new Error('That address is not valid.')
   return ['-q', '-n', '-x', `use ${module}; set RHOSTS ${host}; set RPORT ${port}; check; exit -y`]
+}
+
+/** The arguments for a look-only module: a fixed script around validated values, one thread. */
+export function lookArgs(module: string, host: string, port: number): string[] {
+  if (!validLook(module)) throw new Error('That Metasploit module is not on the look-only list.')
+  if (!validTarget(host, port)) throw new Error('That address is not valid.')
+  return ['-q', '-n', '-x', `use ${module}; set RHOSTS ${host}; set RPORT ${port}; set THREADS 1; run; exit -y`]
 }
 
 export function msfPath(): string | null {
@@ -94,10 +163,12 @@ export interface MsfOptions {
   note?: (t: string) => void
   /** At most this many checks in one scan. */
   max?: number
+  /** The modules the person approved for this scan, one by one. A module that is not in this list never runs. */
+  approved: string[]
 }
 
 /** Runs the checks for the CVEs that have a module. A module is asked once per host and port, however many CVEs share it. */
-export async function msfChecks(items: MsfItem[], o: MsfOptions = {}): Promise<Finding[]> {
+export async function msfChecks(items: MsfItem[], o: MsfOptions): Promise<Finding[]> {
   const bin = o.bin ?? msfPath()
   if (!bin) {
     o.note?.('Metasploit is not installed here, so nothing was checked. Install it yourself from metasploit.com if you want this.')
@@ -110,6 +181,10 @@ export async function msfChecks(items: MsfItem[], o: MsfOptions = {}): Promise<F
     if (o.cancelled?.() || done.size >= (o.max ?? 8)) break
     const m = moduleFor(it.cve)
     if (!m || !validTarget(it.host, it.port)) continue
+    if (!o.approved.includes(m.module)) {
+      o.note?.(`Not approved, so not run: ${m.label}`)
+      continue
+    }
     const key = `${m.module}|${it.host}|${it.port}`
     if (done.has(key)) continue
     done.add(key)
@@ -143,6 +218,68 @@ export async function msfChecks(items: MsfItem[], o: MsfOptions = {}): Promise<F
         shows: [`Metasploit said: ${r.line.slice(0, 160)}`, `module ${m.module}, command check only`, `matches ${it.cve}`]
       }
     })
+  }
+  return out
+}
+
+// ---------------------------------------------------------------- Look-only modules
+
+const strip = (out: string): string[] => out.split('\n').map((l) => l.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '').trim()).filter(Boolean)
+
+/** The facts a look-only module printed: its [+] lines, without the address prefix. Nothing else is kept. */
+export function parseLook(out: string): string[] {
+  return strip(out)
+    .filter((l) => /^\[\+\]/.test(l))
+    .map((l) => l.replace(/^\[\+\]\s*/, '').replace(/^[\w.:[\]-]+\s+-\s+/, '').slice(0, 220))
+    .slice(0, 6)
+}
+
+export interface LookItem {
+  host: string
+  port: number
+  service?: string
+}
+
+/** The open ports a look-only module fits: by the service Nmap named, or by the usual port when it did not name one. */
+export function portsFor(l: LookModule, open: LookItem[]): LookItem[] {
+  return open.filter((p) => (p.service ? l.services.test(p.service) : l.ports.includes(p.port)))
+}
+
+const LOOK_PROOF = (module: string, host: string, port: number): string => `msfconsole -q -n -x "use ${module}; set RHOSTS ${host}; set RPORT ${port}; set THREADS 1; run; exit -y"`
+
+/** Runs the approved look-only modules on the ports they fit. Each result is an observation, not a flaw, except risky methods. */
+export async function msfLook(open: LookItem[], o: MsfOptions): Promise<Finding[]> {
+  const bin = o.bin ?? msfPath()
+  if (!bin) return []
+  const run = o.run ?? defaultRun
+  const out: Finding[] = []
+  let n = 0
+  for (const l of LOOK) {
+    if (!o.approved.includes(l.module)) continue
+    for (const it of portsFor(l, open)) {
+      if (o.cancelled?.() || n >= (o.max ?? 24)) return out
+      if (!validTarget(it.host, it.port)) continue
+      n++
+      o.note?.(`Metasploit look: ${l.title} on ${it.host}:${it.port}`)
+      const text = await run(bin, lookArgs(l.module, it.host, it.port), 120_000)
+      const lines = parseLook(text)
+      if (!lines.length) continue
+      const proof = {
+        request: `msfconsole ${l.module} ${it.host}:${it.port}`,
+        reproduce: LOOK_PROOF(l.module, it.host, it.port),
+        status: 0,
+        bytes: Buffer.byteLength(text),
+        sha256: createHash('sha256').update(text).digest('hex'),
+        at: new Date().toISOString(),
+        shows: lines.map((x) => `Metasploit printed: ${x}`)
+      }
+      const base = { tool: 'Metasploit (look only)', category: 'network' as const, url: `${it.host}:${it.port}`, file: `${it.host}:${it.port}` }
+      const methods = l.module.endsWith('/options') ? /\b(PUT|DELETE|TRACE|CONNECT|PATCH)\b/g : null
+      const risky = methods ? [...new Set(lines.join(' ').match(methods) ?? [])] : []
+      if (risky.length)
+        out.push({ id: fid('msflook-methods', it.host, it.port), ...base, severity: 'low', confidence: 'possible', title: `${it.host}:${it.port} advertises the methods ${risky.join(', ')}`, description: `The server's OPTIONS answer lists ${risky.join(', ')}. Advertising a method does not prove it works, and MacSec did not try them. Try them by hand on a copy: PUT and DELETE can change or remove files, and TRACE can help steal cookies in old browsers.`, fix: 'Allow only the methods the site needs (usually GET, HEAD, POST) in the web server settings.', proof })
+      out.push({ id: fid('msflook', l.module, it.host, it.port), ...base, severity: 'info', confidence: 'confirmed', title: `Metasploit read the ${l.title.toLowerCase()} of ${it.host}:${it.port}`, description: `What the service said about itself: ${lines.slice(0, 3).join(' | ')}. This is an observation, not a flaw. Compare the version with the live flaw list above, and remove version text from banners where you can.`, fix: 'If the version is old, update it. Where the software allows it, hide the exact version from banners.', proof })
+    }
   }
   return out
 }

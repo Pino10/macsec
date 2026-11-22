@@ -40,6 +40,7 @@ import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from 
 import { reconData, startRecon } from './reconscan'
 import { markChecklistItem, readChecklist, readRequest, saveFindings, saveRequest, stripSecrets, triageFinding } from './sessions'
 import { checkForUpdate, installUpdate, releaseNotes, updateStatus } from './updater'
+import { catalog as msfCatalog } from './msf'
 import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
 import { expandTargets } from './targets'
@@ -210,16 +211,22 @@ function validWeb(req: unknown): WebScanRequest {
   if (t?.kind === 'local' && typeof t.name === 'string') target = { kind: 'local', name: t.name }
   else if (t?.kind === 'url' && typeof t.url === 'string' && /^https?:\/\/[^\s'"<>]+$/.test(t.url.trim())) target = { kind: 'url', url: new URL(t.url.trim()).href }
   else throw new ValidationError('Enter the address to scan, starting with http:// or https://.')
-  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, confirm: validConfirm(r.confirm), codePath: typeof r.codePath === 'string' && r.codePath ? allowedProject(r.codePath) : undefined, checklist: r.checklist === true, reviewer: pick(r.reviewer, REVIEWERS, 'none') }
+  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, confirm: validConfirm(r.confirm), codePath: typeof r.codePath === 'string' && r.codePath ? allowedProject(r.codePath) : undefined, checklist: r.checklist === true, autopilot: r.autopilot === true, reviewer: pick(r.reviewer, REVIEWERS, 'none') }
 }
 
 /** Control confirmation settings: switches are strict booleans, text is short and single-line. */
+/** Only module names that are on MacSec's own lists, each at most once. */
+const msfApproved = (v: unknown): string[] => {
+  const known = new Set(msfCatalog().map((c) => c.module))
+  return Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && known.has(x)))].slice(0, 60) : []
+}
+
 function validConfirm(v: unknown): WebScanRequest['confirm'] {
   const c = (v ?? null) as Record<string, unknown> | null
   if (!c || typeof c !== 'object') return undefined
   const text = (x: unknown, max: number): string | undefined => (typeof x === 'string' && x.trim() ? x.replace(/[\r\n\t]+/g, ' ').trim().slice(0, max) : undefined)
-  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, logic: c.logic === true, inject: c.inject === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
-  return out.fuzz || out.auth || out.authz || out.waf || out.logic || out.inject ? out : undefined
+  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, logic: c.logic === true, inject: c.inject === true, proto: c.proto === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
+  return out.fuzz || out.auth || out.authz || out.waf || out.logic || out.inject || out.proto ? out : undefined
 }
 
 /** A host name or IP address only: never something a tool could read as an option. */
@@ -860,7 +867,7 @@ function registerIpc(): void {
         const hosts = multi ? expandTargets(text) : [validHost(typed)]
         const host = hosts.length === 1 ? hosts[0] : `${hosts.length} servers`
         if (!hosts.every(isLocalHost) && r.authorized !== true) throw new ValidationError('Confirm that you own these servers or have permission to test them.')
-        return startAudit({ kind: 'server', host, ...(hosts.length > 1 ? { hosts } : {}), ports: pick((r as { ports?: unknown }).ports, ['top100', 'top1000'] as const, 'top100'), reviewer: pick(r.reviewer, REVIEWERS, 'none'), authorized: r.authorized === true, msf: (r as { msf?: unknown }).msf === true })
+        return startAudit({ kind: 'server', host, ...(hosts.length > 1 ? { hosts } : {}), ports: pick((r as { ports?: unknown }).ports, ['top100', 'top1000'] as const, 'top100'), reviewer: pick(r.reviewer, REVIEWERS, 'none'), authorized: r.authorized === true, msf: (r as { msf?: unknown }).msf === true, msfModules: msfApproved((r as { msfModules?: unknown }).msfModules) })
       }
       throw new ValidationError('Choose an audit.')
     } catch (e) {
@@ -925,6 +932,7 @@ function registerIpc(): void {
     return cloudStatus()
   })
   handle('tools:optional', () => optionalTools())
+  handle('msf:catalog', () => msfCatalog())
   handleStart('recon:start', (req) => {
     const r = (req ?? {}) as Partial<ReconRequest>
     if (typeof r.target !== 'string') throw new ValidationError('Enter a domain, such as example.com.')

@@ -40,8 +40,11 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
   const [ports, setPorts] = useState<'top100' | 'top1000'>('top100')
   const [msf, setMsf] = useState(false)
   const [msfOn, setMsfOn] = useState(false)
+  const [catalog, setCatalog] = useState<{ module: string; kind: 'check' | 'look'; title: string; what: string; risk: string }[]>([])
+  const [approved, setApproved] = useState<string[]>([])
   useEffect(() => {
     if (kind === 'cloud' && !cloud) void api.invoke('cloud:status').then(setCloud)
+    if (kind === 'server') void api.invoke('msf:catalog').then(setCatalog)
     if (kind === 'server') void api.invoke('tools:optional').then((l) => setMsfOn(l.some((t) => t.name === 'Metasploit Framework' && t.installed)))
   }, [api, kind, cloud])
 
@@ -150,6 +153,26 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
                   <div className="hint">{msfOn ? 'Metasploit was found on this Mac. Only the check command is used, with proof saved.' : 'Metasploit was not found on this Mac. Install it yourself from metasploit.com (MacSec never installs it) and this switch turns on.'}</div>
                 </div>
               </div>
+              {msf && msfOn && (
+                <div style={{ marginTop: 12, display: 'grid', gap: 8 }} role="group" aria-label="Metasploit modules to approve">
+                  <div className="hint">Nothing runs unless you tick it. Each module is listed with what it sends and what could go wrong. "Look" modules only read what a service says about itself. "Check" modules ask Metasploit’s own check about one known flaw. No module attacks, logs in, guesses passwords or opens a session.</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="btn btn-sm" onClick={() => setApproved(catalog.filter((c) => c.kind === 'look').map((c) => c.module))}>Tick all look modules</button>
+                    <button className="btn btn-sm" onClick={() => setApproved([])}>Untick all</button>
+                    <span className="hint">{approved.length} of {catalog.length} approved</span>
+                  </div>
+                  {catalog.map((c) => (
+                    <label key={c.module} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={approved.includes(c.module)} onChange={() => setApproved(approved.includes(c.module) ? approved.filter((x) => x !== c.module) : [...approved, c.module])} aria-label={`Approve ${c.title}`} />
+                      <span>
+                        <strong>{c.title}</strong> <span className="hint">({c.kind === 'look' ? 'look' : 'check'}) {c.module}</span>
+                        <span className="hint" style={{ display: 'block' }}>{c.what}</span>
+                        <span className="hint" style={{ display: 'block' }}>Risk: {c.risk}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </FlowStep>
             <FlowStep n={4} title="Who writes the report" state="current">
               <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
@@ -225,7 +248,7 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
             disabled={!ready || busy.has('audit')}
             onClick={async () => {
               const req =
-                kind === 'portfolio' ? { kind } : kind === 'changes' ? { kind, path } : kind === 'cloud' ? { kind, provider, reviewer } : kind === 'server' ? { kind, host: cleanHost, ports, reviewer, authorized: ok, msf: msf && msfOn } : { kind, path, site: site.trim(), reviewer, depth, authorized: ok }
+                kind === 'portfolio' ? { kind } : kind === 'changes' ? { kind, path } : kind === 'cloud' ? { kind, provider, reviewer } : kind === 'server' ? { kind, host: cleanHost, ports, reviewer, authorized: ok, msf: msf && msfOn, msfModules: msf && msfOn ? approved : [] } : { kind, path, site: site.trim(), reviewer, depth, authorized: ok }
               const s = await act('audit', () => api.invoke('audit:start', req as never))
               if (s) showSession(s.id)
             }}

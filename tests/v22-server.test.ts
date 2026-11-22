@@ -105,7 +105,7 @@ describe('Metasploit stays check-only', () => {
       seen.push(args)
       return args[3].includes('smb_ms17_010') ? '[+] 10.0.0.5:445 - The target is vulnerable.' : '[*] x - The target is not exploitable.'
     }
-    const out = await msfChecks([{ cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }, { cve: 'CVE-2022-22965', host: '10.0.0.5', port: 8080 }, { cve: 'CVE-2000-0001', host: '10.0.0.5', port: 80 }, { cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }], { bin: '/x/msfconsole', run })
+    const out = await msfChecks([{ cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }, { cve: 'CVE-2022-22965', host: '10.0.0.5', port: 8080 }, { cve: 'CVE-2000-0001', host: '10.0.0.5', port: 80 }, { cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }], { bin: '/x/msfconsole', run, approved: ['auxiliary/scanner/smb/smb_ms17_010', 'exploit/multi/http/spring_framework_rce_spring4shell'] })
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({ confidence: 'confirmed', tool: 'Metasploit (check only)' })
     expect(out[0].proof?.reproduce).toContain('check; exit -y')
@@ -115,7 +115,7 @@ describe('Metasploit stays check-only', () => {
   })
   it('does nothing when Metasploit is not installed', async () => {
     const notes: string[] = []
-    const out = await msfChecks([{ cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }], { bin: undefined, run: async () => '', note: (t) => notes.push(t) })
+    const out = await msfChecks([{ cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }], { bin: undefined, run: async () => '', note: (t) => notes.push(t), approved: [] })
     // With no explicit path and none on this machine, nothing runs.
     expect(Array.isArray(out)).toBe(true)
   })

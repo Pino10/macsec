@@ -23,7 +23,7 @@ import { log } from './logs'
 import { isPrivateTarget } from './targets'
 import { deepWeb, probeServices } from './servicedeep'
 import { cveFindings, epssFor, liveCves } from './cvelive'
-import { msfChecks, msfPath, type MsfItem } from './msf'
+import { msfChecks, msfLook, msfPath, type MsfItem } from './msf'
 import { writeFileSync } from 'fs'
 
 type Cloud = Extract<AuditRequest, { kind: 'cloud' }>
@@ -243,7 +243,12 @@ async function server(id: string, req: Server): Promise<void> {
         }
         const allowed = req.authorized || hosts.every(isLocalHost)
         if (!allowed) throw new Error('Confirm that you own these servers before using Metasploit.')
-        return msfChecks(matches, { note, cancelled: () => s.cancelled })
+        const approved = req.msfModules ?? []
+        if (!approved.length) {
+          note('No Metasploit module was approved, so nothing was run. Tick the modules you accept on the audit page.')
+          return []
+        }
+        return [...(await msfLook(open, { note, cancelled: () => s.cancelled, approved })), ...(await msfChecks(matches, { note, cancelled: () => s.cancelled, approved }))]
       })
 
     await aiStep(s, st.ai, req.reviewer, 'server', req.host, `Open ports and services on ${many ? `${hosts.length} servers (${hosts.slice(0, 12).join(', ')}${hosts.length > 12 ? ', and more' : ''}), ${hosts.every(isPrivateTarget) ? 'all on a private network' : 'some reachable from the internet'}` : req.host}${!many && isLocalHost(req.host) ? ' (this Mac or a local development host)' : ''}. Say which hosts should not expose each service. Give firewall commands for the likely platform.`)

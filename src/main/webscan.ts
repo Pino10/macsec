@@ -38,6 +38,13 @@ import { PARAM_WORDS } from './wordlists'
 import { injectionChecks, inputsFrom, postFormLead } from './injection'
 import { getPaths, mapCode, paramNames, unguardedPrivate, fillPath } from './routemap'
 import { calibrate, isCatchAll, visibleText } from './confirmtests'
+import { oauthChecks } from './oauth'
+import { jwtChecks } from './jwt'
+import { graphqlChecks } from './graphql'
+import { sessionChecks } from './sessioncheck'
+import { runAutopilot, type Action } from './autopilot'
+import { corsChecks } from './sessioncheck'
+import type { Reply } from './confirmtests'
 import { accessChecks, ConfirmClient, risky, fuzzContent, fuzzParams, loginChecks, resetCheck, wafControl } from './confirmtests'
 
 /** Laramac's sites, from the www folder, at their .test addresses. */
@@ -211,6 +218,8 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     logic: req.confirm?.logic ? s.step('logic', 'Control confirmation: business logic (redirects, host header, code limits, skipped steps)') : null,
     code: req.codePath ? s.step('code', 'White box: read the code, map its routes and parameters, test them live') : null,
     inject: req.confirm?.inject ? s.step('inject', 'Control confirmation: injection tests on every page, parameter and form') : null,
+    proto: req.confirm?.proto ? s.step('proto', 'Control confirmation: OAuth, tokens (JWT), GraphQL, CORS, CSRF and session ids') : null,
+    autopilot: req.autopilot && req.reviewer !== 'none' ? s.step('autopilot', 'AI autopilot: the AI picks the next checks from a safe menu, MacSec runs them') : null,
     login: req.confirm?.auth ? s.step('login', 'Control confirmation: login checks') : null,
     authz: req.confirm?.authz && Object.keys(headers).length && Object.keys(headersB).length ? s.step('authz', 'Control confirmation: what a second account can open') : null,
     wp: s.step('wpscan', 'WordPress: version, plugins and themes (when the site uses it)'),
@@ -360,21 +369,46 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
 
     if (st.logic) await s.run(st.logic, (note) => logicChecks(mk(400), { urls, pages: urls.filter((u) => !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|pdf|zip)$/i.test(u)).slice(0, 10) }, note))
 
+    // The pages the injection, sign-in protocol and autopilot steps read, fetched once.
+    let readPages: Reply[] | null = null
+    const getPages = async (): Promise<Reply[]> => {
+      if (readPages) return readPages
+      const origin = new URL(url).origin
+      const pageUrls = [...new Set([url, ...urls.filter((u) => { try { const p = new URL(u); return p.origin === origin && !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|ttf|pdf|zip|mp4|mp3)$/i.test(p.pathname) && !risky(u) } catch { return false } }).map((u) => { const p = new URL(u); return `${p.origin}${p.pathname}` })])].slice(0, 30)
+      const reader = mk(80)
+      const got: Reply[] = []
+      for (const u of pageUrls) {
+        if (s.cancelled) break
+        const r = await reader.get(u).catch(() => null)
+        if (r) got.push(r)
+      }
+      readPages = got
+      return got
+    }
+
     if (st.inject)
       await s.run(st.inject, async (note) => {
         const origin = new URL(url).origin
-        const pageUrls = [...new Set([url, ...urls.filter((u) => { try { const p = new URL(u); return p.origin === origin && !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|ttf|pdf|zip|mp4|mp3)$/i.test(p.pathname) && !risky(u) } catch { return false } }).map((u) => { const p = new URL(u); return `${p.origin}${p.pathname}` })])].slice(0, 30)
-        const reader = mk(80)
-        const pages: { url: string; html: string }[] = []
-        for (const u of pageUrls) {
-          if (s.cancelled) break
-          const r = await reader.get(u).catch(() => null)
-          if (r && r.status === 200 && /html/i.test(r.headers.get('content-type') ?? '')) pages.push({ url: r.url, html: r.body })
-        }
+        const pages = (await getPages()).filter((r) => r.status === 200 && /html/i.test(r.headers.get('content-type') ?? '')).map((r) => ({ url: r.url, html: r.body }))
         const { inputs, posts } = inputsFrom(pages, urls, origin)
         note(`${pages.length} pages read, ${inputs.length} inputs to test, ${posts.length} forms that send data (listed, not submitted)`)
         const found = await injectionChecks(mk(Math.min(2500, inputs.length * 9 + 60)), inputs, { note })
         return [...found, ...postFormLead(posts)]
+      })
+
+    if (st.proto)
+      await s.run(st.proto, async (note) => {
+        const pages = await getPages()
+        const out: Finding[] = []
+        note('Sign-in with OAuth and OpenID Connect')
+        out.push(...(await oauthChecks(mk(120), { pages, urls }, note)))
+        note('Tokens (JWT)')
+        out.push(...(await jwtChecks(mk(80), { headers, replies: pages, urls }, note)))
+        note('GraphQL')
+        out.push(...(await graphqlChecks(mk(120), { extraPaths: codeNames.filter((n) => /graphql|gql/i.test(n)), note })))
+        note('Cross-site requests and sessions')
+        out.push(...(await sessionChecks(mk(150), { urls, pages, account: headers }, note)))
+        return out
       })
 
     if (st.login)
@@ -382,6 +416,42 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         const found = await loginChecks(mk(120), { loginUrl: req.confirm?.loginUrl, knownUser: req.confirm?.knownUser }, note)
         if (req.confirm?.allowReset && req.confirm.knownUser?.includes('@')) found.push(...(await resetCheck(mk(30), req.confirm.knownUser, note).catch(() => [])))
         return found
+      })
+
+    if (st.autopilot)
+      await s.run(st.autopilot, async (note, line) => {
+        const origin = new URL(url).origin
+        const exec = async (a: Action): Promise<{ findings: Finding[]; page?: Reply }> => {
+          const u = a.url
+          switch (a.action) {
+            case 'read':
+              return { findings: [], page: await mk(20).get(u!) }
+            case 'inject': {
+              const r = await mk(30).get(u!)
+              const { inputs, posts } = inputsFrom([{ url: r.url, html: r.body }], [u!], origin)
+              return { findings: [...(await injectionChecks(mk(Math.min(600, inputs.length * 9 + 40)), inputs, { note })), ...postFormLead(posts)] }
+            }
+            case 'fuzz':
+              return { findings: (await fuzzParams(mk(150), u!.split('?')[0], note, codeNames.length ? [...new Set([...codeNames, ...PARAM_WORDS])] : undefined)).findings }
+            case 'cors':
+              return { findings: await corsChecks(mk(60), [u!], { account: headers, note }) }
+            case 'graphql':
+              return { findings: await graphqlChecks(mk(80), { extraPaths: [new URL(u!).pathname], note }) }
+            case 'oauth':
+              return { findings: await oauthChecks(mk(80), { pages: [await mk(20).get(u!)], urls: [u!] }, note) }
+            case 'jwt':
+              return { findings: await jwtChecks(mk(60), { headers, replies: await getPages(), urls }, note) }
+            case 'logic':
+              return { findings: await logicChecks(mk(250), { urls, pages: [u!] }, note) }
+          }
+        }
+        const r = await runAutopilot({ target: url, ask: (prompt) => askAi(req.reviewer, prompt, op, s.raw), exec, pages: await getPages(), findings: () => s.findings, note, line, cancelled: () => s.cancelled })
+        const have = new Set(s.findings.map((f) => f.id))
+        const fresh = r.findings.filter((f) => !have.has(f.id))
+        note(`${r.done.length} checks chosen by the AI in ${r.rounds} ${r.rounds === 1 ? 'round' : 'rounds'}, ${fresh.length} new ${fresh.length === 1 ? 'finding' : 'findings'}. ${r.stopped}`)
+        if (r.done.length)
+          fresh.push({ id: fid('autopilot', id), tool: 'MacSec', category: 'web', severity: 'info', title: `The AI autopilot chose ${r.done.length} ${r.done.length === 1 ? 'check' : 'checks'} to run`, description: `${r.done.map((d) => `${d.action}${d.url ? ` ${new URL(d.url).pathname}` : ''}${d.why ? ` (${d.why})` : ''}: ${d.found} ${d.found === 1 ? 'finding' : 'findings'}`).join('; ')}. ${r.stopped} Every finding above came from a MacSec check with its own proof, not from the AI.` })
+        return fresh
       })
 
     if (st.authz) await s.run(st.authz, (note) => accessChecks(mk(400), urls, { headersB, identityA: req.confirm?.identityA }, note))
@@ -445,7 +515,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       })
 
     // The test plan: what to try by hand on this site, from the pages the crawl found. Always saved, with or without an AI.
-    const ran = [st.login && 'auth', st.fuzz && 'fuzz', st.waf && 'waf', st.authz && 'authz', st.logic && 'logic', st.inject && 'inject'].filter(Boolean) as string[]
+    const ran = [st.login && 'auth', st.fuzz && 'fuzz', st.waf && 'waf', st.authz && 'authz', st.logic && 'logic', st.inject && 'inject', st.proto && 'proto'].filter(Boolean) as string[]
     const profile = profileSite(urls)
     try {
       savePlan(id, planMarkdown(profile, url, ran))
