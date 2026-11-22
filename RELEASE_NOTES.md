@@ -1,3 +1,14 @@
+## MacSec 1.8.1
+
+DeepSeek works with Claude Code, and online models are shown as online.
+
+### What is new
+- **DeepSeek for Claude Code.** A new ready-made server, "DeepSeek for Claude Code" (Tools, Model servers), uses the same DeepSeek key in the format Claude Code speaks. Add it, pick its model, then choose the reviewer "Claude Code on your model". The key stays in the Keychain and is handed to Claude Code only for that run. The existing "DeepSeek" server still works for the reviewer "Your model" (the API).
+- **Online models are labelled.** When the chosen model is not on this Mac, the reviewer list moves it to the online group and says that the code is sent to the provider, instead of "Nothing leaves this Mac".
+
+### Limits
+- Not tried against a live DeepSeek account here. The model names (deepseek-v4-pro, deepseek-v4-flash) come from DeepSeek's documentation; if DeepSeek renames them, pick another name in the list.
+
 ## MacSec 1.8.0
 
 MacSec now knows what firewalls do to confuse a scanner, remembers what you tell it is not a problem, and checks library versions more carefully.

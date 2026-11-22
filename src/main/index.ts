@@ -18,7 +18,7 @@ import { FREE_KEY, freeConfig } from './freellm'
 import { checkFreeLlm, checkFreeLlmKey, FREELLM_MODELS, freeLlmModel, freeLlmUrl } from './seckit/freellm'
 import { ensureSkills, listSkills, skillPlan } from './skills'
 import { autoRunFinished, checkPackages, isAutoRun, setWatch, startWatch, watchInfo } from './watch'
-import { setModelCrypto, detectLlms, testLlm, listServers, saveServer, deleteServer } from './models'
+import { chosenLocal, setModelCrypto, detectLlms, testLlm, listServers, saveServer, deleteServer } from './models'
 import { jobs } from './jobs'
 import { log, logEvents, listLogs, clearLogs } from './logs'
 import { checkUpdates, checkUpdatesDaily, installTool, listTools, removeTool, toolDef, toolEnv, toolPath, updateToolData } from './toolbox'
@@ -607,7 +607,7 @@ function registerIpc(): void {
     const reviewer = (['claude', 'claude-local', 'claude-free', 'claude-desktop'] as const).find((e) => e === r.reviewer)
     if (!engine || !reviewer) throw new ValidationError('That deep audit request is not valid.')
     const st = getSettings()
-    return deepPlanFor({ engine, reviewer, local: reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : undefined })
+    return deepPlanFor({ engine, reviewer, local: reviewer === 'claude-local' ? chosenLocal() : undefined })
   })
   // Claude Desktop cannot be driven from here, so the request is copied and the app opened: the person pastes it.
   handle('review:deep-handoff', async (req) => {

@@ -6,7 +6,7 @@ import { freeServer } from './freellm'
 import { spawn } from 'child_process'
 import type { Finding, Reviewer } from '../shared/types'
 import { agentEnv, findCli } from './agents'
-import { chatWithLlm } from './models'
+import { chatWithLlm, chosenLocal } from './models'
 import { parseAiOutput, type Verdict } from './aireview'
 import { pluginArgs } from './skills'
 import { methodText } from './bountyskills'
@@ -68,7 +68,7 @@ export async function askAi(reviewer: Reviewer, prompt: string, op: Op, cwd: str
     if (!bin) throw new Error(`${reviewer === 'codex' ? 'Codex' : reviewer === 'gemini' ? 'Gemini CLI' : 'Claude Code'} is not installed. Set it up on Tools.`)
     const st = getSettings()
     const free = reviewer === 'claude-free' ? freeServer() : null
-    const localEnv = reviewer === 'claude-local' ? localModelEnv({ baseUrl: st.llm.baseUrl, model: st.llm.model }) : free ? localModelEnv(free) : {}
+    const localEnv = reviewer === 'claude-local' ? localModelEnv(chosenLocal()) : free ? localModelEnv(free) : {}
     // The AI only reads the findings in the prompt: no tools, no session saved.
     const args =
       reviewer === 'codex'

@@ -10,6 +10,7 @@ import { join } from 'path'
 import type { ChatMessage, LlmTest, LocalLlm, ModelApi, ModelServer, ModelServerInput } from '../shared/types'
 import { dirs } from './paths'
 import { getSettings } from './settings'
+import type { LocalModel } from './seckit/reviewers'
 
 interface Stored {
   id: string
@@ -164,6 +165,15 @@ export function guessTool(name: string, baseUrl: string): LocalLlm['toolId'] {
   return undefined
 }
 
+export const DEEPSEEK_MODELS = ['deepseek-v4-pro', 'deepseek-v4-flash']
+
+/** The model chosen in the app, as Claude Code needs it: with the key of a saved server, read from the Keychain here and never sent to the window. */
+export function chosenLocal(): LocalModel {
+  const { baseUrl, model } = getSettings().llm
+  const key = lookup(baseUrl)?.key
+  return { baseUrl, model, ...(key ? { token: key } : {}) }
+}
+
 /** Every model server that answers right now, found or saved. */
 export async function detectLlms(): Promise<LocalLlm[]> {
   const found: LocalLlm[] = []
@@ -218,7 +228,9 @@ export async function detectLlms(): Promise<LocalLlm[]> {
         const l = lookup(s.baseUrl)
         const modelsUrl = s.api === 'anthropic' ? `${s.baseUrl}/v1/models?limit=100` : `${s.baseUrl}/models`
         const data = await getJson<{ data: ListedModel[] }>(modelsUrl, isLocal(s.baseUrl) ? 1500 : 6000, headers(s.api, l?.key ?? null))
-        const models = (data?.data ?? []).map((m) => m.id).filter((m) => isChatModel(m))
+        let models = (data?.data ?? []).map((m) => m.id).filter((m) => isChatModel(m))
+        // DeepSeek's own address may not list models in the Anthropic format: these are the names its documentation gives.
+        if (!models.length && /^https:\/\/api\.deepseek\.com(\/|$)/i.test(s.baseUrl)) models = DEEPSEEK_MODELS
         found.push({ id: s.id, provider: s.name, toolId: guessTool(s.name, s.baseUrl), baseUrl: s.baseUrl, api: s.api, models, loaded: isLocal(s.baseUrl) ? models : [], remote: !isLocal(s.baseUrl), saved: true, online: !!data })
       })()
     )

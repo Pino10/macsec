@@ -6,6 +6,7 @@
  *  4. The AI reviewer reads the code, checks the scanner findings and hunts for logic flaws.
  *  5. Delete the private copy, unless you asked to keep it for fixing.
  */
+import { chosenLocal } from './models'
 import { freeServer } from './freellm'
 import { deepAuditStep, ENGINE_NAME } from './deepreview'
 import { spawn, type ChildProcess } from 'child_process'
@@ -223,7 +224,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
             name: info.title,
             engine: req.deep.engine,
             reviewer: req.reviewer,
-            local: req.reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : req.reviewer === 'claude-free' ? freeServer() : undefined,
+            local: req.reviewer === 'claude-local' ? chosenLocal() : req.reviewer === 'claude-free' ? freeServer() : undefined,
             onChild: (c) => r.children.add(c),
             onStatus: (text) => set(ai, { detail: text })
           })
@@ -242,7 +243,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
           const chosen = chosenPluginArgs(req.skills ?? [], skillDir, root)
           info.skills = chosen.names
           saveSession(info)
-          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) }, req.reviewer === 'claude-local' ? { baseUrl: st.llm.baseUrl, model: st.llm.model } : req.reviewer === 'claude-free' ? freeServer() : undefined, req.reviewer === 'claude-free', chosen.args)
+          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) }, req.reviewer === 'claude-local' ? chosenLocal() : req.reviewer === 'claude-free' ? freeServer() : undefined, req.reviewer === 'claude-free', chosen.args)
         }
         else if (req.reviewer === 'gemini') res = await reviewWithGemini(root, prompt, req.depth, (c) => r.children.add(c), beat)
         else if (req.reviewer === 'codex') res = await reviewWithCodex(root, prompt, req.depth, join(raw, 'codex-last.md'), (c) => r.children.add(c), beat)

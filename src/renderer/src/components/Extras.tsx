@@ -286,7 +286,8 @@ export function FreeLlmPanel(): React.JSX.Element {
 
 /** Ready-made addresses, so the address never has to be typed or remembered. The model list is read from the server itself. */
 const SERVER_PRESETS: { id: string; name: string; baseUrl: string; api: ModelApi; hint: string }[] = [
-  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', api: 'openai', hint: 'Key from platform.deepseek.com. Your code and findings are sent to DeepSeek.' },
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', api: 'openai', hint: 'Key from platform.deepseek.com. Use this one for the reviewer “Your AI model” (the API). Your code and findings are sent to DeepSeek.' },
+  { id: 'deepseek-claude', name: 'DeepSeek for Claude Code', baseUrl: 'https://api.deepseek.com/anthropic', api: 'anthropic', hint: 'The same DeepSeek key, in the format Claude Code speaks. Pick this one, then choose the reviewer “Claude Code on your model”. Your code is sent to DeepSeek.' },
   { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', api: 'openai', hint: 'One key for many models.' },
   { id: 'groq', name: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', api: 'openai', hint: 'Fast, with a free tier.' },
   { id: 'custom', name: '', baseUrl: '', api: 'openai', hint: 'Any server that speaks the OpenAI or Anthropic format, on this Mac, your network or https.' }
