@@ -16,6 +16,7 @@ import { join } from 'path'
 import type { Finding, ScanMode, SessionInfo, WebScanRequest } from '../shared/types'
 import { beginOp, endOp, runTool, SessionRun } from './engine'
 import { createSession, saveAiReport, savePlan } from './sessions'
+import { proofOf } from './seckit/confirm'
 import { planContext, planMarkdown, profileSite } from './testplan'
 import { checkHeaders, parseHttpx, parseKatana, parseNuclei, pathSeverity, SENSITIVE_PATHS, type Fingerprint } from './scanners/web'
 import { fid, parseZap } from './scanners/parse'
@@ -26,6 +27,10 @@ import { dirs } from './paths'
 import { getSettings } from './settings'
 import { log } from './logs'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
+import { crawlJs } from './jsdeep'
+import { cveFindings, epssFor, liveCves } from './cvelive'
+import { devopsChecks, dnsChecks, protectionFinding } from './webposture'
+import { bannersOf, type Product } from './seckit/confirm'
 import { checkTls, keysInJavaScript, signedOutCheck } from './webextra'
 import { accessChecks, ConfirmClient, risky, fuzzContent, fuzzParams, loginChecks, resetCheck, wafControl } from './confirmtests'
 
@@ -189,6 +194,10 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     crawl: m.depth ? s.step('katana', `Map the site, ${m.depth} levels deep`) : null,
     files: s.step('exposed', `Look for files that should not be public (${m.paths})`),
     js: m.depth ? s.step('js', 'Look for keys in the site’s public JavaScript') : null,
+    infra: s.step('infra', 'Firewall, CDN, hosting, DNS and mail settings'),
+    devops: s.step('devops', 'DevOps and infrastructure left open (Jenkins, Grafana, registries, clusters, state files, Git)'),
+    jsdeep: m.depth ? s.step('jsdeep', 'JavaScript analysis: routes, hidden chunks, source maps, risks') : null,
+    cves: s.step('cves', 'Known flaws for the versions found (live count from NVD, CISA and EPSS)'),
     access: m.depth && Object.keys(headers).length ? s.step('access', 'Compare private pages signed in and signed out') : null,
     fuzz: req.confirm?.fuzz ? s.step('fuzz', 'Control confirmation: hidden pages and parameters') : null,
     waf: req.confirm?.waf ? s.step('waf', 'Control confirmation: web firewall tests') : null,
@@ -237,6 +246,55 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     await s.run(st.files, (note) => exposedFiles(url, SENSITIVE_PATHS.slice(0, m.paths), headers, () => s.cancelled, note))
 
     if (st.js) await s.run(st.js, (note) => keysInJavaScript(urls, host, s.raw, op, headers, note))
+    // Versions found anywhere in this scan are matched against the live vulnerability databases at the end of these steps.
+    const found: { product: Product; host: string }[] = []
+
+    await s.run(st.infra, async (note) => {
+      const out: Finding[] = []
+      note('Reading the site’s protection')
+      const home = await mk(10).get('/').catch(() => null)
+      if (home) {
+        const cookies = home.headers.getSetCookie?.().join('; ') ?? home.headers.get('set-cookie') ?? ''
+        out.push(protectionFinding(url, home.headers, cookies, home.status, home.body))
+        for (const b of bannersOf(home.headers, home.body)) found.push({ product: { ...b, proof: proofOf({ url, status: home.status, headers: home.headers, body: home.body.slice(0, 200000), shows: [b.from] }) }, host })
+      }
+      note('Reading DNS and mail settings')
+      out.push(...(await dnsChecks(host)))
+      return out
+    })
+
+    await s.run(st.devops, async (note) => {
+      const r = await devopsChecks(mk(110), host, { note })
+      found.push(...r.products)
+      if (r.stopped) note(`Stopped early: ${r.stopped}`)
+      return r.findings
+    })
+
+    if (st.jsdeep)
+      await s.run(st.jsdeep, async (note) => {
+        const scripts = urls.filter((u) => /\.m?js(\?|$)/i.test(u))
+        const r = await crawlJs({ scripts, allowed: (u) => { try { return new URL(u).host === host } catch { return false } }, headers, cancelled: () => s.cancelled, note, sourceDir: join(s.raw, 'sources') })
+        writeFileSync(join(s.raw, 'js-map.json'), JSON.stringify({ scripts: r.scripts, endpoints: r.endpoints, routes: r.routes, graphql: r.graphql, envVars: r.envVars, hosts: r.hosts, refs: r.refs }, null, 1))
+        // What the scripts name joins the pages the test plan is built from.
+        urls = [...new Set([...urls, ...r.endpoints.filter((e) => e.startsWith('/')).map((e) => new URL(e, url).href), ...r.routes.map((x) => new URL(x, url).href)])].slice(0, 3000)
+        for (const l of r.libs) if (l.proof) found.push({ product: l, host })
+        note(`${r.scripts.length} scripts (${r.chunksFound} found through chunk lists), ${r.endpoints.length} endpoints, ${r.routes.length} routes, ${r.scripts.filter((x) => x.sourceMap).length} source maps`)
+        return r.findings
+      })
+
+    await s.run(st.cves, async (note) => {
+      if (!found.length) {
+        note('No software versions were stated')
+        return []
+      }
+      const live = await liveCves(found, { cancelled: () => s.cancelled, note, cap: req.mode === 'quick' ? 4 : 10 })
+      const ids = live.results.flatMap((r) => r.matches.slice(0, 10).map((x) => x.id))
+      const epss = await epssFor(ids)
+      const list = cveFindings(live.results, epss)
+      note(live.note || `${found.length} versions checked, ${list.reduce((n, x) => n + (x.cves?.count ?? 0), 0)} known flaws listed${list.some((x) => x.cves?.kev) ? ', some on CISA’s exploited list' : ''}`)
+      return list
+    })
+
     if (st.access) await s.run(st.access, (note) => signedOutCheck(urls, headers, () => s.cancelled, note))
 
     if (st.fuzz)

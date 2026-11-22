@@ -144,6 +144,13 @@ export async function calibrate(c: ConfirmClient): Promise<Calibration[]> {
 }
 
 export function isCatchAll(word: string, r: Reply, cal: Calibration[]): boolean {
+  // A site that answers the same status (other than "not found") for every name that cannot exist says yes to everything,
+  // even when the page differs each time (a clock, an ad, a random token). Only an answer that is really a file or a folder
+  // listing can still be told apart from those pages.
+  const first = cal[0]?.reply.status
+  if (cal.length > 1 && first !== undefined && first !== 404 && first !== 410 && first < 400 && first >= 200 && first < 300 && cal.every((k) => k.reply.status === first) && r.status === first) {
+    return !(dirListing(r.body) || (r.status === 200 && fileShows(`/${word}`, r.body) && !/<html|<!doctype/i.test(r.body.slice(0, 400))))
+  }
   return cal.some((k) => {
     if (k.reply.status !== r.status) return false
     if (r.status >= 300 && r.status < 400) return locOf(k.reply, k.seg) === locOf(r, word)
@@ -269,7 +276,8 @@ async function paramsInner(c: ConfirmClient, page: string, note: (d: string) => 
   const safe = names.filter((n) => /^[A-Za-z][\w.-]{0,40}$/.test(n))
   const base1 = await c.get(page)
   const base2 = await c.get(page)
-  const stable = similar(base1, base2)
+  const base3 = await c.get(page)
+  const stable = similar(base1, base2) && similar(base2, base3)
   const idx = new Map(safe.map((n, i) => [n, i]))
   let splits = 0
 

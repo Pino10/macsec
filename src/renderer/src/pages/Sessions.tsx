@@ -1,4 +1,4 @@
-import ProofBlock, { ConfidenceTag } from '../components/ProofBlock'
+import ProofBlock, { ConfidenceTag, ExploitTag } from '../components/ProofBlock'
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
 import { issueText } from '@shared/insights'
@@ -270,9 +270,9 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <button role="tab" aria-selected={tab === 'run'} onClick={() => setTab('run')}>
             What ran
           </button>
-          {s.kind === 'recon' && (
+          {(s.kind === 'recon' || s.kind === 'web-scan') && (
             <button role="tab" aria-selected={tab === 'surface'} onClick={() => setTab('surface')}>
-              Pages and hosts
+              {s.kind === 'recon' ? 'Pages and hosts' : 'JavaScript map'}
             </button>
           )}
         </div>
@@ -343,6 +343,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
                 </p>
               </div>
               <Spectrum counts={s.counts} />
+              <ExploitStrip findings={detail.findings} />
             </div>
           </div>
           {s.children && s.children.length > 0 && (
@@ -398,7 +399,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
                 <button key={f.id} className="f-row" role="option" data-sev={f.severity} data-fp={f.verdict === 'false-positive' || !!f.triage} aria-selected={f.id === sel} onClick={() => setSel(f.id)}>
                   <Sev s={f.severity} />
                   <span className="t">{f.title}</span>
-                  {f.confidence === 'possible' && <span className="tag tag-warn" style={{ flex: 'none' }}>Possible</span>}
+                  {f.exploit ? <ExploitTag f={f} compact /> : f.confidence === 'possible' && <span className="tag tag-warn" style={{ flex: 'none' }}>Possible</span>}
                   <span className="w">{f.file ? `${f.file}${f.line ? `:${f.line}` : ''}` : (f.advisory ?? f.tool)}</span>
                 </button>
               ))}
@@ -407,6 +408,23 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           </div>
         ))}
     </>
+  )
+}
+
+/** Proven, known exploited, likely and not proven, counted over the findings that are still open. */
+function ExploitStrip({ findings }: { findings: Finding[] }): React.JSX.Element | null {
+  const open = findings.filter((f) => f.exploit && f.verdict !== 'false-positive' && !f.triage)
+  if (!open.length) return null
+  const n = (s: string): number => open.filter((f) => f.exploit!.state === s).length
+  const chips: [string, string, string][] = [['proven', 'Proven', 'tag tag-ok'], ['known-exploited', 'Known exploited', 'tag tag-bad'], ['likely', 'Likely', 'tag tag-warn'], ['unproven', 'Not proven', 'tag']]
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }} title="Proven means a harmless request showed the problem and the proof can be repeated. The rest are leads.">
+      {chips.filter(([k]) => n(k)).map(([k, l, c]) => (
+        <span key={k} className={c}>
+          {n(k)} {l.toLowerCase()}
+        </span>
+      ))}
+    </div>
   )
 }
 
@@ -445,6 +463,7 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
         {f.verdict === 'confirmed' && <span className="tag tag-ok">Confirmed by AI</span>}
         {f.verdict === 'false-positive' && <span className="tag tag-warn">Ruled out by AI</span>}
         <ConfidenceTag f={f} />
+        <ExploitTag f={f} />
         <span className="tag">{f.tool}</span>
         {f.cwe && (
           <button className="tag" style={{ border: 0, cursor: 'pointer' }} onClick={() => void api.invoke('app:open-external', `https://cwe.mitre.org/data/definitions/${f.cwe!.replace('CWE-', '')}.html`)}>
@@ -456,6 +475,11 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
       <h3>{f.title}</h3>
       {(f.file || f.url) && <div className="where">{f.file ? `${f.file}${f.line ? `:${f.line}` : ''}` : f.url}</div>}
       {f.description && <p>{f.description}</p>}
+      {f.exploit && (
+        <p className="hint">
+          <strong>{f.exploit.label}.</strong> {f.exploit.why} Risk score {f.exploit.risk} of 100.
+        </p>
+      )}
       {f.context ? (
         <>
           <h5>The code</h5>
@@ -586,7 +610,9 @@ function Surface({ id }: { id: string }): React.JSX.Element {
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       {d.delta && <ReconChanges delta={d.delta} />}
+      {d.jsmap && <JsMap id={id} m={d.jsmap} />}
       {d.pages && <ReconPages pages={d.pages} />}
+      {d.hosts.length > 0 && (
       <div className="panel">
         <div style={{ padding: '14px 18px 4px' }} className="section-title">
           {d.hosts.length} hosts, {d.hosts.filter((h) => h.live).length} answer
@@ -611,6 +637,8 @@ function Surface({ id }: { id: string }): React.JSX.Element {
           </div>
         ))}
       </div>
+      )}
+      {d.js.length > 0 && (
       <div className="panel">
         <div style={{ padding: '14px 18px 4px' }} className="section-title">
           {d.js.length} scripts, {d.js.filter((j) => j.sourceMap).length} with a public source map
@@ -633,11 +661,49 @@ function Surface({ id }: { id: string }): React.JSX.Element {
             </div>
           ))}
       </div>
+      )}
+      {d.js.length > 0 && (
       <div className="panel" style={{ padding: 18 }}>
         <div className="section-title">Endpoints in the JavaScript, and parameters from {d.urls} archived URLs</div>
         <pre className="codeview" style={{ maxHeight: 360, overflow: 'auto', padding: 14 }}>{d.endpoints.join('\n') || 'None found.'}</pre>
         <p className="hint mono" style={{ wordBreak: 'break-word' }}>{d.params.slice(0, 200).join(', ')}</p>
       </div>
+      )}
+    </div>
+  )
+}
+
+/** What the site's scripts name: endpoints, routes, GraphQL operations, build variables, other sites and cloud storage. */
+function JsMap({ id, m }: { id: string; m: NonNullable<SurfaceData['jsmap']> }): React.JSX.Element {
+  const block = (title: string, items: string[]): React.JSX.Element | null =>
+    items.length ? (
+      <div style={{ padding: '4px 18px 12px' }}>
+        <div className="section-title" style={{ marginBottom: 6 }}>
+          {title} ({items.length})
+        </div>
+        <pre className="codeview" style={{ maxHeight: 220, overflow: 'auto', padding: 12 }}>{items.join('\n')}</pre>
+      </div>
+    ) : null
+  const maps = m.scripts.filter((x) => x.sourceMap)
+  return (
+    <div className="panel">
+      <div style={{ padding: '14px 18px 4px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <span className="section-title grow">
+          JavaScript map: {m.scripts.length} scripts, {m.endpoints.length} endpoints, {m.routes.length} routes, {m.graphql.length} GraphQL operations, {maps.length} source maps
+        </span>
+        {m.sources && (
+          <button className="btn" onClick={() => void window.macsec.invoke('sessions:open-sources', id)}>
+            Open the rebuilt source
+          </button>
+        )}
+      </div>
+      {block('Routes the front end names', m.routes)}
+      {block('API endpoints', m.endpoints)}
+      {block('GraphQL operations', m.graphql)}
+      {block('Build variables (names only)', m.envVars)}
+      {block('Other sites the scripts talk to', m.hosts)}
+      {block('Cloud storage named', [...m.refs.firebase, ...m.refs.s3, ...m.refs.gcs])}
+      {maps.length > 0 && block('Source maps', maps.map((x) => `${x.sourceMap!.url}  (${x.sourceMap!.files} files${x.sourceMap!.recovered ? `, ${x.sourceMap!.recovered} rebuilt` : ''})`))}
     </div>
   )
 }

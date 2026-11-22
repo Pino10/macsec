@@ -1,3 +1,21 @@
+## MacSec 1.4.0
+
+A JavaScript analyzer, the setup behind a site, live vulnerability counts, and an honest label on every finding.
+
+### What is new
+- **Every finding says how far it is proven.** Proven (a harmless request showed it, and the proof can be repeated), Known exploited (the version is on CISA's list), Likely (a high chance of use) or Not proven (a lead). Each has a risk score from 0 to 100 and a one-line reason, and the report header counts them. Nothing runs an exploit: "proven" means the problem itself was seen and you can repeat it with the command in the proof.
+- **A guard against over-claiming.** A finding that says "confirmed" without proof is turned into "possible" before it is saved.
+- **The JavaScript analyzer.** For web scans and recon: it reads every script the site serves, follows lists of hidden chunks (lazy admin screens), and names the routes, API endpoints, GraphQL operations and build variables. It finds public source maps, rebuilds the original source into the session folder (with an "Open the rebuilt source" button) and looks for keys in it. It also flags message listeners that never check the sender, internal addresses, developer comments about security, and cloud storage names. A new "JavaScript map" tab shows it all.
+- **The setup behind a site.** Which firewall or CDN answers, what hosts it, SPF, DMARC and CAA, and a CNAME that points at a service nobody owns any more. DevOps and infrastructure left open: Jenkins, Grafana, Prometheus, Kibana, Elasticsearch, Consul, etcd, Kubernetes, Docker, container registries, Traefik, Argo CD, Portainer, RabbitMQ, SonarQube, Terraform state, cloud credentials and CI files. The public .git folder is read for the GitHub repository it names and for a password in its address. API scans get the same checks around the API.
+- **Live vulnerability counts.** Versions found in server banners, scripts and the DevOps tools are looked up in the public NVD database, marked when they are on CISA's known-exploited list, and given FIRST's EPSS chance of use. The count is always a version match, so it says "possible".
+- **A test plan for APIs**, like the one web scans already get, and the same expert notes in the AI report.
+- **A cleaner AI choice.** Grouped as "On this Mac", "Cloud AI" and "No AI", one line each, with the detail of the chosen one shown below.
+
+### How it stays safe
+- All of it is GET requests, to the site itself, with a request cap, a pause between requests and a stop when the server struggles.
+- A hit is recognised by what the answer contains, never by the status code, and a data probe refuses an HTML page. Every hit is repeated once, and one that does not repeat is dropped.
+- Tests build sites designed to fool the checks (random content on every page, everything forbidden, everything sent to login, everything echoed back) and make sure nothing false is reported.
+
 ## MacSec 1.3.0
 
 Deeper app checks from the file alone, a test plan from your own checklist, and Invariant's knowledge in the AI report.

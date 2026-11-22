@@ -599,6 +599,10 @@ select.input {
   color: var(--accent-text);
   background: var(--accent-soft);
 }
+.tag-bad {
+  color: var(--bad);
+  background: rgba(255, 61, 127, 0.12);
+}
 .tag-warn {
   color: var(--warn);
   background: rgba(255, 201, 74, 0.12);
@@ -2722,3 +2726,49 @@ html[data-tone='light'] .f-detail pre, html[data-tone='light'] .answer pre, html
 .f-detail .tech { display: block; }
 .f-detail .tech-body { display: grid; gap: 14px; align-content: start; }
 .f-detail[data-simple='true'] .tech h3 { display: none; }
+
+/* Reviewer choice: grouped, one line each, the detail of the chosen one below */
+.choices.tidy {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.choices.tidy .choice-group {
+  display: grid;
+  gap: 6px;
+}
+.choices.tidy .choice-label {
+  font: 600 11.5px var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.choices.tidy .choice-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 8px;
+}
+.choices.tidy .choice {
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 1px;
+  padding: 10px 14px;
+  align-items: center;
+}
+.choices.tidy .choice .ci {
+  grid-row: 1 / span 2;
+}
+.choices.tidy .choice strong {
+  font-size: 13.5px;
+}
+.choices.tidy .choice span:not(.ci) {
+  font-size: 12px;
+}
+.choices.tidy .choice[aria-checked='true']::after {
+  top: 12px;
+  right: 12px;
+}
+.choice-detail {
+  margin: 0 2px;
+}

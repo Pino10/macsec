@@ -161,6 +161,12 @@ export function scanCode(text: string, platform: Platform, o: { hasPinSet?: bool
   if (named.length)
     findings.push(f({ severity: 'info', confidence: 'possible', title: `Servers named in the app: ${named.length}`, file: named[0], description: `${named.join(', ')}. Staging, test and old API versions are worth testing: they are often weaker than the live API.`, proof: fileProof('static check', named.slice(0, 12)) }, 'hosts'))
 
+  const refs = cloudRefs(text)
+  return { findings, refs, hosts: named }
+}
+
+/** Firebase, S3 and Google Storage addresses written in some text (an app's code, a script). */
+export function cloudRefs(text: string): Refs {
   const refs: Refs = { firebase: [], s3: [], gcs: [] }
   for (const m of text.matchAll(/\b([a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:firebaseio\.com|firebasedatabase\.app))\b/gi)) refs.firebase.push(m[1].toLowerCase())
   for (const m of text.matchAll(/\b([a-z0-9][a-z0-9.-]{2,62})\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com\b/gi)) refs.s3.push(m[1].toLowerCase())
@@ -171,7 +177,7 @@ export function scanCode(text: string, platform: Platform, o: { hasPinSet?: bool
   refs.firebase = uniq(refs.firebase).slice(0, 6)
   refs.s3 = uniq(refs.s3).filter((b) => !skip.has(b)).slice(0, 6)
   refs.gcs = uniq(refs.gcs).filter((b) => !skip.has(b)).slice(0, 6)
-  return { findings, refs, hosts: named }
+  return refs
 }
 
 /** The printable text of an app's compiled files, for scanCode. */

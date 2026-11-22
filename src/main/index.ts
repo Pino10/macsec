@@ -928,6 +928,12 @@ function registerIpc(): void {
       throw new ValidationError((e as Error).message)
     }
   })
+  handle('sessions:open-sources', async (id) => {
+    const dir = join(sessionDir(String(id)), 'raw', 'sources')
+    if (!existsSync(dir)) return false
+    await shell.openPath(dir)
+    return true
+  })
   handle('recon:data', (id) => reconData(String(id)) as never)
   handle('ai:claude-skills', (on) => {
     if (on === true) installForClaude('macsec')

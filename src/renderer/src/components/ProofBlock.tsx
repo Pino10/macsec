@@ -16,6 +16,18 @@ export function ConfidenceTag({ f }: { f: Finding }): React.JSX.Element | null {
   )
 }
 
+/** How far it is proven: Proven, Known exploited, Likely or Not proven, with the reason on hover. */
+export function ExploitTag({ f, compact }: { f: Finding; compact?: boolean }): React.JSX.Element | null {
+  const e = f.exploit
+  if (!e) return null
+  const cls = e.state === 'proven' ? 'tag tag-ok' : e.state === 'known-exploited' ? 'tag tag-bad' : 'tag tag-warn'
+  return (
+    <span className={cls} title={`${e.why} Risk ${e.risk} of 100.`} style={compact ? { flex: 'none' } : undefined}>
+      {e.state === 'proven' ? <Check size={11} /> : <HelpCircle size={11} />} {e.label}
+    </span>
+  )
+}
+
 export default function ProofBlock({ f }: { f: Finding }): React.JSX.Element | null {
   const [copied, setCopied] = useState(false)
   const p = f.proof

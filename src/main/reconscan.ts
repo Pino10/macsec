@@ -6,10 +6,11 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Finding, FindingCategory, ReconRequest, SessionInfo, SessionStep } from '../shared/types'
+import { crawlJs } from './jsdeep'
 import { beginOp, endOp, SessionRun } from './engine'
 import { createSession, listSessions, readSession, saveAiReport, sessionDir } from './sessions'
 import { reconDelta, type ReconSnapshot } from './seckit/recondelta'
-import { normalizeTarget, reconPrompt, runRecon, type ReconFinding, type ReconResult } from './seckit/recon'
+import { inScope, normalizeTarget, reconPrompt, runRecon, type ReconFinding, type ReconResult } from './seckit/recon'
 import { summarizeWithAi } from './aisummary'
 import { runTool } from './engine'
 import { installTool, isInstalled, toolDef, toolPath } from './toolbox'
@@ -69,6 +70,18 @@ async function run(id: string, req: ReconRequest): Promise<void> {
       /* the comparison is a bonus: never let it stop a recon */
     }
     s.add(result.findings.map(toFinding))
+    // The deeper JavaScript pass: routes, hidden chunks, rebuilt source and risks. Not for passive recon, which never touches the target.
+    if (req.depth !== 'passive' && result.js.length && !s.cancelled) {
+      const st = s.step('jsdeep', 'JavaScript analysis: routes, hidden chunks, source maps, risks')
+      await s.run(st, async (note) => {
+        const r = await crawlJs({ scripts: result.js.map((j) => j.url), allowed: (u) => { try { return inScope(new URL(u).hostname, result.domain) } catch { return false } }, cancelled: () => s.cancelled, note, sourceDir: join(s.raw, 'sources'), cap: req.depth === 'deep' ? 250 : 120 })
+        writeFileSync(join(s.raw, 'js-map.json'), JSON.stringify({ scripts: r.scripts, endpoints: r.endpoints, routes: r.routes, graphql: r.graphql, envVars: r.envVars, hosts: r.hosts, refs: r.refs }, null, 1))
+        note(`${r.scripts.length} scripts (${r.chunksFound} found through chunk lists), ${r.routes.length} routes, ${r.graphql.length} GraphQL operations, ${r.scripts.filter((x) => x.sourceMap?.recovered).length} source maps rebuilt`)
+        // Source maps the first pass already reported are not reported twice.
+        const known = new Set(s.findings.map((x) => x.url))
+        return r.findings.filter((x) => !(x.title.startsWith('Source map public') && known.has(x.url)))
+      })
+    }
     if (req.reviewer !== 'none' && !s.cancelled) {
       const ai = s.step('ai', 'AI: the attack surface and where to look first')
       await s.run(ai, async () => {
@@ -108,8 +121,10 @@ function previousRecon(currentId: string, domain: string): ReconSnapshot | null 
 
 export function reconData(id: string): unknown {
   const f = join(sessionDir(id), 'raw', 'recon.json')
-  if (!existsSync(f)) return null
-  const data = JSON.parse(readFileSync(f, 'utf8')) as Record<string, unknown>
+  const jm = join(sessionDir(id), 'raw', 'js-map.json')
+  if (!existsSync(f) && !existsSync(jm)) return null
+  const data = (existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : { hosts: [], js: [], endpoints: [], params: [], urls: 0, pages: [] }) as Record<string, unknown>
+  if (existsSync(jm)) data.jsmap = { ...(JSON.parse(readFileSync(jm, 'utf8')) as object), sources: existsSync(join(sessionDir(id), 'raw', 'sources')) }
   const d = join(sessionDir(id), 'raw', 'delta.json')
   if (existsSync(d)) data.delta = JSON.parse(readFileSync(d, 'utf8'))
   return data

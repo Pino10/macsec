@@ -15,14 +15,14 @@ export default function ReviewerChoice({ value, onChange, what }: { value: Revie
   const has = (id: string): boolean => agents.find((a) => a.id === id)?.installed ?? false
   const model = settings?.llm.model
   const G: Record<Reviewer, string> = { claude: '#38e1ff', 'claude-local': '#5ef0ff', 'claude-free': '#7cc4ff', codex: '#8b6cff', gemini: '#ffc94a', model: '#3ef0a8', none: '#8c95b8' }
-  const list: { id: Reviewer; icon: React.ReactNode; title: string; text: string; ok: boolean }[] = [
-    { id: 'claude', icon: <Sparkles size={18} />, title: 'Claude Code', text: has('claude') ? (what === 'code' ? 'Reads the project and every scanner result, with MacSec’s security skills. Saved as your Claude Code session.' : 'Reads every finding and writes the report.') : 'Needs its command line tool: set it up on Tools.', ok: has('claude') },
-    { id: 'claude-local', icon: <Sparkles size={18} />, title: model ? `Claude Code on ${model.split('/').pop()}` : 'Claude Code on your model', text: has('claude') && model ? 'Claude Code with all its tools and MacSec’s skills, talking to your model in LM Studio (0.4.1 or newer). Nothing leaves this Mac.' : !has('claude') ? 'Needs Claude Code: set it up on Tools.' : 'Choose a model on Tools first.', ok: has('claude') && !!model },
-    { id: 'claude-free', icon: <Network size={18} />, title: 'Claude Code on Free LLM API', text: has('claude') && free ? 'Claude Code with MacSec’s skills, through Free LLM API: your free keys (Google AI Studio, Groq, NVIDIA, OpenRouter and more) behind one address. The code goes to the provider your chain picks.' : !has('claude') ? 'Needs Claude Code: set it up on Tools.' : 'Connect Free LLM API on Tools first.', ok: has('claude') && free },
-    { id: 'gemini', icon: <Bot size={18} />, title: 'Gemini CLI', text: has('gemini') ? 'Google’s agent, in read-only plan mode, with MacSec’s review method.' : 'Not installed: npm install -g @google/gemini-cli', ok: has('gemini') },
-    { id: 'codex', icon: <Bot size={18} />, title: 'Codex', text: has('codex') ? 'OpenAI’s agent, read-only.' : 'Not installed: set it up on Tools.', ok: has('codex') },
-    { id: 'model', icon: <Cpu size={18} />, title: model ? model.split('/').pop()! : 'Your model', text: model ? 'LM Studio on this Mac: reads the riskiest files and every scanner result.' : 'Choose a model on Tools first.', ok: !!model },
-    { id: 'none', icon: <Layers size={18} />, title: 'Scanners only', text: 'No AI. Findings still come with their code and fixes.', ok: true }
+  const list: { id: Reviewer; group: 'mac' | 'cloud' | 'none'; icon: React.ReactNode; title: string; short: string; long: string; ok: boolean }[] = [
+    { id: 'claude-local', group: 'mac', icon: <Sparkles size={17} />, title: model ? `Claude Code on ${model.split('/').pop()}` : 'Claude Code on your model', short: 'Claude Code with your local model', long: has('claude') && model ? 'Claude Code with all its tools and MacSec’s skills, talking to your model in LM Studio (0.4.1 or newer). Nothing leaves this Mac.' : !has('claude') ? 'Needs Claude Code: set it up on Tools.' : 'Choose a model on Tools first.', ok: has('claude') && !!model },
+    { id: 'model', group: 'mac', icon: <Cpu size={17} />, title: model ? model.split('/').pop()! : 'Your model', short: 'LM Studio on this Mac', long: model ? 'LM Studio on this Mac reads the riskiest files and every scanner result. Nothing leaves this Mac.' : 'Choose a model on Tools first.', ok: !!model },
+    { id: 'claude', group: 'cloud', icon: <Sparkles size={17} />, title: 'Claude Code', short: 'Your Claude account', long: has('claude') ? (what === 'code' ? 'Reads the project and every scanner result, with MacSec’s security skills. Saved as your Claude Code session.' : 'Reads every finding and writes the report, with MacSec’s security skills.') : 'Needs its command line tool: set it up on Tools.', ok: has('claude') },
+    { id: 'claude-free', group: 'cloud', icon: <Network size={17} />, title: 'Claude Code on Free LLM API', short: 'Your free provider keys', long: has('claude') && free ? 'Claude Code with MacSec’s skills, through Free LLM API: your free keys (Google AI Studio, Groq, NVIDIA, OpenRouter and more) behind one address. The findings go to the provider your chain picks.' : !has('claude') ? 'Needs Claude Code: set it up on Tools.' : 'Connect Free LLM API on Tools first.', ok: has('claude') && free },
+    { id: 'gemini', group: 'cloud', icon: <Bot size={17} />, title: 'Gemini CLI', short: 'Google’s agent, read-only', long: has('gemini') ? 'Google’s agent, in read-only plan mode, with MacSec’s review method.' : 'Not installed: npm install -g @google/gemini-cli', ok: has('gemini') },
+    { id: 'codex', group: 'cloud', icon: <Bot size={17} />, title: 'Codex', short: 'OpenAI’s agent, read-only', long: has('codex') ? 'OpenAI’s agent, read-only.' : 'Not installed: set it up on Tools.', ok: has('codex') },
+    { id: 'none', group: 'none', icon: <Layers size={17} />, title: 'Scanners only', short: 'No AI. Fixes still come with each finding', long: 'No AI. Every finding still comes with its proof, its code and its fix, and web scans still get the test plan.', ok: true }
   ]
   // Only what is ready to use is offered. Anything else appears here by itself once it is set up on Tools.
   const ready = list.filter((r) => r.ok)
@@ -31,35 +31,33 @@ export default function ReviewerChoice({ value, onChange, what }: { value: Revie
     if (agents.length && !ready.some((r) => r.id === value)) onChange('none')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agents, free, model])
+  const groups: [typeof list[number]['group'], string][] = [['mac', 'On this Mac: nothing leaves it'], ['cloud', 'Cloud AI: the findings are sent to the provider'], ['none', 'No AI']]
+  const chosen = ready.find((r) => r.id === value)
   return (
-    <div className="choices" role="radiogroup" aria-label="AI reviewer">
-      {ready.map((r) => (
-        <button key={r.id} className="choice" role="radio" aria-checked={value === r.id} disabled={!r.ok} onClick={() => onChange(r.id)} title={!r.ok ? 'Set it up on the Tools page' : undefined}>
-          <span className="ci" style={{ ['--g' as string]: G[r.id] }}>
-            {r.icon}
-          </span>
-          <strong>{r.title}</strong>
-          <span>
-            {r.text}
-            {!r.ok && r.id !== 'none' && (
-              <>
-                {' '}
-                <a
-                  className="link"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPage('tools')
-                  }}
-                >
-                  Open Tools
-                </a>
-              </>
-            )}
-          </span>
-        </button>
-      ))}
+    <div className="choices tidy" role="radiogroup" aria-label="AI reviewer">
+      {groups.map(([g, label]) => {
+        const items = ready.filter((r) => r.group === g)
+        if (!items.length) return null
+        return (
+          <div key={g} className="choice-group">
+            <span className="choice-label">{label}</span>
+            <div className="choice-row">
+              {items.map((r) => (
+                <button key={r.id} className="choice" role="radio" aria-checked={value === r.id} onClick={() => onChange(r.id)}>
+                  <span className="ci" style={{ ['--g' as string]: G[r.id] }}>
+                    {r.icon}
+                  </span>
+                  <strong>{r.title}</strong>
+                  <span>{r.short}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+      {chosen && <p className="hint choice-detail">{chosen.long}</p>}
       {hidden > 0 && (
-        <p className="hint" style={{ gridColumn: '1 / -1', margin: '4px 2px 0' }}>
+        <p className="hint" style={{ margin: '2px 2px 0' }}>
           More AI options ({hidden}) appear here once they are set up.{' '}
           <a className="link" onClick={() => setPage('tools')}>
             Open Tools

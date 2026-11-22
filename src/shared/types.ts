@@ -93,6 +93,10 @@ export interface Finding {
   confidence?: 'confirmed' | 'possible'
   /** The request, the size and fingerprint of the answer, and what in it proves the finding. */
   proof?: { request: string; reproduce: string; status: number; contentType?: string; bytes: number; sha256: string; at: string; shows: string[] }
+  /** Live count of known flaws for a software version (NVD), with CISA's exploited list and EPSS. */
+  cves?: { count: number; kev: number; topEpss: number; top: { id: string; score?: number; kev: boolean; epss?: number }[] }
+  /** How far this is proven, in the words a report uses. Worked out when the test finishes. */
+  exploit?: { state: 'proven' | 'known-exploited' | 'likely' | 'unproven'; label: string; why: string; risk: number }
   /** The lines around the problem, with secrets masked. */
   context?: { start: number; lines: string[]; at: number }
   /** The AI's explanation: why it has this severity. */
@@ -320,6 +324,19 @@ export interface SessionInfo {
   error?: string
   languages?: string[]
   files?: number
+}
+
+/** The JavaScript map a scan builds: what the site's scripts name. */
+export interface JsMapInfo {
+  scripts: { url: string; bytes: number; endpoints: string[]; routes: string[]; graphql: string[]; envVars: string[]; sourceMap?: { url: string; files: number; recovered: number } }[]
+  endpoints: string[]
+  routes: string[]
+  graphql: string[]
+  envVars: string[]
+  hosts: string[]
+  refs: { firebase: string[]; s3: string[]; gcs: string[] }
+  /** Whether original source was rebuilt into the session folder. */
+  sources: boolean
 }
 
 export interface SessionDetail extends SessionInfo {
@@ -580,7 +597,8 @@ export interface Channels {
   'app:update-status': { args: []; result: UpdateStatus }
   'app:changelog': { args: []; result: ReleaseNote[] }
   'recon:start': { args: [ReconRequest]; result: SessionInfo }
-  'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number; pages?: ReconPage[]; delta?: ReconDeltaInfo } | null }
+  'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number; pages?: ReconPage[]; delta?: ReconDeltaInfo; jsmap?: JsMapInfo } | null }
+  'sessions:open-sources': { args: [string]; result: boolean }
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
   'sessions:list': { args: []; result: SessionInfo[] }
   'overview:top': { args: []; result: import('./insights').TopFinding[] }

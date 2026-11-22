@@ -1,3 +1,4 @@
+import { honest, label } from './risk'
 import { EventEmitter } from 'events'
 /**
  * The engine every test runs on: starts tools, tracks them so a session can be stopped, and
@@ -150,7 +151,7 @@ export class SessionRun {
     saveSession(this.info)
   }
   add(found: Finding[]): void {
-    this.findings = mergeFindings([...this.findings, ...found])
+    this.findings = label(mergeFindings([...this.findings, ...found.map(honest)]))
     this.info.counts = countBySeverity(this.findings.filter((f) => f.verdict !== 'false-positive'))
     saveFindings(this.info.id, this.findings)
     saveSession(this.info)
@@ -187,6 +188,7 @@ export class SessionRun {
     if (error) this.info.error = error
     this.info.finishedAt = new Date().toISOString()
     this.info.steps = this.info.steps.map((s) => (s.status === 'running' || s.status === 'waiting' ? { ...s, status: 'skipped' } : s))
+    this.findings = label(this.findings)
     this.info.counts = countBySeverity(this.findings.filter((f) => f.verdict !== 'false-positive'))
     saveFindings(this.info.id, this.findings)
     saveSession(this.info)

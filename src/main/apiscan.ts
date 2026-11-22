@@ -15,7 +15,12 @@ import { join } from 'path'
 import type { ApiAuth, ApiScanRequest, ApiSpecInfo, Finding, ScanMode, SessionInfo, Severity } from '../shared/types'
 import { parseSpec, type Endpoint, type ParsedSpec } from './apispec'
 import { beginOp, endOp, runTool, SessionRun } from './engine'
-import { createSession, saveAiReport } from './sessions'
+import { createSession, saveAiReport, savePlan } from './sessions'
+import { planContext, planMarkdown, profileSite } from './testplan'
+import { ConfirmClient } from './confirmtests'
+import { devopsChecks, dnsChecks, protectionFinding } from './webposture'
+import { cveFindings, epssFor, liveCves } from './cvelive'
+import { bannersOf, proofOf, type Product } from './seckit/confirm'
 import { fid } from './scanners/parse'
 import { parseNuclei } from './scanners/web'
 import { installTool, isInstalled, nucleiTemplatesDir, toolDef } from './toolbox'
@@ -148,8 +153,11 @@ async function runApiScan(id: string, spec: ParsedSpec, base: string, req: ApiSc
     spec: s.step('spec', `Review the ${spec.format === 'har' ? 'recorded traffic' : spec.format === 'postman' ? 'Postman collection' : 'API description'}: ${spec.endpoints.length} endpoints`),
     probe: s.step('probe', `Ordinary GET requests to ${gets.length} endpoints, signed in as you`),
     nuclei: req.mode !== 'quick' ? s.step('nuclei', 'Nuclei read-only checks for exposed docs, panels and settings') : null,
+    infra: s.step('infra', 'Firewall, CDN, DNS and DevOps exposure around the API'),
+    cves: s.step('cves', 'Known flaws for the versions found (live count from NVD, CISA and EPSS)'),
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what matters most and how to fix it') : null
   }
+  const found: { product: Product; host: string }[] = []
   try {
     await s.run(st.spec, async () => reviewSpec(spec))
     await s.run(st.probe, (note) => probe(gets, base, req.auth, () => s.cancelled, note))
@@ -164,9 +172,41 @@ async function runApiScan(id: string, spec: ParsedSpec, base: string, req: ApiSc
         })
         return existsSync(out) ? parseNuclei(readFileSync(out, 'utf8')).map((x) => ({ ...x, category: 'api' as const })) : []
       })
+    const host = new URL(base).hostname
+    await s.run(st.infra, async (note) => {
+      const c = new ConfirmClient(base, { cap: 90, cancelled: () => s.cancelled })
+      const out: Finding[] = []
+      const home = await c.get('/').catch(() => null)
+      if (home) {
+        out.push(protectionFinding(base, home.headers, home.headers.get('set-cookie') ?? '', home.status, home.body))
+        for (const b of bannersOf(home.headers, home.body)) found.push({ product: { ...b, proof: proofOf({ url: base, status: home.status, headers: home.headers, body: home.body.slice(0, 200000), shows: [b.from] }) }, host })
+      }
+      out.push(...(await dnsChecks(host)))
+      const r = await devopsChecks(c, host, { note })
+      found.push(...r.products)
+      return [...out, ...r.findings].map((x) => ({ ...x, category: 'api' as const }))
+    })
+    await s.run(st.cves, async (note) => {
+      if (!found.length) {
+        note('No software versions were stated')
+        return []
+      }
+      const live = await liveCves(found, { cancelled: () => s.cancelled, note, cap: req.mode === 'quick' ? 4 : 10 })
+      const epss = await epssFor(live.results.flatMap((r) => r.matches.slice(0, 10).map((x) => x.id)))
+      note(live.note || `${found.length} versions checked`)
+      return cveFindings(live.results, epss).map((x) => ({ ...x, category: 'api' as const }))
+    })
+    // The test plan: what to try by hand on this API, from your checklist and the endpoints in the file.
+    const profile = profileSite([...spec.endpoints.map((e) => e.url), `${base}/api/`])
+    try {
+      savePlan(id, planMarkdown(profile, base, []))
+    } catch (e) {
+      log('warn', `Could not save the test plan: ${(e as Error).message}`, id)
+    }
+
     if (st.ai)
       await s.run(st.ai, async () => {
-        const r = await summarizeWithAi(req.reviewer, summaryPrompt('api', base, `The API has ${spec.endpoints.length} endpoints (${spec.format}).`, s.findings), op, s.raw)
+        const r = await summarizeWithAi(req.reviewer, summaryPrompt('api', base, `The API has ${spec.endpoints.length} endpoints (${spec.format}).\n${planContext(profile, [])}`, s.findings), op, s.raw)
         for (const x of s.findings) {
           const d = r.details.get(x.id)
           if (d) {
