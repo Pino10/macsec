@@ -9,16 +9,17 @@ import { agentEnv, findCli } from './agents'
 import { chatWithLlm } from './models'
 import { parseAiOutput, type Verdict } from './aireview'
 import { pluginArgs } from './skills'
-import { skillText } from './seckit/skills'
+import { methodText } from './bountyskills'
+import { knowledgeBlock } from './knowledge'
 import { localModelEnv } from './seckit/reviewers'
 import { getSettings } from './settings'
 import type { Op } from './engine'
 
 /** The review methods that fit each kind of check, so the report judges findings the way an expert in that area would. */
 export const METHOD: Record<'web' | 'api' | 'mobile' | 'cloud' | 'server', string[]> = {
-  web: ['client-side-review', 'infra-config-review', 'identity-surface-review', 'http-cache-review', 'standards-mapping-catalog', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
-  api: ['api-security-review', 'standards-mapping-catalog', 'graphql-review', 'auth-session-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
-  mobile: ['mobile-app-review', 'android-app-review', 'ios-app-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
+  web: ['client-side-review', 'infra-config-review', 'identity-surface-review', 'http-cache-review', 'standards-mapping-catalog', 'false-positive-check', 'evidence-gate-review', 'verify-with-proof', 'novelty-and-impact', 'hypotheses-from-invariants', 'bounty-report-writing', 'untrusted-content-guard'],
+  api: ['api-security-review', 'standards-mapping-catalog', 'graphql-review', 'auth-session-review', 'false-positive-check', 'evidence-gate-review', 'verify-with-proof', 'novelty-and-impact', 'hypotheses-from-invariants', 'bounty-report-writing', 'untrusted-content-guard'],
+  mobile: ['mobile-app-review', 'android-app-review', 'ios-app-review', 'false-positive-check', 'evidence-gate-review', 'verify-with-proof', 'novelty-and-impact', 'bounty-report-writing', 'untrusted-content-guard'],
   cloud: ['cloud-iam-review', 'cloud-baas-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
   server: ['network-server-review', 'infra-config-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard']
 }
@@ -31,6 +32,8 @@ export function summaryPrompt(kind: keyof typeof WHAT, target: string, context: 
     .slice(0, 150)
     .map((f) => `- id=${f.id} [${f.severity}] ${f.tool}: ${f.title}${f.url ? ` at ${f.url}` : f.file ? ` at ${f.file}` : ''}${f.cwe ? ` (${f.cwe})` : ''}${f.description ? `: ${f.description.slice(0, 200).replace(/\n/g, ' ')}` : ''}`)
     .join('\n')
+  const kb = ['web', 'api', 'mobile'].includes(kind) ? knowledgeBlock(`${context} ${findings.map((f) => f.title).join(' ')}`, { max: 4, maxChars: 12000, prefer: kind === 'mobile' ? ['mobile', 'authz'] : ['authz', 'authn', 'logic', kind === 'api' ? 'api' : 'web'] }) : ''
+  const notes = kb ? `\nExpert notes that match what was found (use them to judge impact and to suggest what to try next by hand):\n${kb}\n` : ''
   return `You are a senior application security engineer. A read-only ${scan} security check of ${target} found the items below.
 ${context}
 
@@ -43,12 +46,14 @@ A table: | Severity | Finding | Where |, most severe first. Group repeated items
 For each problem worth fixing, "### [SEVERITY] Title" (CRITICAL, HIGH, MEDIUM or LOW) with: **Where** (the address), **Evidence** (what the scan saw), **Why it is rated SEVERITY**, **Impact** in plain words, **Fix** with the exact configuration, code or command for this stack in a fenced code block, and **How to verify** (a command such as curl -I, or what to check in the browser).
 ## Probably harmless
 Items that look alarming but are not, and why.
+## What to try next
+Up to 6 leads for a person to test by hand, most promising first: each with the exact first step, what result would count as proof, and what would make it a false alarm. Use only what the findings and context support. Never suggest anything that changes or deletes other people's data.
 
 End with one fenced json block: {"verdicts":[{"id":"<id>","verdict":"confirmed" or "false-positive","severity":"high","reason":"one sentence"}]} for the items you judged.
 
 Use this method to judge what matters and what is noise:
-${skillText(METHOD[kind])}
-
+${methodText(METHOD[kind])}
+${notes}
 Findings (${findings.length}):
 ${list || '(none)'}`
 }

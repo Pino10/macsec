@@ -906,7 +906,7 @@ function registerIpc(): void {
       const lv = (r as { live?: { serial?: unknown; confirmed?: unknown } }).live
       const live = lv && typeof lv === 'object' ? { serial: String(lv.serial ?? ''), confirmed: lv.confirmed === true } : undefined
       if (live && !validSerial(live.serial)) throw new Error('Choose a test phone first.')
-      return startMobileScan({ path: allowedProject(r.path), reviewer: pick(r.reviewer, REVIEWERS, 'none'), live })
+      return startMobileScan({ path: allowedProject(r.path), reviewer: pick(r.reviewer, REVIEWERS, 'none'), live, online: (r as { online?: unknown }).online === true })
     } catch (e) {
       throw new ValidationError((e as Error).message)
     }

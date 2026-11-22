@@ -15,7 +15,8 @@ import { homedir } from 'os'
 import { join } from 'path'
 import type { Finding, ScanMode, SessionInfo, WebScanRequest } from '../shared/types'
 import { beginOp, endOp, runTool, SessionRun } from './engine'
-import { createSession, saveAiReport } from './sessions'
+import { createSession, saveAiReport, savePlan } from './sessions'
+import { planContext, planMarkdown, profileSite } from './testplan'
 import { checkHeaders, parseHttpx, parseKatana, parseNuclei, pathSeverity, SENSITIVE_PATHS, type Fingerprint } from './scanners/web'
 import { fid, parseZap } from './scanners/parse'
 import { execFileSync } from 'child_process'
@@ -322,9 +323,18 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         return existsSync(out) ? parseZap(readFileSync(out, 'utf8')) : []
       })
 
+    // The test plan: what to try by hand on this site, from the pages the crawl found. Always saved, with or without an AI.
+    const ran = [st.login && 'auth', st.fuzz && 'fuzz', st.waf && 'waf', st.authz && 'authz'].filter(Boolean) as string[]
+    const profile = profileSite(urls)
+    try {
+      savePlan(id, planMarkdown(profile, url, ran))
+    } catch (e) {
+      log('warn', `Could not save the test plan: ${(e as Error).message}`, id)
+    }
+
     if (st.ai)
       await s.run(st.ai, async () => {
-        const tech = fp[0] ? `Detected: ${[fp[0].server, ...fp[0].tech].filter(Boolean).join(', ')}.` : ''
+        const tech = `${fp[0] ? `Detected: ${[fp[0].server, ...fp[0].tech].filter(Boolean).join(', ')}.` : ''}\n${planContext(profile, ran)}`
         const r = await summarizeWithAi(req.reviewer, summaryPrompt('web', url, tech, s.findings.filter((f) => f.severity !== 'info')), op, s.raw)
         for (const f of s.findings) {
           const d = r.details.get(f.id)

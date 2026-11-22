@@ -372,6 +372,11 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           ) : (
             <Empty title="No AI report">Choose Claude Code, Codex or your model next time for a written report that explains every finding.</Empty>
           )}
+          {detail.plan && (
+            <div className="md glass" style={{ marginTop: 18 }}>
+              <Markdown text={detail.plan} />
+            </div>
+          )}
         </>
       )}
 

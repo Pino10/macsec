@@ -13,6 +13,7 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
   const [path, setPath] = useState('')
   const [reviewer, setReviewer] = useState<Reviewer>(settings?.reviewer ?? 'none')
   const [liveOn, setLiveOn] = useState(false)
+  const [onlineOn, setOnlineOn] = useState(false)
   const [setup, setSetup] = useState<LiveSetupInfo | null>(null)
   const [serial, setSerial] = useState('')
   const [ok, setOk] = useState(false)
@@ -110,18 +111,26 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
           )}
         </FlowStep>
       )}
+      {(isApk || path.toLowerCase().endsWith('.ipa')) && (
+        <label className="consent" style={{ margin: '0 0 14px' }}>
+          <input type="checkbox" checked={onlineOn} onChange={(e) => setOnlineOn(e.target.checked)} />
+          <span>
+            <strong style={{ color: 'var(--ink)' }}>Also ask once whether the cloud addresses inside the app are open (optional).</strong> For each Firebase, S3 or Google Storage address found in the app, MacSec makes one read-only request without signing in. Nothing is changed, and file names are not saved. Only do this for apps you are allowed to test.
+          </span>
+        </label>
+      )}
       <FlowStep n={start + (isApk ? 2 : 1)} title="Who writes the report" state="current">
         <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
       </FlowStep>
       <div className="flow-go glass">
         <span className="hint grow">
-          {kind === 'Source folder' || !path ? 'mobsfscan rules, manifest and Info.plist settings, and keys in the code.' : 'Settings, compiled code hardening, and keys inside the app.'} {liveOn && isApk ? 'The app will also run on the test phone you chose.' : 'Nothing is run or installed on a phone.'}
+          {kind === 'Source folder' || !path ? 'mobsfscan rules, manifest and Info.plist settings, and keys in the code.' : 'Settings, signing, what the app’s code names (pinning, root checks, weak crypto), hardening, and keys inside the app. All from the file.'} {liveOn && isApk ? 'The app will also run on the test phone you chose.' : 'Nothing is run or installed on a phone.'}
         </span>
         <button
           className="btn btn-primary btn-lg"
           disabled={!path || !liveReady || busy.has('mobile')}
           onClick={async () => {
-            const s = await act('mobile', () => api.invoke('mobile:start', { path, reviewer, live: liveOn && isApk ? { serial, confirmed: ok } : undefined }))
+            const s = await act('mobile', () => api.invoke('mobile:start', { path, reviewer, live: liveOn && isApk ? { serial, confirmed: ok } : undefined, online: onlineOn && (isApk || path.toLowerCase().endsWith('.ipa')) }))
             if (s) showSession(s.id)
           }}
         >

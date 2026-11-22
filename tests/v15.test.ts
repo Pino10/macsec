@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { deltaIsEmpty, deltaText, reconDelta } from '../src/main/seckit/recondelta'
 import { SKILLS, skillText } from '../src/main/seckit/skills'
 import { METHOD } from '../src/main/aisummary'
+import { BOUNTY_SKILLS } from '../src/main/bountyskills'
 
 const prev = { session: 'a', at: '2026-10-01T10:00:00Z', hosts: ['a.x.com', 'old.x.com'], endpoints: ['/api/a'], findings: [{ id: '1', title: 'Open .env', severity: 'high' }] }
 
@@ -25,7 +26,7 @@ describe('recon delta', () => {
 describe('new skills', () => {
   it('exist and every method list points at real skills', () => {
     for (const n of ['cicd-pipeline-review', 'smart-contract-review', 'identity-surface-review', 'evidence-gate-review', 'standards-mapping-catalog', 'untrusted-content-guard', 'file-upload-review', 'http-cache-review']) expect(SKILLS[n]).toBeTruthy()
-    for (const list of Object.values(METHOD)) for (const n of list) expect(SKILLS[n], n).toBeTruthy()
+    for (const list of Object.values(METHOD)) for (const n of list) expect(SKILLS[n] ?? BOUNTY_SKILLS[n], n).toBeTruthy()
   })
   it('the guard rides along in every method and has no em dashes', () => {
     for (const list of Object.values(METHOD)) expect(list).toContain('untrusted-content-guard')

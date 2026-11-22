@@ -267,6 +267,8 @@ export interface MobileScanRequest {
   reviewer: Reviewer
   /** Live test on a phone or emulator (Android .apk only). See CLAUDE.md for the rules. */
   live?: { serial: string; confirmed: boolean }
+  /** Ask each cloud address found in a built app once, read only, whether anyone can read it. */
+  online?: boolean
 }
 
 export interface AndroidDevice {
@@ -324,6 +326,8 @@ export interface SessionDetail extends SessionInfo {
   findings: Finding[]
   /** The AI reviewer's written report (markdown). */
   aiReport?: string
+  /** The test plan for what to try by hand (markdown), built from the site's own pages. */
+  plan?: string
 }
 
 // ---------------------------------------------------------------- AI

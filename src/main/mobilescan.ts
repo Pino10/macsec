@@ -23,6 +23,7 @@ import { addEvidence } from './evidence'
 import { installTool, isInstalled, toolDef, toolPath } from './toolbox'
 import { findAdb, getFridaServer, liveTest, packageFromManifest, realExec, validSerial } from './mobilelive'
 import { extract } from './download'
+import { codeText, onlineChecks, scanCode, signingFindings, type Refs } from './mobilestatic'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
 import { log } from './logs'
 
@@ -79,6 +80,7 @@ export function startMobileScan(req: MobileScanRequest): SessionInfo {
     if (!req.live.confirmed) throw new Error('Confirm that you are allowed to test this app on that phone first.')
     if (!validSerial(req.live.serial)) throw new Error('Choose a test phone first.')
   }
+  if (req.online && kind === 'source') throw new Error('Online checks are for a built app (.apk or .ipa).')
   if (kind === 'source' && !statSync(req.path).isDirectory()) throw new Error('Choose an app’s source folder, or a built .apk or .ipa file.')
   const info = createSession('mobile-scan', basename(req.path).replace(/\.(apk|ipa)$/i, ''), req.path)
   info.reviewer = req.reviewer
@@ -118,6 +120,8 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
     settings: s.step('settings', kind === 'apk' ? 'Decode and check the Android manifest' : kind === 'ipa' ? 'Check Info.plist settings' : 'Check the manifest and Info.plist settings'),
     binary: kind !== 'source' ? s.step('binary', kind === 'apk' ? 'Check native libraries are hardened' : 'Check the app binary is hardened') : null,
     keys: s.step('gitleaks', 'Look for keys and passwords in the app'),
+    deep: kind !== 'source' ? s.step('deep', 'Read the app’s code: pinning, root checks, weak crypto, signing') : null,
+    online: req.online && kind !== 'source' ? s.step('online', 'Ask once whether the cloud addresses in the app are open') : null,
     live: req.live && kind === 'apk' ? s.step('live', 'Run the app on a test phone and watch it') : null,
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what matters most and how to fix it') : null
   }
@@ -217,6 +221,44 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
       const found = parseGitleaks(readFileSync(out, 'utf8'), root).map((f) => ({ ...f, category: 'secret' as const }))
       return kind === 'source' ? addEvidence(root, found) : found
     })
+
+    let refs: Refs = { firebase: [], s3: [], gcs: [] }
+    if (st.deep)
+      await s.run(st.deep, async (note) => {
+        const files = findFiles(unpacked, (n) => (kind === 'apk' ? /^classes\d*\.dex$/.test(n) : true), 20000)
+        let bufs: Buffer[]
+        const out: Finding[] = []
+        if (kind === 'apk') {
+          bufs = files.slice(0, 20).map((p) => readFileSync(p))
+          out.push(...signingFindings(readFileSync(req.path), unpacked))
+        } else {
+          const app = findFiles(unpacked, (n) => n === 'Info.plist').find((p) => /Payload\/[^/]+\.app\/Info\.plist$/.test(p))
+          const dir = app ? join(app, '..') : null
+          const exe = dir ? /<key>CFBundleExecutable<\/key>\s*<string>([^<]+)<\/string>/.exec(readFileSync(app!, 'latin1'))?.[1] : null
+          const bin = dir && exe && !/[/\\]|^\.\.?$/.test(exe) ? join(dir, exe) : null
+          bufs = bin && existsSync(bin) && lstatSync(bin).isFile() && statSync(bin).size < 400 * 1024 * 1024 ? [readFileSync(bin)] : []
+        }
+        if (!bufs.length) {
+          note('No compiled code found')
+          return out
+        }
+        const nsc = findFiles(unpacked, (n) => n.endsWith('.xml'), 300).some((p) => /network[^/]*config/i.test(p) && /<pin-set/i.test(readFileSync(p, 'latin1')))
+        const r = scanCode(codeText(bufs), kind === 'apk' ? 'android' : 'ios', { hasPinSet: nsc })
+        refs = r.refs
+        note(`${bufs.length} compiled ${bufs.length === 1 ? 'file' : 'files'} read, ${r.hosts.length} servers named`)
+        return [...out, ...r.findings]
+      })
+
+    if (st.online)
+      await s.run(st.online, async (note) => {
+        const n = refs.firebase.length + refs.s3.length + refs.gcs.length
+        if (!n) {
+          note('No Firebase, S3 or Google Storage addresses in the app')
+          return []
+        }
+        note(`${n} cloud ${n === 1 ? 'address' : 'addresses'}, one read-only request each`)
+        return onlineChecks(refs)
+      })
 
     if (st.live && req.live) {
       const live = req.live

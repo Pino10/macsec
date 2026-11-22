@@ -55,6 +55,10 @@ export function saveAiReport(id: string, md: string): void {
   writeFileSync(join(sessionDir(id), 'ai-report.md'), md)
 }
 
+export function savePlan(id: string, md: string): void {
+  writeFileSync(join(sessionDir(id), 'test-plan.md'), md)
+}
+
 export function readSession(id: string): SessionInfo {
   const f = join(sessionDir(id), 'session.json')
   if (!existsSync(f)) throw new Error('That session does not exist.')
@@ -66,7 +70,8 @@ export function sessionDetail(id: string): SessionDetail {
   const dir = sessionDir(id)
   const findings = existsSync(join(dir, 'findings.json')) ? (JSON.parse(readFileSync(join(dir, 'findings.json'), 'utf8')) as Finding[]) : []
   const aiReport = existsSync(join(dir, 'ai-report.md')) ? readFileSync(join(dir, 'ai-report.md'), 'utf8') : undefined
-  return { ...info, findings, ...(aiReport ? { aiReport } : {}) }
+  const plan = existsSync(join(dir, 'test-plan.md')) ? readFileSync(join(dir, 'test-plan.md'), 'utf8') : undefined
+  return { ...info, findings, ...(aiReport ? { aiReport } : {}), ...(plan ? { plan } : {}) }
 }
 
 export function listSessions(): SessionInfo[] {
