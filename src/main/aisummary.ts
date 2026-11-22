@@ -58,7 +58,8 @@ Findings (${findings.length}):
 ${list || '(none)'}`
 }
 
-export async function summarizeWithAi(reviewer: Reviewer, prompt: string, op: Op, cwd: string): Promise<{ report: string; verdicts: Map<string, 'confirmed' | 'false-positive'>; details: Map<string, Verdict> }> {
+/** Sends a prompt to the chosen AI (read-only, no tools) and returns its text. */
+export async function askAi(reviewer: Reviewer, prompt: string, op: Op, cwd: string): Promise<string> {
   let text: string
   if (reviewer === 'model') text = await chatWithLlm([{ role: 'user', content: prompt }], 20 * 60_000)
   else {
@@ -92,6 +93,11 @@ export async function summarizeWithAi(reviewer: Reviewer, prompt: string, op: Op
       })
     })
   }
+  return text
+}
+
+export async function summarizeWithAi(reviewer: Reviewer, prompt: string, op: Op, cwd: string): Promise<{ report: string; verdicts: Map<string, 'confirmed' | 'false-positive'>; details: Map<string, Verdict> }> {
+  const text = await askAi(reviewer, prompt, op, cwd)
   const r = parseAiOutput(text, 'AI')
   return { report: r.report, verdicts: r.verdicts, details: r.details }
 }

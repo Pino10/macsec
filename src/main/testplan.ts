@@ -78,11 +78,12 @@ export function profileSite(urls: string[]): Profile {
 }
 
 /** Which of MacSec's own confirmations covers an item, so the person does not repeat work already done. */
-const COVERS: { key: 'fuzz' | 'waf' | 'auth' | 'authz' | 'logic'; label: string; re: RegExp }[] = [
+const COVERS: { key: 'fuzz' | 'waf' | 'auth' | 'authz' | 'logic' | 'inject'; label: string; re: RegExp }[] = [
   { key: 'auth', label: 'Login checks', re: /enumerat|lockout|account lock|rate limit|brute|wrong (password|guess)/i },
   { key: 'fuzz', label: 'Hidden pages and parameters', re: /directory|hidden (page|file|param|endpoint)|content discovery|forced brows|backup file|parameter (discovery|fuzz)/i },
   { key: 'waf', label: 'Web firewall tests', re: /\bwaf\b|web application firewall/i },
   { key: 'logic', label: 'Business logic checks', re: /open redirect|redirect (to|parameter)|host header|forwarded host|otp|one.?time (code|password)|pin\b.*(limit|guess)|skip(ping)? (a )?(step|stage)|workflow|order of steps|hidden (price|field)|client-?side (price|total)/i },
+  { key: 'inject', label: 'Injection tests', re: /\bxss\b|cross-?site scripting|sql ?injection|template injection|\bssti\b|crlf|header injection|html injection|reflected input/i },
   { key: 'authz', label: 'Two-account access check', re: /idor|direct object|horizontal|vertical privilege|access control|bola|cross-?tenant/i }
 ]
 

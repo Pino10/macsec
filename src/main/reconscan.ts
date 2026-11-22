@@ -3,6 +3,7 @@
  * you can filter and export, and an optional AI write-up with the recon skills. Read-only, and
  * domains not on this Mac need your confirmation.
  */
+import { deepHosts } from './recondeep'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Finding, FindingCategory, ReconRequest, SessionInfo, SessionStep } from '../shared/types'
@@ -80,6 +81,14 @@ async function run(id: string, req: ReconRequest): Promise<void> {
         // Source maps the first pass already reported are not reported twice.
         const known = new Set(s.findings.map((x) => x.url))
         return r.findings.filter((x) => !(x.title.startsWith('Source map public') && known.has(x.url)))
+      })
+    }
+    // The deeper pass over the live hosts: headers, certificates, firewall, versions to live CVEs, DevOps tools, takeovers.
+    if (req.depth !== 'passive' && result.hosts.some((h) => h.live) && !s.cancelled) {
+      const st = s.step('hostsdeep', 'Each live host: headers, certificate, firewall, versions and DevOps tools')
+      await s.run(st, async (note) => {
+        const live = result.hosts.filter((h) => h.live).map((h) => ({ host: h.host, url: h.live!.url, status: h.live!.status, cname: h.cname }))
+        return deepHosts(live, { cancelled: () => s.cancelled, paused: () => op.paused, note, maxHosts: req.depth === 'deep' ? 60 : 25 })
       })
     }
     if (req.reviewer !== 'none' && !s.cancelled) {

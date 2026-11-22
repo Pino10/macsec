@@ -21,6 +21,9 @@ import { appPath, installTool, isInstalled, toolDef, toolEnv, toolPath } from '.
 import { summarizeWithAi, summaryPrompt } from './aisummary'
 import { log } from './logs'
 import { isPrivateTarget } from './targets'
+import { deepWeb, probeServices } from './servicedeep'
+import { cveFindings, epssFor, liveCves } from './cvelive'
+import { msfChecks, msfPath, type MsfItem } from './msf'
 import { writeFileSync } from 'fs'
 
 type Cloud = Extract<AuditRequest, { kind: 'cloud' }>
@@ -172,9 +175,12 @@ async function server(id: string, req: Server): Promise<void> {
   const st = {
     ports: s.step('naabu', `Find open ports${many ? ` on ${hosts.length} servers` : ''} (the ${req.ports === 'top100' ? '100' : '1,000'} most common)`),
     nmap: s.step('nmap', nmap ? 'Name the service on each open port (Nmap)' : 'Name the services (install Nmap to add this)'),
+    svc: s.step('svc', 'Each service: versions to live vulnerability data, data stores open without a password, web services behind the ports'),
+    msf: req.msf ? s.step('msf', 'Metasploit check (check only: it never exploits)') : null,
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what should not be reachable and how to close it') : null
   }
   let open: OpenPort[] = []
+  const matches: MsfItem[] = []
   try {
     await s.run(st.ports, async (note, line) => {
       await ensure('naabu', note)
@@ -208,6 +214,37 @@ async function server(id: string, req: Server): Promise<void> {
       open = all
     })
     s.add([...new Set(open.map((p) => p.host))].flatMap((h) => portFindings(open.filter((p) => p.host === h), !many && isLocalHost(req.host))))
+
+    await s.run(st.svc, async (note) => {
+      const out: Finding[] = []
+      if (!open.length) return out
+      const svc = await probeServices(open, { note, cancelled: () => s.cancelled })
+      out.push(...svc.findings)
+      if (svc.products.length) {
+        const live = await liveCves(svc.products.map((x) => ({ product: x.product, host: x.host })), { cancelled: () => s.cancelled, note, cap: 12 }).catch(() => null)
+        if (live) {
+          const ids = live.results.flatMap((r) => r.matches.slice(0, 10).map((x) => x.id))
+          out.push(...cveFindings(live.results, await epssFor(ids).catch(() => new Map())))
+          for (const r of live.results) {
+            const port = svc.products.find((x) => x.product === r.product)?.port
+            if (port) for (const m of r.matches) matches.push({ cve: m.id, host: r.host, port })
+          }
+        }
+      }
+      out.push(...(await deepWeb(open, { cancelled: () => s.cancelled, paused: () => op.paused, note, maxHosts: 20 })))
+      return out
+    })
+
+    if (st.msf)
+      await s.run(st.msf, async (note) => {
+        if (!msfPath()) {
+          note('Metasploit is not installed on this Mac, so nothing was checked. MacSec never installs it: get it from metasploit.com if you want this step.')
+          return []
+        }
+        const allowed = req.authorized || hosts.every(isLocalHost)
+        if (!allowed) throw new Error('Confirm that you own these servers before using Metasploit.')
+        return msfChecks(matches, { note, cancelled: () => s.cancelled })
+      })
 
     await aiStep(s, st.ai, req.reviewer, 'server', req.host, `Open ports and services on ${many ? `${hosts.length} servers (${hosts.slice(0, 12).join(', ')}${hosts.length > 12 ? ', and more' : ''}), ${hosts.every(isPrivateTarget) ? 'all on a private network' : 'some reachable from the internet'}` : req.host}${!many && isLocalHost(req.host) ? ' (this Mac or a local development host)' : ''}. Say which hosts should not expose each service. Give firewall commands for the likely platform.`)
     s.finish()

@@ -38,7 +38,7 @@ import { loadSpec, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
 import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from './mobilelive'
 import { reconData, startRecon } from './reconscan'
-import { readRequest, saveFindings, saveRequest, stripSecrets, triageFinding } from './sessions'
+import { markChecklistItem, readChecklist, readRequest, saveFindings, saveRequest, stripSecrets, triageFinding } from './sessions'
 import { checkForUpdate, installUpdate, releaseNotes, updateStatus } from './updater'
 import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
@@ -50,7 +50,6 @@ import { retestFinding } from './retest'
 import { createGithubIssue, ticketJira, ticketMarkdown, validRepo } from './tickets'
 import { buildAssets, remediationPlan } from './assets'
 import { chainsOf } from './chains'
-import { runSelfTest } from './selftest'
 import { accounts, azureProjects, connectAzure, connectGitHub, githubRepos, importIntoWww, listLocal } from './projects'
 import { cancelSession, sourceFiles, startReview } from './review'
 import { deleteSession, listSessions, readSession, recoverSessions, saveSession, sessionCodeDir, sessionDetail, sessionDir, sessionEvents, discardCode } from './sessions'
@@ -211,7 +210,7 @@ function validWeb(req: unknown): WebScanRequest {
   if (t?.kind === 'local' && typeof t.name === 'string') target = { kind: 'local', name: t.name }
   else if (t?.kind === 'url' && typeof t.url === 'string' && /^https?:\/\/[^\s'"<>]+$/.test(t.url.trim())) target = { kind: 'url', url: new URL(t.url.trim()).href }
   else throw new ValidationError('Enter the address to scan, starting with http:// or https://.')
-  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, confirm: validConfirm(r.confirm), reviewer: pick(r.reviewer, REVIEWERS, 'none') }
+  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, confirm: validConfirm(r.confirm), codePath: typeof r.codePath === 'string' && r.codePath ? allowedProject(r.codePath) : undefined, checklist: r.checklist === true, reviewer: pick(r.reviewer, REVIEWERS, 'none') }
 }
 
 /** Control confirmation settings: switches are strict booleans, text is short and single-line. */
@@ -219,8 +218,8 @@ function validConfirm(v: unknown): WebScanRequest['confirm'] {
   const c = (v ?? null) as Record<string, unknown> | null
   if (!c || typeof c !== 'object') return undefined
   const text = (x: unknown, max: number): string | undefined => (typeof x === 'string' && x.trim() ? x.replace(/[\r\n\t]+/g, ' ').trim().slice(0, max) : undefined)
-  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, logic: c.logic === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
-  return out.fuzz || out.auth || out.authz || out.waf || out.logic ? out : undefined
+  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, logic: c.logic === true, inject: c.inject === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
+  return out.fuzz || out.auth || out.authz || out.waf || out.logic || out.inject ? out : undefined
 }
 
 /** A host name or IP address only: never something a tool could read as an option. */
@@ -861,7 +860,7 @@ function registerIpc(): void {
         const hosts = multi ? expandTargets(text) : [validHost(typed)]
         const host = hosts.length === 1 ? hosts[0] : `${hosts.length} servers`
         if (!hosts.every(isLocalHost) && r.authorized !== true) throw new ValidationError('Confirm that you own these servers or have permission to test them.')
-        return startAudit({ kind: 'server', host, ...(hosts.length > 1 ? { hosts } : {}), ports: pick((r as { ports?: unknown }).ports, ['top100', 'top1000'] as const, 'top100'), reviewer: pick(r.reviewer, REVIEWERS, 'none'), authorized: r.authorized === true })
+        return startAudit({ kind: 'server', host, ...(hosts.length > 1 ? { hosts } : {}), ports: pick((r as { ports?: unknown }).ports, ['top100', 'top1000'] as const, 'top100'), reviewer: pick(r.reviewer, REVIEWERS, 'none'), authorized: r.authorized === true, msf: (r as { msf?: unknown }).msf === true })
       }
       throw new ValidationError('Choose an audit.')
     } catch (e) {
@@ -984,6 +983,22 @@ function registerIpc(): void {
       throw new ValidationError((e as Error).message)
     }
   })
+  handle('sessions:checklist', (id) => readChecklist(String(id)))
+  handle('sessions:checklist-set', (id, item, state, note) => {
+    try {
+      return markChecklistItem(String(id), String(item), state === 'done' || state === 'problem' || state === 'na' ? state : null, typeof note === 'string' ? note : undefined)
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
+  handle('web:pick-code', async () => {
+    if (!mainWindow) return null
+    const r = await dialog.showOpenDialog(mainWindow, { title: 'Choose the site’s source code folder', buttonLabel: 'Read this code', properties: ['openDirectory'] })
+    if (r.canceled || !r.filePaths[0]) return null
+    const p = resolve(r.filePaths[0])
+    picked.add(p)
+    return p
+  })
   handle('assets:list', () => buildAssets(listSessions(), (id) => sessionDetail(id).findings))
   handle('sessions:fixplan', (id) => {
     const d = sessionDetail(String(id))
@@ -999,7 +1014,6 @@ function registerIpc(): void {
     if (out) shell.showItemInFolder(out)
     return out
   })
-  handle('selftest:run', () => jobs.run('Testing MacSec’s own checks', () => runSelfTest()))
   handle('sessions:pdf', async (id) => {
     const out = await exportPdf(String(id))
     if (out) shell.showItemInFolder(out)

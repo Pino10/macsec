@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, Gauge, Globe, KeyRound, Laptop, LogIn, Radar, Telescope, UserX, Zap } from 'lucide-react'
+import { Box, ExternalLink, FolderOpen, Gauge, Globe, KeyRound, Laptop, LogIn, Radar, Telescope, UserX, Zap } from 'lucide-react'
 import type { ConfirmOptions, LocalSite, Reviewer, ScanMode } from '@shared/types'
 import { useApp } from '../store'
 import { FlowStep, PageHead, Seg, Switch } from '../ui'
@@ -33,12 +33,15 @@ export default function WebScan(): React.JSX.Element {
   const [reviewer, setReviewer] = useState<Reviewer>(settings?.reviewer ?? 'none')
   const [ok, setOk] = useState(false)
   const [login, setLogin] = useState<Login>('none')
+  const [box, setBox] = useState<'black' | 'white'>('black')
+  const [code, setCode] = useState<string | null>(null)
+  const [checklist, setChecklist] = useState(false)
   const [headers, setHeaders] = useState('')
   const [captured, setCaptured] = useState<number | null>(null)
-  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false, logic: false })
+  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false, logic: false, inject: false })
   const [ccOk, setCcOk] = useState(false)
   const setC = (p: Partial<ConfirmOptions>): void => setCc((x) => ({ ...x, ...p }))
-  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf || cc.logic
+  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf || cc.logic || cc.inject
 
   useEffect(() => {
     void api.invoke('web:sites').then((s) => {
@@ -127,7 +130,43 @@ export default function WebScan(): React.JSX.Element {
           {login === 'paste' && <textarea className="input mono" rows={3} placeholder={'Cookie: laravel_session=…\nAuthorization: Bearer …'} value={headers} onChange={(e) => setHeaders(e.target.value)} aria-label="Request headers" />}
         </FlowStep>
 
-        <FlowStep n={3} title="How much to cover" state={valid ? 'current' : 'todo'}>
+        <FlowStep n={3} title="Black box or white box" help="Black box tests the site from outside, like an attacker with no inside knowledge. White box also reads the site's own code, so it knows every route and parameter, finds pages nothing links to, and checks them on the live site." state={valid ? 'current' : 'todo'}>
+          <div className="choices" role="radiogroup" aria-label="Approach">
+            <button className="choice" role="radio" aria-checked={box === 'black'} onClick={() => setBox('black')}>
+              <span className="ci"><Box size={18} /></span>
+              <strong>Black box</strong>
+              <span>From outside only. No code needed.</span>
+            </button>
+            <button className="choice" role="radio" aria-checked={box === 'white'} onClick={() => setBox('white')}>
+              <span className="ci"><FolderOpen size={18} /></span>
+              <strong>White box</strong>
+              <span>Reads the code (it never changes it) and tests what it finds, live.</span>
+            </button>
+          </div>
+          {box === 'white' && (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+              {where === 'local' ? (
+                <span className="hint">The code is the {site || 'site'} folder in your www folder.</span>
+              ) : (
+                <>
+                  <button className="btn" onClick={async () => setCode((await act('pick', () => api.invoke('web:pick-code'))) ?? code)}>
+                    <FolderOpen size={14} /> {code ? 'Choose another folder' : 'Choose the code folder'}
+                  </button>
+                  <span className="hint mono">{code ?? 'No folder chosen yet.'}</span>
+                </>
+              )}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 12 }}>
+            <Switch on={checklist} onChange={() => setChecklist(!checklist)} label="Walk my checklist" />
+            <div>
+              <strong>Walk my checklist</strong>
+              <div className="hint">Goes through your 638-item web checklist for this site. Items MacSec can test are marked found or clear. The AI you pick below judges the rest from the evidence only, and says "try by hand" where it cannot know. It needs an AI choice in the last step.</div>
+            </div>
+          </div>
+        </FlowStep>
+
+        <FlowStep n={4} title="How much to cover" state={valid ? 'current' : 'todo'}>
           <div className="choices" role="radiogroup" aria-label="Mode">
             {MODES.map((m) => (
               <button key={m.id} className="choice" role="radio" aria-checked={mode === m.id} onClick={() => setMode(m.id)}>
@@ -139,16 +178,16 @@ export default function WebScan(): React.JSX.Element {
           </div>
         </FlowStep>
 
-        <FlowStep n={4} title="Control confirmations (optional)" help="Active checks that try a harmless version of a problem, so every finding comes with proof and nothing is a guess. They only use harmless test strings, never change data, and stop if the server struggles." state={valid ? 'current' : 'todo'}>
+        <FlowStep n={5} title="Control confirmations (optional)" help="Active checks that try a harmless version of a problem, so every finding comes with proof and nothing is a guess. They only use harmless test strings, never change data, and stop if the server struggles." state={valid ? 'current' : 'todo'}>
           <div className="stack" style={{ display: 'grid', gap: 10 }}>
             <div role="group" aria-label="Quick choices" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <span className="hint">Quick choices:</span>
               {(
                 [
-                  ['None', { fuzz: false, waf: false, auth: false, authz: false, logic: false }],
-                  ['Public site', { fuzz: true, waf: true, auth: false, authz: false, logic: true }],
-                  ['Login and accounts', { fuzz: false, waf: false, auth: true, authz: false, logic: true }],
-                  ['Shop or booking flow', { fuzz: true, waf: false, auth: true, authz: false, logic: true }]
+                  ['None', { fuzz: false, waf: false, auth: false, authz: false, logic: false, inject: false }],
+                  ['Public site', { fuzz: true, waf: true, auth: false, authz: false, logic: true, inject: true }],
+                  ['Login and accounts', { fuzz: false, waf: false, auth: true, authz: false, logic: true, inject: true }],
+                  ['Shop or booking flow', { fuzz: true, waf: false, auth: true, authz: false, logic: true, inject: true }]
                 ] as const
               ).map(([name, set]) => (
                 <button key={name} className="btn btn-sm" onClick={() => setC(set)}>
@@ -160,6 +199,7 @@ export default function WebScan(): React.JSX.Element {
               [
                 ['fuzz', 'Hidden pages and parameters', 'Looks for pages and settings that are not linked, and tells you which are real. Sites that answer yes to everything are detected and ignored.'],
                 ['waf', 'Web firewall tests', 'Finds which firewall answers, what it blocks, and whether a harmless marker gets past it. A way through is reported at once so the owner can tighten the rule.'],
+                ['inject', 'Injection tests on every page and form', 'Sends harmless markers into every parameter and every search-style form it finds (signed in too, if you signed in above) and reads what comes back: unescaped output, database errors, a calculated expression, a line break in a header. It only reads: forms that send data are listed, never submitted.'],
                 ['logic', 'Business logic checks', 'Tests for open redirects, a poisoned host header, forms that accept endless wrong codes, price or role fields the browser sends, and steps of a flow that can be skipped. Anything that would change data is listed as a lead for you to test by hand.'],
                 ['auth', 'Login checks', 'Eight wrong guesses for a user that does not exist (to see if anything slows them), and whether the login reveals which usernames exist.'],
                 ['authz', 'Two-account access check', 'Compares what a second account can open with what the first can. Needs you to be signed in above, and a second account below.']
@@ -203,7 +243,7 @@ export default function WebScan(): React.JSX.Element {
           </div>
         </FlowStep>
 
-        <FlowStep n={5} title="Who writes the report" help="The AI reads every finding and explains what matters for your stack, with the exact configuration to fix it." state={valid ? 'current' : 'todo'}>
+        <FlowStep n={6} title="Who writes the report" help="The AI reads every finding and explains what matters for your stack, with the exact configuration to fix it." state={valid ? 'current' : 'todo'}>
           <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
         </FlowStep>
 
@@ -223,9 +263,9 @@ export default function WebScan(): React.JSX.Element {
           </button>
           <button
             className="btn btn-primary btn-lg"
-            disabled={!valid || (needsOk && !ok) || (login !== 'none' && !signedIn) || !ccReady || busy.has('web')}
+            disabled={!valid || (needsOk && !ok) || (login !== 'none' && !signedIn) || !ccReady || busy.has('web') || (box === 'white' && where === 'url' && !code)}
             onClick={async () => {
-              const s = await act('web', () => api.invoke('web:start', { target: where === 'local' ? { kind: 'local', name: site } : { kind: 'url', url: target }, mode, authorized: ok, headers: signedIn ? headers : undefined, confirm: ccOn ? cc : undefined, reviewer }))
+              const s = await act('web', () => api.invoke('web:start', { target: where === 'local' ? { kind: 'local', name: site } : { kind: 'url', url: target }, mode, authorized: ok, headers: signedIn ? headers : undefined, confirm: ccOn ? cc : undefined, codePath: box === 'white' ? (where === 'local' ? `${settings?.wwwPath ?? ''}/${site}` : (code ?? undefined)) : undefined, checklist: checklist && reviewer !== 'none', reviewer }))
               if (s) showSession(s.id)
             }}
           >

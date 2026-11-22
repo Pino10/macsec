@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Cloud, Microscope, Server, Smartphone, Swords } from 'lucide-react'
 import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
-import type { SelfTestResult, AgentInfo, LocalLlm, OptionalTool, ToolCategory, ToolInfo } from '@shared/types'
+import type { AgentInfo, LocalLlm, OptionalTool, ToolCategory, ToolInfo } from '@shared/types'
 import { useApp } from '../store'
 import { FreeLlmPanel, Integrations, ModelServersPanel, SkillPacks, PacksAsk } from '../components/Extras'
 import { PageHead, Seg } from '../ui'
@@ -84,8 +84,6 @@ export default function Tools(): React.JSX.Element {
           <Download size={14} /> {missing.length === 0 ? 'All installed' : busy.has('all') ? 'Installing…' : `Install ${missing.length} missing`}
         </button>
       </PageHead>
-
-      <SelfTest />
 
       {outdated.length > 0 && (
         <div className="notice info">
@@ -432,32 +430,3 @@ function ToolRow({ t, icon, onInstall, onRemove, busy }: { t: ToolInfo; icon: Re
   )
 }
 
-/** MacSec tests its own checks on a weak local app and a safe decoy. Nothing leaves this Mac. */
-function SelfTest(): React.JSX.Element {
-  const api = window.macsec
-  const { act, busy } = useApp()
-  const [r, setR] = useState<SelfTestResult | null>(null)
-  return (
-    <div className="panel" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <strong>Test MacSec’s own checks</strong>
-          <div className="hint">Starts a deliberately weak web app and a correct look-alike on this Mac only. Every planted weakness must be found, and the correct one must give no alarms at all.</div>
-        </div>
-        <button className="btn" disabled={busy.has('selftest')} onClick={async () => setR((await act('selftest', () => api.invoke('selftest:run'))) ?? null)}>
-          {busy.has('selftest') ? 'Testing…' : 'Run the self-test'}
-        </button>
-      </div>
-      {r && (
-        <div role="status" style={{ marginTop: 10, display: 'grid', gap: 4 }}>
-          <strong>{r.ok ? 'All checks passed' : 'Some checks failed: do not trust those results'}</strong>
-          {r.items.map((i) => (
-            <div key={i.name} className="hint">
-              {i.ok ? '✓' : '✗'} {i.name}: {i.detail}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}

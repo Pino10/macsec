@@ -12,7 +12,7 @@ import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { randomBytes } from 'crypto'
 import { join, sep } from 'path'
-import type { Finding, SessionDetail, SessionInfo, SessionKind } from '../shared/types'
+import type { Finding, SessionDetail, SessionInfo, SessionKind, ChecklistData } from '../shared/types'
 import { dirs } from './paths'
 import { countBySeverity } from './scanners/parse'
 
@@ -162,4 +162,35 @@ export function stripSecrets(req: unknown): unknown {
   }
   if (r.auth && typeof r.auth === 'object') r.auth = { kind: 'none' }
   return r
+}
+
+// ---------------------------------------------------------------- The checklist walk
+
+export type UserMark = { state: 'done' | 'problem' | 'na'; note?: string; at: string }
+export type ChecklistFile = ChecklistData
+
+export function saveChecklist(id: string, c: unknown): void {
+  writeFileSync(join(sessionDir(id), 'checklist.json'), JSON.stringify(c))
+}
+
+export function readChecklist(id: string): ChecklistData {
+  const dir = sessionDir(id)
+  const read = (f: string): unknown => {
+    try {
+      return JSON.parse(readFileSync(join(dir, f), 'utf8'))
+    } catch {
+      return null
+    }
+  }
+  return { checklist: read('checklist.json') as ChecklistData['checklist'], user: (read('checklist-user.json') as Record<string, UserMark> | null) ?? {} }
+}
+
+/** Your own answer on one item. Item ids look like 3.12; null takes your answer back. */
+export function markChecklistItem(id: string, item: string, state: UserMark['state'] | null, note?: string): ChecklistData {
+  if (!/^\d{1,3}\.\d{1,3}$/.test(item)) throw new Error('That checklist item does not exist.')
+  const { user } = readChecklist(id)
+  if (state) user[item] = { state, ...(note ? { note: note.slice(0, 500) } : {}), at: new Date().toISOString() }
+  else delete user[item]
+  writeFileSync(join(sessionDir(id), 'checklist-user.json'), JSON.stringify(user))
+  return readChecklist(id)
 }

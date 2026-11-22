@@ -15,7 +15,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import type { Finding, ScanMode, SessionInfo, WebScanRequest } from '../shared/types'
 import { beginOp, endOp, runTool, SessionRun } from './engine'
-import { createSession, saveAiReport, savePlan } from './sessions'
+import { createSession, saveAiReport, saveChecklist, savePlan } from './sessions'
 import { proofOf } from './seckit/confirm'
 import { planContext, planMarkdown, profileSite } from './testplan'
 import { checkHeaders, parseHttpx, parseKatana, parseNuclei, pathSeverity, SENSITIVE_PATHS, type Fingerprint } from './scanners/web'
@@ -26,13 +26,18 @@ import { parseWpscan } from './scanners/infra'
 import { dirs } from './paths'
 import { getSettings } from './settings'
 import { log } from './logs'
-import { summarizeWithAi, summaryPrompt } from './aisummary'
+import { askAi, summarizeWithAi, summaryPrompt } from './aisummary'
 import { crawlJs } from './jsdeep'
 import { cveFindings, epssFor, liveCves } from './cvelive'
 import { devopsChecks, dnsChecks, protectionFinding } from './webposture'
 import { bannersOf, type Product } from './seckit/confirm'
 import { checkTls, keysInJavaScript, signedOutCheck } from './webextra'
 import { logicChecks } from './bizlogic'
+import { applyAnswers, autoMark, BATCH, parseAnswers, walkPrompt } from './checklist'
+import { PARAM_WORDS } from './wordlists'
+import { injectionChecks, inputsFrom, postFormLead } from './injection'
+import { getPaths, mapCode, paramNames, unguardedPrivate, fillPath } from './routemap'
+import { calibrate, isCatchAll, visibleText } from './confirmtests'
 import { accessChecks, ConfirmClient, risky, fuzzContent, fuzzParams, loginChecks, resetCheck, wafControl } from './confirmtests'
 
 /** Laramac's sites, from the www folder, at their .test addresses. */
@@ -183,6 +188,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
   const headersB = parseHeaders(req.confirm?.headersB)
   const mk = (cap: number): ConfirmClient => new ConfirmClient(url, { headers, cap, cancelled: () => s.cancelled, paused: () => op.paused })
   let carrier: string | undefined
+  let codeNames: string[] = []
   const urlsFile = join(s.raw, 'urls.txt')
   let urls: string[] = [url]
   let fp: Fingerprint[] = []
@@ -203,12 +209,15 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     fuzz: req.confirm?.fuzz ? s.step('fuzz', 'Control confirmation: hidden pages and parameters') : null,
     waf: req.confirm?.waf ? s.step('waf', 'Control confirmation: web firewall tests') : null,
     logic: req.confirm?.logic ? s.step('logic', 'Control confirmation: business logic (redirects, host header, code limits, skipped steps)') : null,
+    code: req.codePath ? s.step('code', 'White box: read the code, map its routes and parameters, test them live') : null,
+    inject: req.confirm?.inject ? s.step('inject', 'Control confirmation: injection tests on every page, parameter and form') : null,
     login: req.confirm?.auth ? s.step('login', 'Control confirmation: login checks') : null,
     authz: req.confirm?.authz && Object.keys(headers).length && Object.keys(headersB).length ? s.step('authz', 'Control confirmation: what a second account can open') : null,
     wp: s.step('wpscan', 'WordPress: version, plugins and themes (when the site uses it)'),
     templates: s.step('templates', 'Update Nuclei’s community checks'),
     zap: req.mode === 'thorough' && dockerPath() ? s.step('zap', 'ZAP baseline: passive checks while it browses (it never attacks)') : null,
     nuclei: s.step('nuclei', m.everyPage ? 'Nuclei read-only checks on every page' : req.mode === 'quick' ? 'Nuclei checks for serious known problems' : 'Every read-only Nuclei check'),
+    checklist: req.checklist && req.reviewer !== 'none' ? s.step('checklist', 'AI: walk your checklist item by item, from the evidence only') : null,
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what matters most and how to fix it') : null
   }
   try {
@@ -284,6 +293,39 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         return r.findings
       })
 
+    if (st.code)
+      await s.run(st.code, async (note) => {
+        const map = mapCode(req.codePath!)
+        note(`${map.files} files read, ${map.routes.length} routes${map.frameworks.length ? ` (${map.frameworks.join(', ')})` : ''}, ${Object.keys(map.params).length} parameters`)
+        writeFileSync(join(s.raw, 'code-map.json'), JSON.stringify({ frameworks: map.frameworks, files: map.files, routes: map.routes, params: Object.keys(map.params) }, null, 1))
+        codeNames = paramNames(map)
+        const out: Finding[] = []
+        const known = new Set(urls.map((u) => { try { return new URL(u).pathname.replace(/\/+$/, '') || '/' } catch { return u } }))
+        const fromCode = getPaths(map).map((p) => ({ p, u: new URL(p, url).href }))
+        const hidden = fromCode.filter((x) => !known.has(x.p.replace(/\/+$/, '') || '/'))
+        urls = [...new Set([...urls, ...fromCode.map((x) => x.u)])].slice(0, 3000)
+        if (hidden.length)
+          out.push({ id: fid('code-hidden', hidden.map((x) => x.p).join('|')), tool: 'MacSec', category: 'web', severity: 'info', confidence: 'possible', title: `${hidden.length} ${hidden.length === 1 ? 'route in the code is' : 'routes in the code are'} not linked from the site`, description: `The code defines these routes, but nothing the crawl read links to them: ${hidden.slice(0, 25).map((x) => x.p).join(', ')}${hidden.length > 25 ? ', and more' : ''}. They were added to the pages tested below.`, fix: 'Check that each of them asks for the right kind of sign-in. Not being linked is not protection.' })
+        // Private-looking routes with no access check in the code: ask the live site, signed out, and report only what it answers.
+        const leads = unguardedPrivate(map)
+        if (leads.length) {
+          const c = mk(120)
+          const cal = await calibrate(c).catch(() => [])
+          for (const r of leads.slice(0, 25)) {
+            if (s.cancelled) break
+            const path = fillPath(r.path)
+            const a = await c.get(path, { headers: 'none' }).catch(() => null)
+            if (!a || a.status !== 200 || isCatchAll(path.replace(/^\//, ''), a, cal)) continue
+            const text = visibleText(a.body)
+            if (text.length < 200 || /<input[^>]+type=["']?password/i.test(a.body)) continue
+            const b = await c.get(path, { headers: 'none' }).catch(() => null)
+            if (!b || b.status !== 200) continue
+            out.push({ id: fid('code-open', path), tool: 'MacSec', category: 'web', severity: /admin|billing|export|users?/i.test(path) ? 'high' : 'medium', confidence: 'confirmed', title: `A private-looking page opens without signing in: ${path}`, url: a.url, file: a.url, cwe: 'CWE-306', description: `The code defines ${r.method} ${r.path} (${r.file}:${r.line}) with no access check in the lines around it, and the live site gave a full page to a visitor who was not signed in. The code and the site agree: nothing asks who is asking.`, fix: 'Put the route behind your sign-in and role check (a middleware or a guard), and test it signed out.', proof: proofOf({ url: a.url, status: a.status, headers: a.headers, body: a.body.slice(0, 300000), shows: ['a request with no cookie or token got a full page', `the code at ${r.file}:${r.line} shows no access check`, 'the same on a second try'] }) })
+          }
+        }
+        return out
+      })
+
     await s.run(st.cves, async (note) => {
       if (!found.length) {
         note('No software versions were stated')
@@ -306,7 +348,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         const pages = [url, ...urls.filter((u) => !u.includes('?') && u !== url && !risky(u) && !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|pdf|zip)$/i.test(u))].slice(0, 5)
         for (const p of pages) {
           if (s.cancelled) break
-          const r = await fuzzParams(mk(150), p, note)
+          const r = await fuzzParams(mk(150), p, note, codeNames.length ? [...new Set([...codeNames, ...PARAM_WORDS])] : undefined)
           found.push(...r.findings)
           const hit = r.hits.find((h) => h.how === 'reflected')
           if (hit && !carrier) carrier = `${new URL(p).pathname}?${hit.name}`
@@ -317,6 +359,23 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     if (st.waf) await s.run(st.waf, (note) => wafControl(mk(150), note, carrier))
 
     if (st.logic) await s.run(st.logic, (note) => logicChecks(mk(400), { urls, pages: urls.filter((u) => !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|pdf|zip)$/i.test(u)).slice(0, 10) }, note))
+
+    if (st.inject)
+      await s.run(st.inject, async (note) => {
+        const origin = new URL(url).origin
+        const pageUrls = [...new Set([url, ...urls.filter((u) => { try { const p = new URL(u); return p.origin === origin && !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|ttf|pdf|zip|mp4|mp3)$/i.test(p.pathname) && !risky(u) } catch { return false } }).map((u) => { const p = new URL(u); return `${p.origin}${p.pathname}` })])].slice(0, 30)
+        const reader = mk(80)
+        const pages: { url: string; html: string }[] = []
+        for (const u of pageUrls) {
+          if (s.cancelled) break
+          const r = await reader.get(u).catch(() => null)
+          if (r && r.status === 200 && /html/i.test(r.headers.get('content-type') ?? '')) pages.push({ url: r.url, html: r.body })
+        }
+        const { inputs, posts } = inputsFrom(pages, urls, origin)
+        note(`${pages.length} pages read, ${inputs.length} inputs to test, ${posts.length} forms that send data (listed, not submitted)`)
+        const found = await injectionChecks(mk(Math.min(2500, inputs.length * 9 + 60)), inputs, { note })
+        return [...found, ...postFormLead(posts)]
+      })
 
     if (st.login)
       await s.run(st.login, async (note) => {
@@ -386,13 +445,41 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       })
 
     // The test plan: what to try by hand on this site, from the pages the crawl found. Always saved, with or without an AI.
-    const ran = [st.login && 'auth', st.fuzz && 'fuzz', st.waf && 'waf', st.authz && 'authz', st.logic && 'logic'].filter(Boolean) as string[]
+    const ran = [st.login && 'auth', st.fuzz && 'fuzz', st.waf && 'waf', st.authz && 'authz', st.logic && 'logic', st.inject && 'inject'].filter(Boolean) as string[]
     const profile = profileSite(urls)
     try {
       savePlan(id, planMarkdown(profile, url, ran))
     } catch (e) {
       log('warn', `Could not save the test plan: ${(e as Error).message}`, id)
     }
+
+    // The checklist: every item of the person's web checklist, marked from what this scan ran, and (with an AI) judged from the evidence.
+    const done = Object.entries(st).filter(([, v]) => v && v.status === 'done').map(([k]) => k)
+    const list = autoMark(s.findings, done, profile)
+    try {
+      saveChecklist(id, list)
+    } catch (e) {
+      log('warn', `Could not save the checklist: ${(e as Error).message}`, id)
+    }
+    if (st.checklist)
+      await s.run(st.checklist, async (note) => {
+        const todo = list.sections.filter((x) => x.relevant).flatMap((x) => x.items.filter((i) => i.state === 'manual')).slice(0, BATCH * 6)
+        const evidence = { findings: s.findings, ran: done, profileText: planContext(profile, ran, 0).split('\nChecklist items')[0] }
+        let applied = 0
+        for (let i = 0; i < todo.length && !s.cancelled; i += BATCH) {
+          note(`Items ${i + 1} to ${Math.min(todo.length, i + BATCH)} of ${todo.length}`)
+          try {
+            const text = await askAi(req.reviewer, walkPrompt(url, evidence, todo.slice(i, i + BATCH)), op, s.raw)
+            applied += applyAnswers(list, parseAnswers(text), s.findings)
+          } catch (e) {
+            note(`A batch failed: ${(e as Error).message}`)
+          }
+        }
+        list.ai = true
+        saveChecklist(id, list)
+        note(`${applied} of ${todo.length} items judged from the evidence; the rest are for you to test`)
+        return []
+      })
 
     if (st.ai)
       await s.run(st.ai, async () => {

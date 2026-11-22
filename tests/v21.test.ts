@@ -11,7 +11,7 @@ import { checkIdOf } from '../src/main/checks'
 import { inWindow } from '../src/main/watch'
 import { beginOp, endOp, isPaused, pauseOp } from '../src/main/engine'
 import { executiveHtml } from '../src/main/report'
-import { runSelfTest } from '../src/main/selftest'
+import { runSelfTest } from './helpers/selftest'
 import type { Finding, SessionDetail, SessionInfo } from '../src/shared/types'
 
 const serve = (h: Parameters<typeof createServer>[1]): Promise<{ server: Server; url: string }> =>

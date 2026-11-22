@@ -137,6 +137,10 @@ export interface WebScanRequest {
   headers?: string
   /** Control confirmations: active checks that prove a problem is real (see CLAUDE.md for the rules). */
   confirm?: ConfirmOptions
+  /** White box: the site's source folder. MacSec reads it, maps its routes and parameters, and tests them live. */
+  codePath?: string
+  /** Walk the person's web checklist item by item (needs an AI reviewer for the items a scan cannot test). */
+  checklist?: boolean
   reviewer: Reviewer
 }
 
@@ -149,6 +153,8 @@ export interface ConfirmOptions {
   authz: boolean
   /** Which web firewall answers, what it blocks, and whether a harmless marker gets past it. */
   waf: boolean
+  /** Injection tests on every parameter and every GET form, with harmless markers. */
+  inject?: boolean
   /** Business logic: open redirects, host header poisoning, code limits, trusted fields, skipped steps. */
   logic?: boolean
   /** Where the sign-in form is, when it is not at an obvious address. */
@@ -253,7 +259,7 @@ export type AuditRequest =
   | { kind: 'changes'; path: string }
   | { kind: 'cloud'; provider: 'azure' | 'aws'; reviewer: Reviewer }
   /** `host` names the check; `hosts` is every server in it (one, a list, or a small network). */
-  | { kind: 'server'; host: string; hosts?: string[]; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean }
+  | { kind: 'server'; host: string; hosts?: string[]; ports: 'top100' | 'top1000'; reviewer: Reviewer; authorized: boolean; /** Ask Metasploit's check command (never exploit) about matched known flaws. Needs Metasploit already installed. */ msf?: boolean }
 
 /** A mobile app: its source folder, or a built .apk or .ipa file. */
 export interface ReconDeltaInfo {
@@ -604,7 +610,9 @@ export interface Channels {
   'sessions:fixplan': { args: [string]; result: FixPlan }
   'sessions:pause': { args: [string, boolean]; result: boolean }
   'sessions:pdf-executive': { args: [string]; result: string | null }
-  'selftest:run': { args: []; result: SelfTestResult }
+  'sessions:checklist': { args: [string]; result: ChecklistData }
+  'sessions:checklist-set': { args: [string, string, 'done' | 'problem' | 'na' | null, string?]; result: ChecklistData }
+  'web:pick-code': { args: []; result: string | null }
   'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null]; result: SessionDetail }
   'app:check-update': { args: []; result: UpdateInfo | null }
   'app:install-update': { args: []; result: void }
@@ -819,15 +827,30 @@ export interface FixPlan {
   chains: Chain[]
 }
 
-export interface SelfTestResult {
-  ok: boolean
-  at: string
-  items: { name: string; ok: boolean; detail: string }[]
-}
 
 /** Hours of the day (0 to 23, this Mac's time) when automatic scans may run. */
 export interface WatchWindow {
   on: boolean
   from: number
   to: number
+}
+
+export type ChecklistState = 'found' | 'clear' | 'ai-ok' | 'ai-issue' | 'manual'
+export interface ChecklistItemInfo {
+  id: string
+  text: string
+  state: ChecklistState
+  by: 'macsec' | 'ai' | 'none'
+  covered?: string
+  findings?: string[]
+  note?: string
+}
+export interface ChecklistInfo {
+  at: string
+  ai: boolean
+  sections: { n: number; title: string; relevant: boolean; items: ChecklistItemInfo[] }[]
+}
+export interface ChecklistData {
+  checklist: ChecklistInfo | null
+  user: Record<string, { state: 'done' | 'problem' | 'na'; note?: string; at: string }>
 }

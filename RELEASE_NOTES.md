@@ -1,3 +1,23 @@
+## MacSec 1.6.0
+
+Deeper testing everywhere: web scan with black box and white box, a checklist walk, injection tests, a deeper This Mac, deeper recon, deeper server scans and a safe Metasploit check.
+
+### What is new
+- **Web scan: black box or white box.** Black box tests the site from outside. White box also reads the code folder you pick, finds every route and parameter, and tries the private routes signed out to prove which ones are open.
+- **Injection tests on every page and form.** After a login, MacSec reads the pages it can reach and tries each input with harmless markers: unescaped output, a database error from a lone quote, a server that calculates a sent expression, and a line break reaching a header. Every hit is repeated and keeps its proof. POST forms are listed, never submitted.
+- **Walk my checklist.** Your own checklist (52 sections, 638 items) is walked item by item. MacSec marks what it tested itself, the AI reviewer you chose (including your Claude login) judges the rest using only the evidence found, and anything unproven stays manual. A new Checklist tab shows it all.
+- **This Mac, much deeper.** Root and admin accounts, screen lock, login window, secrets in files and shell history (never shown), .env files, XProtect age, third-party extensions, rejected apps, outdated Homebrew packages, SSH server settings, cron jobs, Wi-Fi security, saved open Wi-Fi, internet sharing, DNS servers, and a "Fix these first" panel.
+- **Deeper recon.** Each host gets its own headers, TLS, protection and banner checks, DevOps probes, DNS takeover signs and live CVE lookups.
+- **Server scans with depth.** Each open service is asked for its version and checked against live CVE data, data stores that answer without a password are proven, and web services behind other ports are tested as web apps.
+- **Metasploit, check only.** Optional switch on the server scan. A fixed list of modules, only the module's own `check`, never run or exploit. Proven results keep the command as proof.
+- **Removed the self-test** from the app (it was confusing). It now lives only in the test suite.
+
+### Honest limits
+- POST forms and bugs that need a data change are listed as leads, not proven.
+- The Metasploit module names were not tried against a real install here: a module that is missing is reported as unsupported, never as a finding.
+- The This Mac checks were tested with sample output, not on a real Mac.
+- Real WAF and real phone behaviour are still unverified.
+
 ## MacSec 1.5.0
 
 Business logic checks, a risk score for everything you test, and ways to hand findings on.

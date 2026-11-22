@@ -1,5 +1,5 @@
 /**
- * Self-test: MacSec checks its own checks. It starts two tiny web apps on this Mac only (127.0.0.1,
+ * Regression helper (tests only, not part of the app): the checks are run against a deliberately weak local app and a correct decoy. It starts two tiny web apps on this Mac only (127.0.0.1,
  * a random port, closed again afterwards): one with known weaknesses and one that looks similar but is
  * built correctly (the decoy). The checks must find every planted weakness and must report nothing
  * at all on the decoy. A result that fails either way means a check cannot be trusted, and says which.
@@ -7,11 +7,16 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http'
 import type { AddressInfo } from 'net'
-import type { Finding, SelfTestResult } from '../shared/types'
-import { ConfirmClient, fuzzContent } from './confirmtests'
-import { logicChecks } from './bizlogic'
+import type { Finding } from '../../src/shared/types'
 
-export type { SelfTestResult }
+export interface SelfTestResult {
+  ok: boolean
+  at: string
+  items: { name: string; ok: boolean; detail: string }[]
+}
+import { ConfirmClient, fuzzContent } from '../../src/main/confirmtests'
+import { logicChecks } from '../../src/main/bizlogic'
+
 type SelfTestItem = SelfTestResult['items'][number]
 
 const page = (body: string): string => `<!doctype html><html><head><title>Shop</title></head><body><h1>Shop</h1>${body}<p>Welcome to the shop. Browse our products, read our story and contact us.</p></body></html>`

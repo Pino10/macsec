@@ -6,6 +6,7 @@
 import { execFile } from 'child_process'
 import { readFileSync, statSync } from 'fs'
 import type { Check, ListeningPort } from './checkup'
+import { runDeepMacChecks } from './machecks2'
 
 const missing = (out: string): boolean => /does not exist|No such file|not found|error/i.test(out) && !/^\s*\d/.test(out)
 
@@ -179,6 +180,7 @@ export async function runMoreChecks(ports: ListeningPort[]): Promise<Check[]> {
     g('Where your traffic goes', trustedCerts(userTrust, adminTrust)),
     g('Updates and management', lastUpdateCheck(upd)),
     g('Updates and management', mdm(enroll)),
-    g('Programs and commands', pathDirs(process.env.PATH ?? ''))
+    g('Programs and commands', pathDirs(process.env.PATH ?? '')),
+    ...(await runDeepMacChecks())
   ]
 }

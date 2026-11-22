@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Cloud, GitCompareArrows, Layers3, LogIn, Radar, Server, ShieldHalf } from 'lucide-react'
 import type { LocalProject, LocalSite, ReviewDepth, Reviewer } from '@shared/types'
 import { useApp } from '../store'
-import { FlowStep, PageHead } from '../ui'
+import { FlowStep, PageHead, Switch } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
 import { isLocal } from './WebScan'
 
@@ -38,8 +38,11 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
   const [cloud, setCloud] = useState<{ azure: string | null; aws: string | null } | null>(null)
   const [host, setHost] = useState('')
   const [ports, setPorts] = useState<'top100' | 'top1000'>('top100')
+  const [msf, setMsf] = useState(false)
+  const [msfOn, setMsfOn] = useState(false)
   useEffect(() => {
     if (kind === 'cloud' && !cloud) void api.invoke('cloud:status').then(setCloud)
+    if (kind === 'server') void api.invoke('tools:optional').then((l) => setMsfOn(l.some((t) => t.name === 'Metasploit Framework' && t.installed)))
   }, [api, kind, cloud])
 
   useEffect(() => {
@@ -139,7 +142,16 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
                 ))}
               </div>
             </FlowStep>
-            <FlowStep n={3} title="Who writes the report" state="current">
+            <FlowStep n={3} title="Metasploit check (optional)" help="MacSec matches the versions it sees to known flaws. For some of them, Metasploit has a check command that answers without attacking. MacSec uses only that command, from a short fixed list of modules, and never runs or exploits anything. Metasploit must already be installed by you." state="current">
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <Switch on={msf} disabled={!msfOn} onChange={() => setMsf(!msf)} label="Ask Metasploit to check" />
+                <div>
+                  <strong>Ask Metasploit to check</strong>
+                  <div className="hint">{msfOn ? 'Metasploit was found on this Mac. Only the check command is used, with proof saved.' : 'Metasploit was not found on this Mac. Install it yourself from metasploit.com (MacSec never installs it) and this switch turns on.'}</div>
+                </div>
+              </div>
+            </FlowStep>
+            <FlowStep n={4} title="Who writes the report" state="current">
               <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
             </FlowStep>
             {needsOk && (
@@ -213,7 +225,7 @@ export function AuditFlow({ kinds, start = 'Start' }: { kinds: Kind[]; start?: s
             disabled={!ready || busy.has('audit')}
             onClick={async () => {
               const req =
-                kind === 'portfolio' ? { kind } : kind === 'changes' ? { kind, path } : kind === 'cloud' ? { kind, provider, reviewer } : kind === 'server' ? { kind, host: cleanHost, ports, reviewer, authorized: ok } : { kind, path, site: site.trim(), reviewer, depth, authorized: ok }
+                kind === 'portfolio' ? { kind } : kind === 'changes' ? { kind, path } : kind === 'cloud' ? { kind, provider, reviewer } : kind === 'server' ? { kind, host: cleanHost, ports, reviewer, authorized: ok, msf: msf && msfOn } : { kind, path, site: site.trim(), reviewer, depth, authorized: ok }
               const s = await act('audit', () => api.invoke('audit:start', req as never))
               if (s) showSession(s.id)
             }}

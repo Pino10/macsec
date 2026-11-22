@@ -1,4 +1,5 @@
 import ProofBlock, { ConfidenceTag, ExploitTag } from '../components/ProofBlock'
+import ChecklistView from '../components/ChecklistView'
 import FixPlan from '../components/FixPlan'
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
@@ -101,7 +102,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [showFp, setShowFp] = useState(false)
   const [paused, setPaused] = useState(false)
   const [onlyProven, setOnlyProven] = useState(false)
-  const [tab, setTab] = useState<'findings' | 'owasp' | 'report' | 'run' | 'surface'>('findings')
+  const [tab, setTab] = useState<'findings' | 'owasp' | 'report' | 'run' | 'surface' | 'checklist'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const live = sessions.find((s) => s.id === id)
   const now = useNow(live?.status === 'running')
@@ -280,6 +281,11 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <button role="tab" aria-selected={tab === 'run'} onClick={() => setTab('run')}>
             What ran
           </button>
+          {s.kind === 'web-scan' && (
+            <button role="tab" aria-selected={tab === 'checklist'} onClick={() => setTab('checklist')}>
+              Checklist
+            </button>
+          )}
           {(s.kind === 'recon' || s.kind === 'web-scan') && (
             <button role="tab" aria-selected={tab === 'surface'} onClick={() => setTab('surface')}>
               {s.kind === 'recon' ? 'Pages and hosts' : 'JavaScript map'}
@@ -339,6 +345,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
       )}
 
       {tab === 'surface' && <Surface id={id} />}
+      {tab === 'checklist' && <ChecklistView id={id} />}
       {tab === 'owasp' && <SessionOwasp id={id} stamp={stamp} />}
 
       {tab === 'report' && (
