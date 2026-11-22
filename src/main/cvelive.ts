@@ -103,7 +103,7 @@ export function cveFindings(results: LiveCve[], epss: Map<string, Epss>): Findin
       file: host,
       advisory: matches[0].id,
       cves: { count: matches.length, kev, topEpss, top: top.map((m) => ({ id: m.id, score: m.score, kev: m.kev, epss: epss.get(m.id)?.epss })) },
-      description: `The version comes from ${product.from}. The public NVD database lists ${matches.length} flaw${matches.length === 1 ? '' : 's'} whose affected range includes it. Top: ${top.map(line).join('; ')}${matches.length > 5 ? `; and ${matches.length - 5} more` : ''}. This is a version match, not proof: the number can be old while the fixes are in${product.distro ? ` (${product.distro} fixes problems without changing the number)` : ''}, and some flaws need settings MacSec cannot see.`,
+      description: `The version comes from ${product.from}.${product.note ? ` ${product.note}` : ''} The public NVD database lists ${matches.length} flaw${matches.length === 1 ? '' : 's'} whose affected range includes it. Top: ${top.map(line).join('; ')}${matches.length > 5 ? `; and ${matches.length - 5} more` : ''}. This is a version match, not proof: the number can be old while the fixes are in${product.distro ? ` (${product.distro} fixes problems without changing the number)` : ''}, and some flaws need settings MacSec cannot see.`,
       fix: 'Update to the newest release, or ask your provider whether these fixes are in the build you run. Start with the ones on the exploited list.',
       proof: product.proof ? { ...product.proof, shows: [...product.proof.shows, `NVD lists ${matches.length} flaw${matches.length === 1 ? '' : 's'} whose range includes ${product.version}`, `counted on ${new Date().toISOString().slice(0, 10)}`] } : undefined
     }

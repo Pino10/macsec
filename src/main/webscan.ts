@@ -30,6 +30,7 @@ import { askAi, summarizeWithAi, summaryPrompt } from './aisummary'
 import { crawlJs } from './jsdeep'
 import { cveFindings, epssFor, liveCves } from './cvelive'
 import { devopsChecks, dnsChecks, protectionFinding } from './webposture'
+import { groupDecoyFiles } from './decoys'
 import { bannersOf, type Product } from './seckit/confirm'
 import { checkTls, keysInJavaScript, signedOutCheck } from './webextra'
 import { logicChecks } from './bizlogic'
@@ -263,7 +264,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
 
     if (st.tls) await s.run(st.tls, () => checkTls(url))
 
-    await s.run(st.files, (note) => exposedFiles(url, SENSITIVE_PATHS.slice(0, m.paths), headers, () => s.cancelled, note))
+    await s.run(st.files, async (note) => groupDecoyFiles(await exposedFiles(url, SENSITIVE_PATHS.slice(0, m.paths), headers, () => s.cancelled, note)))
 
     if (st.js) await s.run(st.js, (note) => keysInJavaScript(urls, host, s.raw, op, headers, note))
     // Versions found anywhere in this scan are matched against the live vulnerability databases at the end of these steps.

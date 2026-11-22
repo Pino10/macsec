@@ -21,7 +21,12 @@ describe('This Mac: sign-in and lock', () => {
 describe('This Mac: lost or stolen', () => {
   it('Find My and backups', () => {
     expect(findMy('fmm-mobileme-token-FMM\t%00\nboot-args\t').status).toBe('ok')
-    expect(findMy('boot-args\t').status).toBe('warn')
+    // Nothing readable is "could not tell", not a warning: the nvram token is missing on some Macs that have Find My on.
+    expect(findMy('boot-args\t').status).toBe('info')
+    const acct = (enabled: number) => `{\n Accounts = (\n {\n AccountID = "a@b.c";\n Services = (\n { Enabled = ${enabled}; Name = "FIND_MY_MAC"; }\n );\n }\n );\n}`
+    expect(findMy('boot-args\t', acct(1)).status).toBe('ok')
+    expect(findMy('boot-args\t', acct(0)).status).toBe('warn')
+    expect(findMy('', 'The domain/default pair of (MobileMeAccounts, ) does not exist').status).toBe('warn')
     expect(timeMachine('tmutil: No destinations configured.').status).toBe('warn')
     expect(timeMachine('====================================================\nName          : Backup\nKind          : Local\n').status).toBe('ok')
     expect(timeMachine('').status).toBe('info')

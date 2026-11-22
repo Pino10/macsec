@@ -8,6 +8,7 @@
  *   code/          the private copy of a downloaded repository, deleted when the review ends
  *                  unless you chose to keep it
  */
+import { applyIgnored } from './ignored'
 import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { randomBytes } from 'crypto'
@@ -48,6 +49,7 @@ export function saveSession(info: SessionInfo): void {
 
 export function saveFindings(id: string, findings: Finding[]): void {
   if (!existsSync(sessionDir(id))) return
+  applyIgnored(findings)
   writeFileSync(join(sessionDir(id), 'findings.json'), JSON.stringify(findings, null, 2))
 }
 
@@ -142,6 +144,7 @@ export function triageFinding(id: string, findingId: string, triage: Finding['tr
   } else {
     delete item.triage
     delete item.triagedAt
+    delete item.remembered
   }
   writeFileSync(f, JSON.stringify(list, null, 2))
   info.counts = countBySeverity(list.filter((x) => x.verdict !== 'false-positive'))

@@ -238,6 +238,8 @@ export interface Product {
   from: string
   /** Linux distributions patch without changing the number. */
   distro?: string
+  /** Something to know about the version: the series it belongs to, or a disagreement between two places. */
+  note?: string
   /** The answer the version was read from. */
   proof?: Proof
 }
@@ -286,7 +288,9 @@ export function libsIn(url: string, js: string): Product[] {
     const fromHead = l.re.exec(head)?.[1]
     const fromName = l.file?.exec(url.split('?')[0])?.[1]
     const version = fromHead ?? fromName
-    if (version) out.push({ name: l.name, version, cpe: l.cpe, from: fromHead ? `the banner comment in ${url.split('?')[0]}` : `the file name ${url.split('?')[0].split('/').pop()}` })
+    // The code's own banner wins over a file name, which anyone can change. A disagreement is said out loud.
+    const clash = fromHead && fromName && fromHead.split('.')[0] !== fromName.split('.')[0] ? `The file name says ${fromName} but the code says ${fromHead}: the code is used.` : undefined
+    if (version) out.push({ name: l.name, version, cpe: l.cpe, note: clash, from: fromHead ? `the banner comment in ${url.split('?')[0]}` : `the file name ${url.split('?')[0].split('/').pop()}` })
   }
   return out
 }

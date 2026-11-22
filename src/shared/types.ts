@@ -116,6 +116,8 @@ export interface Finding {
   /** What you decided: fixed, accepted risk, or not a problem. It then stops counting. */
   triage?: 'fixed' | 'accepted' | 'not-a-problem'
   triagedAt?: string
+  /** Marked "not a problem" by a rule you saved earlier, not by hand in this session. */
+  remembered?: boolean
 }
 
 export type Reviewer = 'none' | 'claude' | 'claude-local' | 'claude-free' | 'codex' | 'gemini' | 'model'
@@ -618,7 +620,9 @@ export interface Channels {
   'sessions:checklist': { args: [string]; result: ChecklistData }
   'sessions:checklist-set': { args: [string, string, 'done' | 'problem' | 'na' | null, string?]; result: ChecklistData }
   'web:pick-code': { args: []; result: string | null }
-  'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null]; result: SessionDetail }
+  'ignored:list': { args: []; result: { key: string; scope: 'site' | 'everywhere'; title: string; place?: string; at: string }[] }
+  'ignored:remove': { args: [string]; result: { key: string; scope: 'site' | 'everywhere'; title: string; place?: string; at: string }[] }
+  'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null, ('site' | 'everywhere')?]; result: SessionDetail }
   'app:check-update': { args: []; result: UpdateInfo | null }
   'app:install-update': { args: []; result: void }
   'app:update-status': { args: []; result: UpdateStatus }

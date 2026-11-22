@@ -1,3 +1,20 @@
+## MacSec 1.8.0
+
+MacSec now knows what firewalls do to confuse a scanner, remembers what you tell it is not a problem, and checks library versions more carefully.
+
+### What is new
+- **Firewall and decoy knowledge.** Shields such as Imperva, Cloudflare, Akamai, F5, AWS, Sucuri and Wordfence are recognised by their headers, cookies and block pages. When one address shows a crowd of open ports (or many database, mail and remote-access ports at once), MacSec reports one info finding instead of dozens, keeps only the web ports and does not run service checks on the rest. When four or more sensitive file names answer at once (trace.axd, db.sql, .env and so on), they are turned down to info as "probably a decoy" and one summary says why. Nothing is hidden: you can still read each one.
+- **See it, then say "this is not it".** Keys found in a site's scripts now show the line they were found on, with every value cut to its first four characters and its length. Example values (YOUR_API_KEY, xxxx, AKIA...EXAMPLE and the like) are turned down to info on their own. Source maps and keys that belong to public libraries (jQuery, Bootstrap, files from a public CDN, node_modules) are turned down to info too.
+- **Not a problem, remember.** On any finding, choose "Not a problem, remember" (this site) or "on every site". Later scans mark it "Not a problem" and stop counting it. The list is in Settings, with a button to report it again. Only the finding's id or title and place are kept, never a secret value.
+- **Library versions and series.** A version is only checked against known flaws if it fits a series that exists (Bootstrap 1 to 5, jQuery 1 to 4 and so on). When a file name and the code's own banner disagree, MacSec says so and uses the code. Each library says which series it belongs to and whether that series still gets fixes.
+- **Find My Mac.** MacSec now reads your iCloud account settings as well as the system flag, and says "could not tell" instead of "off" when the two do not agree. The account format is written from documentation, not tested on every Mac.
+- **This Mac.** The "Fix these first" panel is now a tidy numbered list, in the same style as the rest of the page.
+- **AI helpers no longer load your own tools.** The AI helpers MacSec starts now run with `--strict-mcp-config`, so Claude Code does not start the MCP servers from your own setup. This is the most likely reason a tool such as Serena opened its dashboard in your browser while MacSec ran an AI review. It is not proven: another program can start it too.
+
+### Limits
+- Decoy detection is by pattern. A real server with many open ports, or a real site with several backup files, can look like a decoy: those are listed as info with the reason, not hidden.
+- MacSec still never installs Metasploit or other attack tools. If it is installed, the checks run as before.
+
 ## MacSec 1.7.0
 
 Sign-in protocols, tokens, GraphQL and cross-site checks, an AI autopilot, and Metasploit with approval for every module.

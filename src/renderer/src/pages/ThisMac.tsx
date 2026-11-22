@@ -63,16 +63,16 @@ export default function ThisMac(): React.JSX.Element {
       {!r && tab !== 'images' && <div className="panel empty-state">{busy.has('checkup') ? 'Checking this Mac. It takes a few seconds, and it only reads.' : 'Press “Check this Mac”. It takes a few seconds.'}</div>}
       {r && tab === 'checks' && r.checks.some((c) => c.status === 'bad' || c.status === 'warn') && (
         <div className="panel" style={{ marginBottom: 14 }}>
-          <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>Fix these first</h3>
-          <p className="hint" style={{ margin: '0 0 8px' }}>The most serious come first. Each one says how to fix it yourself in System Settings or Terminal.</p>
-          <ol style={{ margin: 0, paddingLeft: 20, display: 'grid', gap: 6 }}>
-            {[...r.checks.filter((c) => c.status === 'bad'), ...r.checks.filter((c) => c.status === 'warn')].slice(0, 8).map((c) => (
-              <li key={c.id}>
-                {ICON[c.status]} <strong>{c.title}</strong>
-                {c.fix && <div className="hint">{c.fix}</div>}
-              </li>
-            ))}
-          </ol>
+          <div className="mac-group">Fix these first</div>
+          {[...r.checks.filter((c) => c.status === 'bad'), ...r.checks.filter((c) => c.status === 'warn')].slice(0, 8).map((c, i) => (
+            <div key={c.id} className="row mac-row">
+              {ICON[c.status]}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="row-title">{i + 1}. {c.title}</div>
+                {c.fix && <div className="row-sub fix-line" style={{ whiteSpace: 'normal' }}>{c.fix}</div>}
+              </div>
+            </div>
+          ))}
         </div>
       )}
       {r && tab === 'checks' && (

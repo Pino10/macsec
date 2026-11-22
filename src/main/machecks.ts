@@ -35,9 +35,28 @@ export function airdrop(out: string): Check {
   return { id: 'airdrop', title: 'AirDrop visibility', status: everyone ? 'warn' : 'ok', detail: everyone ? 'AirDrop is open to Everyone, so strangers nearby can see this Mac and send files to it.' : /off/i.test(v) ? 'AirDrop is off.' : 'AirDrop only shows this Mac to your contacts.', fix: everyone ? 'Finder, AirDrop (or Control Centre): choose "Contacts Only" or "No One".' : undefined }
 }
 
-export function findMy(nvram: string): Check {
-  const on = /^fmm-mobileme-token-FMM/m.test(nvram)
-  return { id: 'findmy', title: 'Find My Mac', status: on ? 'ok' : 'warn', detail: on ? 'Find My is on: you can locate, lock or wipe a lost Mac.' : 'Find My Mac does not look switched on, so a lost or stolen Mac cannot be located or locked remotely.', fix: on ? undefined : 'System Settings, your name, iCloud, Find My Mac: turn it on.' }
+/**
+ * Find My Mac. Apple stores the answer in several places and not every Mac shows all of them, so MacSec
+ * looks at two and never says "off" unless it actually saw it off:
+ *   - the firmware setting fmm-mobileme-token-FMM (present when Find My is on, on many Macs)
+ *   - the iCloud account file, where the Find My Mac service is listed as enabled or not
+ * If neither can be read, the answer is "could not tell" with where to look, not a warning.
+ */
+export function findMy(nvram: string, accounts = ''): Check {
+  const id = 'findmy'
+  const title = 'Find My Mac'
+  const on = 'Find My is on: you can locate, lock or wipe a lost Mac.'
+  if (/^fmm-mobileme-token-FMM/m.test(nvram)) return { id, title, status: 'ok', detail: on }
+  const block = /\{[^{}]*(?:FIND_MY_MAC|FindMyMac|FINDMYMAC)[^{}]*\}/i.exec(accounts)?.[0]
+  if (block) {
+    const enabled = /Enabled\s*=\s*(1|true|yes)\s*;/i.test(block)
+    const disabled = /Enabled\s*=\s*(0|false|no)\s*;/i.test(block)
+    if (enabled) return { id, title, status: 'ok', detail: on }
+    if (disabled) return { id, title, status: 'warn', detail: 'Find My Mac is switched off in your iCloud settings, so a lost or stolen Mac cannot be located or locked.', fix: 'System Settings, your name, iCloud, Find My Mac: turn it on.' }
+  }
+  if (/AccountID|Accounts\s*=/i.test(accounts) === false && /does not exist|domain/i.test(accounts))
+    return { id, title, status: 'warn', detail: 'No iCloud account seems to be signed in on this Mac, so Find My cannot be on.', fix: 'System Settings, sign in with your Apple ID, then iCloud, Find My Mac: turn it on.' }
+  return { id, title, status: 'info', detail: 'MacSec could not tell whether Find My Mac is on (Apple does not always let other apps read it). Please look yourself: System Settings, your name, iCloud, Find My Mac.' }
 }
 
 export function timeMachine(out: string): Check {
@@ -146,7 +165,7 @@ function run(cmd: string, args: string[], timeout = 8000): Promise<string> {
 
 /** All the extra checks, each grouped so the page reads in sections. */
 export async function runMoreChecks(ports: ListeningPort[]): Promise<Check[]> {
-  const [lock, guest, auto, drop, nvram, tm, prox, userTrust, adminTrust, enroll, upd] = await Promise.all([
+  const [lock, guest, auto, drop, nvram, tm, prox, userTrust, adminTrust, enroll, upd, icloud] = await Promise.all([
     run('/usr/sbin/sysadminctl', ['-screenLock', 'status']),
     run('/usr/bin/defaults', ['read', '/Library/Preferences/com.apple.loginwindow', 'GuestEnabled']),
     run('/usr/bin/defaults', ['read', '/Library/Preferences/com.apple.loginwindow', 'autoLoginUser']),
@@ -157,7 +176,8 @@ export async function runMoreChecks(ports: ListeningPort[]): Promise<Check[]> {
     run('/usr/bin/security', ['dump-trust-settings']),
     run('/usr/bin/security', ['dump-trust-settings', '-d']),
     run('/usr/bin/profiles', ['status', '-type', 'enrollment']),
-    run('/usr/bin/defaults', ['read', '/Library/Preferences/com.apple.SoftwareUpdate', 'LastSuccessfulDate'])
+    run('/usr/bin/defaults', ['read', '/Library/Preferences/com.apple.SoftwareUpdate', 'LastSuccessfulDate']),
+    run('/usr/bin/defaults', ['read', 'MobileMeAccounts'])
   ])
   let hosts = ''
   try {
@@ -170,7 +190,7 @@ export async function runMoreChecks(ports: ListeningPort[]): Promise<Check[]> {
     g('Logging in and locking', screenLock(lock)),
     g('Logging in and locking', guestAccount(guest)),
     g('Logging in and locking', autoLogin(auto)),
-    g('If the Mac is lost', findMy(nvram)),
+    g('If the Mac is lost', findMy(nvram, icloud)),
     g('If the Mac is lost', timeMachine(tm)),
     g('Reachable from other devices', airdrop(drop)),
     g('Reachable from other devices', sharingFrom(ports)),

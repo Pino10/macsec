@@ -1,3 +1,4 @@
+import { addRule, readRules, removeRule } from './ignored'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, safeStorage, session, shell, type IpcMainInvokeEvent, nativeTheme } from 'electron'
 import { installedEditors, isAppBundle, isEditorChoice, openInEditorOf, pickEditor } from './seckit/editors'
 import { execFile } from 'child_process'
@@ -468,10 +469,18 @@ function registerIpc(): void {
     }
     return out.filter(Boolean)
   })
-  handle('findings:triage', (sid, fidv, t) => {
+  handle('findings:triage', (sid, fidv, t, remember) => {
     const triage = t === 'fixed' || t === 'accepted' || t === 'not-a-problem' ? t : null
-    return triageFinding(String(sid), String(fidv), triage)
+    const detail = triageFinding(String(sid), String(fidv), triage)
+    // "Not a problem, remember": the next scan leaves it alone.
+    if (triage === 'not-a-problem' && (remember === 'site' || remember === 'everywhere')) {
+      const f = detail.findings.find((x) => x.id === String(fidv))
+      if (f) addRule(f, remember)
+    }
+    return detail
   })
+  handle('ignored:list', () => readRules())
+  handle('ignored:remove', (key) => removeRule(String(key)))
   // ---- Findings over time and exports
   handle('sessions:compare', (id) => {
     const s = readSession(String(id))

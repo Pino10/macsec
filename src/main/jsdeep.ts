@@ -16,6 +16,7 @@ import { dirname, join, resolve, sep } from 'path'
 import type { Finding, Severity } from '../shared/types'
 import { fid } from './scanners/parse'
 import { endpointsIn, parseSourceMap, secretsIn, sourceMapUrl } from './seckit/recon'
+import { isPublicLibrary, plausibleVersion, seriesNote } from './decoys'
 import { libsIn, proofOf, type Product } from './seckit/confirm'
 import { cloudRefs, type Refs } from './mobilestatic'
 
@@ -237,7 +238,7 @@ export async function crawlJs(o: CrawlOptions): Promise<JsCrawl> {
     if (!r || r.status !== 200 || !/javascript|ecmascript|text\/plain|octet-stream|^$/i.test(r.headers.get('content-type') ?? '')) continue
     const vendor = isVendor(url)
     const d = analyzeJs(r.text, url)
-    const info: ScriptInfo = { url, bytes: r.text.length, endpoints: vendor ? [] : endpointsIn(r.text), routes: vendor ? [] : d.routes, graphql: d.graphql, envVars: vendor ? [] : d.envVars, libs: libsIn(url, r.text).map((l) => ({ ...l, proof: proofOf({ url, status: r.status, headers: r.headers, body: r.text.slice(0, 200000), shows: [l.from] }) })) }
+    const info: ScriptInfo = { url, bytes: r.text.length, endpoints: vendor ? [] : endpointsIn(r.text), routes: vendor ? [] : d.routes, graphql: d.graphql, envVars: vendor ? [] : d.envVars, libs: libsIn(url, r.text).filter((l) => plausibleVersion(l.name, l.version)).map((l) => ({ ...l, note: [l.note, seriesNote(l.name, l.version)].filter(Boolean).join(' '), proof: proofOf({ url, status: r.status, headers: r.headers, body: r.text.slice(0, 200000), shows: [l.from] }) })) }
     for (const u of d.chunks) if (!seen.has(u)) {
       queue.push(u)
       res.chunksFound++
@@ -260,9 +261,9 @@ export async function crawlJs(o: CrawlOptions): Promise<JsCrawl> {
       if (m && parsed) {
         const rec = o.sourceDir && parsed.hasContent ? recoverSources(m.text, join(o.sourceDir, fid(mapUrl))) : { written: 0, bytes: 0, keys: [] }
         info.sourceMap = { url: mapUrl, files: parsed.files, recovered: rec.written }
-        res.findings.push({ id: fid('map', mapUrl), tool: 'MacSec', category: 'web', severity: parsed.hasContent ? 'medium' : 'low', confidence: 'confirmed', title: `Source map public: ${parsed.files} original files`, url: mapUrl, file: mapUrl, cwe: 'CWE-540', description: `The original source code${parsed.hasContent ? ', with its full text,' : ''} can be rebuilt from this file. Files include: ${parsed.sample.join(', ')}.${rec.written ? ` ${rec.written} files were rebuilt into the session folder so you can read the code the way an attacker would.` : ''}`, fix: 'Stop publishing .map files to production (productionBrowserSourceMaps: false in Next.js, build.sourcemap: false in Vite), or upload them only to your error tracker.', proof: proofOf({ url: mapUrl, status: m.status, headers: m.headers, body: m.text.slice(0, 200000), shows: ['the map downloaded without signing in and parses as a source map', `it lists ${parsed.files} original files`, parsed.hasContent ? 'it includes the full text of the source files' : 'it lists file names only', `for example ${parsed.sample.slice(0, 5).join(', ')}`] }) })
+        res.findings.push({ id: fid('map', mapUrl), tool: 'MacSec', category: 'web', severity: isPublicLibrary(mapUrl) ? 'info' : parsed.hasContent ? 'medium' : 'low', confidence: 'confirmed', title: `${isPublicLibrary(mapUrl) ? 'Library source map (already public)' : 'Source map public'}: ${parsed.files} original files`, url: mapUrl, file: mapUrl, cwe: 'CWE-540', description: `The original source code${parsed.hasContent ? ', with its full text,' : ''} can be rebuilt from this file. Files include: ${parsed.sample.join(', ')}.${rec.written ? ` ${rec.written} files were rebuilt into the session folder so you can read the code the way an attacker would.` : ''}`, fix: 'Stop publishing .map files to production (productionBrowserSourceMaps: false in Next.js, build.sourcemap: false in Vite), or upload them only to your error tracker.', proof: proofOf({ url: mapUrl, status: m.status, headers: m.headers, body: m.text.slice(0, 200000), shows: ['the map downloaded without signing in and parses as a source map', `it lists ${parsed.files} original files`, parsed.hasContent ? 'it includes the full text of the source files' : 'it lists file names only', `for example ${parsed.sample.slice(0, 5).join(', ')}`] }) })
         for (const k of rec.keys.slice(0, 20))
-          res.findings.push({ id: fid('srckey', mapUrl, k.file, k.kind, k.masked), tool: 'MacSec', category: 'web', severity: k.severity, confidence: 'possible', title: `${k.kind} in the original source: ${k.file}`, url: mapUrl, file: k.file, description: `Starts with ${k.masked}. It sits in code rebuilt from the public source map. MacSec does not test whether the key still works.`, fix: 'Revoke the key, keep it on the server, and stop publishing source maps.', proof: proofOf({ url: mapUrl, status: m.status, headers: m.headers, body: m.text.slice(0, 200000), shows: [`${k.kind} pattern in ${k.file}`, `starts with ${k.masked}`] }) })
+          res.findings.push({ id: fid('srckey', mapUrl, k.file, k.kind, k.masked), tool: 'MacSec', category: 'web', severity: /node_modules\//.test(k.file) || isPublicLibrary(mapUrl) ? 'info' : k.severity, confidence: 'possible', title: `${k.kind} in the original source: ${k.file}`, url: mapUrl, file: k.file, description: `Starts with ${k.masked}. It sits in code rebuilt from the public source map. MacSec does not test whether the key still works.`, fix: 'Revoke the key, keep it on the server, and stop publishing source maps.', proof: proofOf({ url: mapUrl, status: m.status, headers: m.headers, body: m.text.slice(0, 200000), shows: [`${k.kind} pattern in ${k.file}`, `starts with ${k.masked}`] }) })
       }
     }
     res.scripts.push(info)

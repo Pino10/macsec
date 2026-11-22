@@ -146,7 +146,7 @@ async function changes(id: string, path: string): Promise<void> {
       const bin = findCli('claude')
       if (!bin) throw new Error('Claude Code’s command line tool is not installed. Set it up on Tools.')
       s.info.claudeSession = randomUUID()
-      const args = ['-p', '/security-review', '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill,Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*)', '--session-id', s.info.claudeSession, '--name', `MacSec change review: ${path.split('/').pop()}`, ...pluginArgs()]
+      const args = ['-p', '/security-review', '--output-format', 'text', '--permission-mode', 'plan', '--strict-mcp-config', '--allowedTools', 'Read,Grep,Glob,Skill,Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git show:*)', '--session-id', s.info.claudeSession, '--name', `MacSec change review: ${path.split('/').pop()}`, ...pluginArgs()]
       const text = await new Promise<string>((resolve, reject) => {
         const child = spawn(bin, args, { cwd: path, env: agentEnv(), stdio: ['ignore', 'pipe', 'pipe'] })
         op.children.add(child)

@@ -2,6 +2,7 @@
  * Extra read-only web checks: TLS settings, keys left in public JavaScript, and pages that show
  * the same content whether you are signed in or not.
  */
+import { explainKey } from './decoys'
 import { connect, type PeerCertificate } from 'tls'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -75,7 +76,14 @@ export async function keysInJavaScript(urls: string[], host: string, rawDir: str
   }
   const report = join(rawDir, 'gitleaks-js.json')
   await runTool({ name: 'gitleaks-js', bin: 'gitleaks', args: ['dir', dir, '--report-format', 'json', '--report-path', report, '--no-banner', '--redact', '--exit-code', '0', '--log-level', 'error'], timeoutMs: 10 * 60_000, output: report }, op, rawDir)
-  return parseGitleaks(readFileSync(report, 'utf8'), dir).map((x) => ({
+  const lineOf = (file: string | undefined, n: number | undefined): string | undefined => {
+    try {
+      return file && n ? readFileSync(join(dir, file.split('/').pop() ?? ''), 'utf8').split('\n')[n - 1] : undefined
+    } catch {
+      return undefined
+    }
+  }
+  return parseGitleaks(readFileSync(report, 'utf8'), dir).map((x) => explainKey({
     ...x,
     category: 'web' as const,
     title: x.title.replace(/ in code$/, ' in public JavaScript'),
@@ -83,7 +91,7 @@ export async function keysInJavaScript(urls: string[], host: string, rawDir: str
     file: map[x.file?.split('/').pop() ?? ''] ?? x.file,
     description: 'Anyone who opens the site can read this file. Keys meant for servers must never be in front-end code.',
     fix: 'Revoke the key, move the call that needs it to your server, and expose only public, restricted keys (for example a publishable key limited to your domain).'
-  }))
+  }, lineOf(x.file, x.line)))
 }
 
 const PRIVATE = /(account|dashboard|admin|profile|settings|order|invoice|billing|user|member|my|portal|manage|api\/)/i

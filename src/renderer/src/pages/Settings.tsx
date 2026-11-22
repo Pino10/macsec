@@ -9,8 +9,10 @@ export default function Settings(): React.JSX.Element {
   const [check, setCheck] = useState<string | null>(null)
   const [eds, setEds] = useState<{ found: { id: string; name: string }[]; current: string | null } | null>(null)
   const [have, setHave] = useState<string[] | null>(null)
+  const [ignored, setIgnored] = useState<Awaited<ReturnType<typeof window.macsec.invoke<'ignored:list'>>>>([])
   useEffect(() => {
     void window.macsec.invoke('editors:list').then(setEds)
+    void window.macsec.invoke('ignored:list').then(setIgnored)
     void window.macsec.invoke('ai:agents').then((a) => setHave(a.filter((x) => x.installed).map((x) => x.id)))
   }, [])
   const api = window.macsec
@@ -77,6 +79,29 @@ export default function Settings(): React.JSX.Element {
           </div>
           <Switch on={!!settings.explainSimply} label="Explain findings simply" onChange={() => void updateSettings({ explainSimply: !settings.explainSimply })} />
         </div>
+      </div>
+      <h2 className="section-title">Things you told MacSec to ignore</h2>
+      <div className="panel">
+        {ignored.length === 0 ? (
+          <div className="ms-row">
+            <div className="grow row-sub">Nothing yet. When you open a finding and choose “Not a problem, remember”, it shows up here and later scans leave it alone.</div>
+          </div>
+        ) : (
+          ignored.map((r) => (
+            <div className="ms-row" key={r.key}>
+              <div className="grow">
+                <div className="row-title">{r.title}</div>
+                <div className="row-sub">
+                  {r.scope === 'everywhere' ? 'Everywhere' : 'This site only'}
+                  {r.place ? `: ${r.place}` : ''}
+                </div>
+              </div>
+              <button className="btn btn-sm" onClick={async () => { const l = await act('ignored', () => api.invoke('ignored:remove', r.key)); if (l) setIgnored(l) }}>
+                Report it again
+              </button>
+            </div>
+          ))
+        )}
       </div>
       <h2 className="section-title">General</h2>
       <div className="panel">

@@ -183,12 +183,12 @@ export async function reviewWithClaude(root: string, prompt: string, depth: Revi
     const ctx = await ensureLmContext(local.baseUrl, local.model, local.token)
     if (!ctx.ok) throw new Error(ctx.note)
   }
-  const base = ['-p', prompt + method, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', ...(local ? ['--model', local.model] : []), ...(plugins ?? pluginArgs())]
+  const base = ['-p', prompt + method, '--output-format', 'text', '--permission-mode', 'plan', '--strict-mcp-config', '--allowedTools', 'Read,Grep,Glob,Skill', ...(local ? ['--model', local.model] : []), ...(plugins ?? pluginArgs())]
   const keep = session ? ['--session-id', session.id, '--name', session.name] : ['--no-session-persistence']
   let r = await runCli(bin, [...base, ...keep], root, onChild, (local ? 2 : 1) * TIMEOUT[depth] * 60_000, onActivity, env)
   if (local && r.code !== 0) throw new Error(explainFailure(free ? 'claude-free' : 'claude-local', r.err))
   // Older Claude Code versions: without the newer options.
-  if (r.code !== 0 && /unknown option/i.test(r.err)) r = await runCli(bin, ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
+  if (r.code !== 0 && /unknown option/i.test(r.err)) r = await runCli(bin, ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--strict-mcp-config', '--allowedTools', 'Read,Grep,Glob'], root, onChild, TIMEOUT[depth] * 60_000, onActivity)
   if (r.code !== 0 || !r.out.trim()) {
     if (/log ?in|auth|credential|api key/i.test(r.err)) throw new Error('Claude Code is not signed in. Run claude once in Terminal to sign in.')
     throw new Error(`Claude Code stopped without a report. ${r.err.trim().split('\n').slice(-2).join(' ')}`.trim())

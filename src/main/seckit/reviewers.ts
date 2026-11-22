@@ -76,7 +76,7 @@ export function reviewerRun(id: ReviewerId, bin: string, prompt: string, o: { pl
     return {
       bin,
       session,
-      args: ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--allowedTools', 'Read,Grep,Glob,Skill', '--disallowedTools', 'Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch', '--session-id', session, ...(o.name ? ['--name', o.name.slice(0, 80)] : []), ...(viaServer ? ['--model', viaServer.model] : []), ...plugins],
+      args: ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--strict-mcp-config', '--allowedTools', 'Read,Grep,Glob,Skill', '--disallowedTools', 'Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch', '--session-id', session, ...(o.name ? ['--name', o.name.slice(0, 80)] : []), ...(viaServer ? ['--model', viaServer.model] : []), ...plugins],
       env: viaServer ? localModelEnv(viaServer) : {}
     }
   }

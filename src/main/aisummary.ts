@@ -75,7 +75,7 @@ export async function askAi(reviewer: Reviewer, prompt: string, op: Op, cwd: str
         ? ['exec', '--sandbox', 'read-only', '--skip-git-repo-check', '--color', 'never', prompt]
         : reviewer === 'gemini'
           ? ['-p', prompt, '--approval-mode', 'plan', '--skip-trust', '--output-format', 'text']
-          : ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--disallowedTools', 'Bash,Edit,Write,WebFetch,WebSearch,NotebookEdit', '--no-session-persistence', ...(reviewer === 'claude-local' ? ['--model', st.llm.model] : free ? ['--model', free.model] : []), ...pluginArgs()]
+          : ['-p', prompt, '--output-format', 'text', '--permission-mode', 'plan', '--strict-mcp-config', '--disallowedTools', 'Bash,Edit,Write,WebFetch,WebSearch,NotebookEdit', '--no-session-persistence', ...(reviewer === 'claude-local' ? ['--model', st.llm.model] : free ? ['--model', free.model] : []), ...pluginArgs()]
     text = await new Promise<string>((resolve, reject) => {
       const child = spawn(bin, args, { cwd, env: { ...agentEnv(), ...localEnv }, stdio: ['ignore', 'pipe', 'pipe'] })
       op.children.add(child)

@@ -450,8 +450,8 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
   const api = window.macsec
   const { act, settings, notify } = useApp()
   const simple = !!settings?.explainSimply
-  const triage = async (t: Finding['triage'] | null): Promise<void> => {
-    const d = await act('triage', () => api.invoke('findings:triage', id, f.id, t ?? null))
+  const triage = async (t: Finding['triage'] | null, remember?: 'site' | 'everywhere'): Promise<void> => {
+    const d = await act('triage', () => api.invoke('findings:triage', id, f.id, t ?? null, remember))
     if (d) onChange(d)
   }
   return (
@@ -569,7 +569,7 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
         {f.triage ? (
           <>
             <span className="tag tag-ok">{f.triage === 'fixed' ? 'Marked fixed' : f.triage === 'accepted' ? 'Risk accepted' : 'Not a problem'}</span>
-            <span className="hint">It no longer counts towards the posture.</span>
+            <span className="hint">{f.remembered ? 'Left alone because you told MacSec to remember it. Undo in Settings.' : 'It no longer counts towards the posture.'}</span>
             <button className="link" onClick={() => void triage(null)}>
               Open it again
             </button>
@@ -585,6 +585,12 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
             </button>
             <button className="btn btn-sm" onClick={() => void triage('not-a-problem')}>
               Not a problem
+            </button>
+            <button className="btn btn-sm" title="Later scans of this site leave it alone. You can undo this in Settings." onClick={() => void triage('not-a-problem', 'site')}>
+              Not a problem, remember
+            </button>
+            <button className="link" title="Leave this kind of finding alone on every site. You can undo this in Settings." onClick={() => void triage('not-a-problem', 'everywhere')}>
+              on every site
             </button>
           </>
         )}
