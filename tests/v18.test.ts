@@ -227,8 +227,10 @@ describe('building a test phone', () => {
   it('says what to install when Android’s tools are missing', async () => {
     const old = process.env.ANDROID_HOME
     const oldS = process.env.ANDROID_SDK_ROOT
+    const oldHome = process.env.HOME
     process.env.ANDROID_HOME = '/nonexistent-sdk'
     process.env.ANDROID_SDK_ROOT = '/nonexistent-sdk'
+    process.env.HOME = mkdtempSync(join(tmpdir(), 'macsec-home-'))
     try {
       await expect(createAvd(async () => Buffer.from(''), () => undefined, true)).rejects.toThrow(/Android Studio/)
     } finally {
@@ -236,6 +238,8 @@ describe('building a test phone', () => {
       else process.env.ANDROID_HOME = old
       if (oldS === undefined) delete process.env.ANDROID_SDK_ROOT
       else process.env.ANDROID_SDK_ROOT = oldS
+      rmSync(process.env.HOME!, { recursive: true, force: true })
+      process.env.HOME = oldHome
     }
   })
 })

@@ -81,14 +81,16 @@ export function pickFridaServer(assets: ReleaseAsset[], version: string, arch: s
 
 // ---------------------------------------------------------------- Finding tools on this Mac
 
+const sdkCandidates = (env: NodeJS.ProcessEnv): string[] => [env.ANDROID_HOME, env.ANDROID_SDK_ROOT, join(env.HOME || homedir(), 'Library/Android/sdk')].filter(Boolean) as string[]
+
 export function findAdb(env: NodeJS.ProcessEnv = process.env): string | null {
-  const roots = [env.ANDROID_HOME, env.ANDROID_SDK_ROOT, join(homedir(), 'Library/Android/sdk')].filter(Boolean) as string[]
+  const roots = sdkCandidates(env)
   const list = [...roots.map((r) => join(r, 'platform-tools/adb')), '/opt/homebrew/bin/adb', '/usr/local/bin/adb']
   return list.find((p) => existsSync(p)) ?? null
 }
 
 export function sdkRoot(env: NodeJS.ProcessEnv = process.env): string | null {
-  return [env.ANDROID_HOME, env.ANDROID_SDK_ROOT, join(homedir(), 'Library/Android/sdk')].filter(Boolean).find((r) => existsSync(r as string)) ?? null
+  return sdkCandidates(env).find((r) => existsSync(r)) ?? null
 }
 
 const sdkTool = (rel: string[]): string | null => {
