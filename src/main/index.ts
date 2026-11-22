@@ -36,6 +36,7 @@ import { MCP_PORT, mcpToken, mcpUrl, startMcpServer } from './mcp'
 import { macsecCli, macsecTools } from './mcptools'
 import { loadSpec, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
+import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from './mobilelive'
 import { reconData, startRecon } from './reconscan'
 import { readRequest, saveRequest, stripSecrets, triageFinding } from './sessions'
 import { checkForUpdate, installUpdate, releaseNotes, updateStatus } from './updater'
@@ -884,10 +885,28 @@ function registerIpc(): void {
     picked.add(p)
     return p
   })
+  handle('mobile:live-setup', () => liveSetup())
+  handle('mobile:avd-start', async (name) => {
+    if (!validAvd(name)) throw new ValidationError('That test phone name is not valid.')
+    try {
+      startAvd(name)
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+    return liveSetup()
+  })
+  handle('mobile:avd-create', async () => {
+    const name = await jobs.run('Building the test phone', (u) => createAvd(realExec, (d) => u(null, d)))
+    log('info', `Test phone ${name} is ready`)
+    return liveSetup()
+  })
   handleStart('mobile:start', (req) => {
     const r = (req ?? {}) as { path?: unknown; reviewer?: unknown }
     try {
-      return startMobileScan({ path: allowedProject(r.path), reviewer: pick(r.reviewer, REVIEWERS, 'none') })
+      const lv = (r as { live?: { serial?: unknown; confirmed?: unknown } }).live
+      const live = lv && typeof lv === 'object' ? { serial: String(lv.serial ?? ''), confirmed: lv.confirmed === true } : undefined
+      if (live && !validSerial(live.serial)) throw new Error('Choose a test phone first.')
+      return startMobileScan({ path: allowedProject(r.path), reviewer: pick(r.reviewer, REVIEWERS, 'none'), live })
     } catch (e) {
       throw new ValidationError((e as Error).message)
     }

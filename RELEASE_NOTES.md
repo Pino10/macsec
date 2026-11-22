@@ -1,3 +1,22 @@
+## MacSec 1.2.0
+
+The live phone test: run an Android app on a test phone and watch what it really does.
+
+### What is new
+- **Run it on a test phone (optional, Android .apk).** On the Mobile apps page, tick "Also run this app on a test phone", choose an emulator or a phone you own, and confirm you may test the app. MacSec installs the app, starts it, watches it for about half a minute, and removes it again if it installed it.
+- **What it proves.** Servers the app talks to, and any request sent over plain HTTP. Whether certificate pinning is in use. Whether the app checks for a rooted phone. Passwords and tokens written to the phone's log, and passwords and tokens kept in plain text in the app's own files. Each finding has proof you can repeat with an `adb` command, and secret values are never saved, only the kind, the file and the name.
+- **Frida only watches.** Every hook calls the original and returns what it returned, so the app behaves as normal. Frida is installed into MacSec the first time it is needed, and its server file for the phone is only used after its checksum matches the one GitHub lists.
+- **Test phones.** MacSec lists your emulators and starts one with a click. If Android's tools are installed, "Build a test phone" makes one from a Google APIs image (which allows root, needed for Frida), downloading the image if it is missing.
+
+### How it stays safe
+- Off by default. You confirm per app and per phone.
+- No taps, typing or buttons are sent to the app, so nothing is bought, posted or deleted. Only the app under test is touched.
+- A real phone must be confirmed as yours. Without root, only the log is read and Frida is not used.
+
+### Good to know
+- Only the first seconds of the app are watched, because nothing is tapped. Pinning that happens later is not seen, so "no pinning seen" is marked as possible, not confirmed.
+- Not in this release: iOS live testing, and testing whether pinning can be bypassed (which needs a proxy). One-time codes, session fixation and sign-out replay are also still to come.
+
 ## MacSec 1.1.0
 
 Control confirmations: optional checks that prove a problem is real, so a finding is never a guess.

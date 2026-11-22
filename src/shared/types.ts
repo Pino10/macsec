@@ -265,6 +265,24 @@ export interface ReconRequest {
 export interface MobileScanRequest {
   path: string
   reviewer: Reviewer
+  /** Live test on a phone or emulator (Android .apk only). See CLAUDE.md for the rules. */
+  live?: { serial: string; confirmed: boolean }
+}
+
+export interface AndroidDevice {
+  serial: string
+  state: string
+  model: string
+  kind: 'emulator' | 'phone'
+}
+
+export interface LiveSetupInfo {
+  adb: string | null
+  emulator: boolean
+  /** Whether Android's command line tools are present, which MacSec needs to build a test phone. */
+  canCreate: boolean
+  devices: AndroidDevice[]
+  avds: string[]
 }
 
 /** A tool that was in the T3MP3ST pack but MacSec does not install or run, because it attacks. */
@@ -544,6 +562,9 @@ export interface Channels {
   /** Picks an app's source folder or a built .apk / .ipa file. */
   'mobile:pick': { args: ['folder' | 'file']; result: string | null }
   'mobile:start': { args: [MobileScanRequest]; result: SessionInfo }
+  'mobile:live-setup': { args: []; result: LiveSetupInfo }
+  'mobile:avd-start': { args: [string]; result: LiveSetupInfo }
+  'mobile:avd-create': { args: []; result: LiveSetupInfo }
   'cloud:status': { args: []; result: { azure: string | null; aws: string | null } }
   'cloud:azure-login': { args: []; result: { azure: string | null; aws: string | null } }
   'tools:optional': { args: []; result: OptionalTool[] }

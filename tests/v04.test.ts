@@ -195,10 +195,10 @@ describe('tools', () => {
   })
   it('lists the attack tools without installing or running any', () => {
     const list = optionalTools()
-    expect(list.map((t) => t.name)).toEqual(expect.arrayContaining(['Metasploit Framework', 'sqlmap', 'Hydra', 'Frida', 'drozer', 'Pacu']))
+    expect(list.map((t) => t.name)).toEqual(expect.arrayContaining(['Metasploit Framework', 'sqlmap', 'Hydra', 'drozer', 'Pacu']))
     expect(list.every((t) => t.homepage.startsWith('https://'))).toBe(true)
     // None of them is in the catalog MacSec installs from.
-    expect(CATALOG.some((t) => /metasploit|sqlmap|hydra|frida|drozer|pacu|ffuf|dalfox|hashcat|john/i.test(t.id))).toBe(false)
+    expect(CATALOG.some((t) => /metasploit|sqlmap|hydra|drozer|pacu|ffuf|dalfox|hashcat|john/i.test(t.id))).toBe(false)
   })
   it('writes AI prompts for the new kinds of check', () => {
     expect(summaryPrompt('mobile', 'Demo', '', [])).toContain('read-only mobile app security check')

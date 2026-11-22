@@ -56,6 +56,8 @@ export const CATALOG: ToolDef[] = [
   { id: 'mobsfscan', name: 'mobsfscan', category: 'mobile', method: 'python', pkg: 'mobsfscan', binaries: ['mobsfscan'], languages: ['Java', 'Kotlin', 'Swift', 'Objective-C'], purpose: 'MobSF’s rules for Android and iOS source: insecure storage, weak crypto, WebView and network settings.', homepage: 'https://github.com/MobSF/mobsfscan' },
   { id: 'androguard', name: 'Androguard', category: 'mobile', method: 'python', pkg: 'androguard', binaries: ['androguard'], purpose: 'Reads a built Android app (.apk): its manifest, permissions and exported parts.', homepage: 'https://github.com/androguard/androguard' },
 
+  { id: 'frida-tools', name: 'Frida', category: 'mobile', method: 'python', pkg: 'frida-tools', binaries: ['frida', 'frida-ps'], purpose: 'Watches a built Android app while it runs on a test phone: certificate pinning, root checks and plain HTTP. Used only by the live phone test, and only to watch.', homepage: 'https://frida.re' },
+
   // Cloud accounts (read-only)
   { id: 'scoutsuite', name: 'ScoutSuite', category: 'cloud', method: 'python', pkg: 'scoutsuite', binaries: ['scout'], purpose: 'Audits the settings of an Azure or AWS account against best practice. Only reads.', homepage: 'https://github.com/nccgroup/ScoutSuite' },
   { id: 'azure-cli', name: 'Azure CLI', category: 'cloud', method: 'python', pkg: 'azure-cli', binaries: ['az'], purpose: 'Signs in to Azure for the cloud audit. Its sign-in stays inside MacSec.', homepage: 'https://learn.microsoft.com/cli/azure/' },

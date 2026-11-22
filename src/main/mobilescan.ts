@@ -1,5 +1,6 @@
 /**
- * A mobile app check. Everything is read-only and stays on this Mac:
+ * A mobile app check. It reads the app and stays on this Mac, unless the person also asks for the live
+ * phone test (mobilelive.ts), which runs an Android .apk on a test phone they choose and only watches it:
  *
  *   Source folder   mobsfscan's Android and iOS rules, the manifest and Info.plist settings,
  *                   and keys left in the code
@@ -19,7 +20,8 @@ import { createSession, saveAiReport, sessionDir } from './sessions'
 import { checkAndroidManifest, checkFirebaseConfig, checkInfoPlist, checkNetworkSecurityConfig, checkProvisioning, checkTargetSdk, hardening, hardeningFindings, parseMobsfscan, type Hardening } from './scanners/mobile'
 import { parseGitleaks } from './scanners/parse'
 import { addEvidence } from './evidence'
-import { installTool, isInstalled, toolDef } from './toolbox'
+import { installTool, isInstalled, toolDef, toolPath } from './toolbox'
+import { findAdb, getFridaServer, liveTest, packageFromManifest, realExec, validSerial } from './mobilelive'
 import { extract } from './download'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
 import { log } from './logs'
@@ -72,6 +74,11 @@ export function mobileKind(path: string): 'source' | 'apk' | 'ipa' {
 export function startMobileScan(req: MobileScanRequest): SessionInfo {
   if (!existsSync(req.path)) throw new Error('That app or folder is not there any more.')
   const kind = mobileKind(req.path)
+  if (req.live) {
+    if (kind !== 'apk') throw new Error('The live phone test works with a built Android app (.apk).')
+    if (!req.live.confirmed) throw new Error('Confirm that you are allowed to test this app on that phone first.')
+    if (!validSerial(req.live.serial)) throw new Error('Choose a test phone first.')
+  }
   if (kind === 'source' && !statSync(req.path).isDirectory()) throw new Error('Choose an app’s source folder, or a built .apk or .ipa file.')
   const info = createSession('mobile-scan', basename(req.path).replace(/\.(apk|ipa)$/i, ''), req.path)
   info.reviewer = req.reviewer
@@ -111,6 +118,7 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
     settings: s.step('settings', kind === 'apk' ? 'Decode and check the Android manifest' : kind === 'ipa' ? 'Check Info.plist settings' : 'Check the manifest and Info.plist settings'),
     binary: kind !== 'source' ? s.step('binary', kind === 'apk' ? 'Check native libraries are hardened' : 'Check the app binary is hardened') : null,
     keys: s.step('gitleaks', 'Look for keys and passwords in the app'),
+    live: req.live && kind === 'apk' ? s.step('live', 'Run the app on a test phone and watch it') : null,
     ai: req.reviewer !== 'none' ? s.step('ai', 'AI: what matters most and how to fix it') : null
   }
   try {
@@ -209,6 +217,20 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
       const found = parseGitleaks(readFileSync(out, 'utf8'), root).map((f) => ({ ...f, category: 'secret' as const }))
       return kind === 'source' ? addEvidence(root, found) : found
     })
+
+    if (st.live && req.live) {
+      const live = req.live
+      await s.run(st.live, async (note) => {
+        const adb = findAdb()
+        if (!adb) throw new Error('adb was not found. Install Android Studio (free), or run: brew install --cask android-platform-tools')
+        const manifest = join(s.raw, 'AndroidManifest.xml')
+        const pkg = existsSync(manifest) ? packageFromManifest(readFileSync(manifest, 'utf8')) : null
+        if (!pkg) throw new Error('Could not read the app’s package name from its manifest.')
+        await ensure('frida-tools', note).catch((e) => note(`Frida could not be installed (${(e as Error).message}), so the app will not be watched`))
+        const frida = isInstalled(toolDef('frida-tools')!) ? toolPath('frida') : null
+        return liveTest({ exec: realExec, adb, frida, serial: live.serial, apk: req.path, pkg, confirmed: live.confirmed, note, fridaServer: (arch) => getFridaServer(realExec, toolPath('frida'), arch, note), scriptPath: join(s.raw, 'watch.js'), cancelled: () => s.cancelled })
+      })
+    }
 
     if (st.ai)
       await s.run(st.ai, async () => {
