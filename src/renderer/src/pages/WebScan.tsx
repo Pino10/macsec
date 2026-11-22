@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { ExternalLink, Gauge, Globe, KeyRound, Laptop, LogIn, Radar, Telescope, UserX, Zap } from 'lucide-react'
-import type { LocalSite, Reviewer, ScanMode } from '@shared/types'
+import type { ConfirmOptions, LocalSite, Reviewer, ScanMode } from '@shared/types'
 import { useApp } from '../store'
-import { FlowStep, PageHead, Seg } from '../ui'
+import { FlowStep, PageHead, Seg, Switch } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
 
 export const MODES: { id: ScanMode; icon: React.ReactNode; title: string; text: string }[] = [
@@ -35,6 +35,10 @@ export default function WebScan(): React.JSX.Element {
   const [login, setLogin] = useState<Login>('none')
   const [headers, setHeaders] = useState('')
   const [captured, setCaptured] = useState<number | null>(null)
+  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false })
+  const [ccOk, setCcOk] = useState(false)
+  const setC = (p: Partial<ConfirmOptions>): void => setCc((x) => ({ ...x, ...p }))
+  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf
 
   useEffect(() => {
     void api.invoke('web:sites').then((s) => {
@@ -47,6 +51,7 @@ export default function WebScan(): React.JSX.Element {
   const valid = /^https?:\/\/[^\s]+$/.test(target)
   const needsOk = valid && !isLocal(target)
   const signedIn = login !== 'none' && headers.trim().length > 0
+  const ccReady = !ccOn || (ccOk && (!cc.authz || (signedIn && !!cc.headersB?.trim())))
 
   return (
     <>
@@ -134,7 +139,55 @@ export default function WebScan(): React.JSX.Element {
           </div>
         </FlowStep>
 
-        <FlowStep n={4} title="Who writes the report" help="The AI reads every finding and explains what matters for your stack, with the exact configuration to fix it." state={valid ? 'current' : 'todo'}>
+        <FlowStep n={4} title="Control confirmations (optional)" help="Active checks that try a harmless version of a problem, so every finding comes with proof and nothing is a guess. They only use harmless test strings, never change data, and stop if the server struggles." state={valid ? 'current' : 'todo'}>
+          <div className="stack" style={{ display: 'grid', gap: 10 }}>
+            {(
+              [
+                ['fuzz', 'Hidden pages and parameters', 'Looks for pages and settings that are not linked, and tells you which are real. Sites that answer yes to everything are detected and ignored.'],
+                ['waf', 'Web firewall tests', 'Finds which firewall answers, what it blocks, and whether a harmless marker gets past it. A way through is reported at once so the owner can tighten the rule.'],
+                ['auth', 'Login checks', 'Eight wrong guesses for a user that does not exist (to see if anything slows them), and whether the login reveals which usernames exist.'],
+                ['authz', 'Two-account access check', 'Compares what a second account can open with what the first can. Needs you to be signed in above, and a second account below.']
+              ] as const
+            ).map(([k, t, d]) => (
+              <div key={k} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <Switch on={cc[k]} onChange={() => setC({ [k]: !cc[k] })} label={t} />
+                <div>
+                  <strong>{t}</strong>
+                  <div className="hint">{d}</div>
+                </div>
+              </div>
+            ))}
+            {cc.auth && (
+              <>
+                <input className="input mono" placeholder="Sign-in page address, if it is not /login (optional)" value={cc.loginUrl ?? ''} onChange={(e) => setC({ loginUrl: e.target.value })} aria-label="Sign-in page address" />
+                <input className="input mono" placeholder="Your own username or email on this site (optional, tried with 2 wrong passwords)" value={cc.knownUser ?? ''} onChange={(e) => setC({ knownUser: e.target.value })} aria-label="Your username" />
+                {cc.knownUser?.includes('@') && (
+                  <label className="consent">
+                    <input type="checkbox" checked={!!cc.allowReset} onChange={(e) => setC({ allowReset: e.target.checked })} />
+                    <span>Also test “forgot password”. This sends one reset email to {cc.knownUser}.</span>
+                  </label>
+                )}
+              </>
+            )}
+            {cc.authz && (
+              <>
+                {!signedIn && <span className="hint">Sign in above first: that is the first account.</span>}
+                <textarea className="input mono" rows={2} placeholder={'Second account, copied the same way:\nCookie: session=…'} value={cc.headersB ?? ''} onChange={(e) => setC({ headersB: e.target.value })} aria-label="Second account cookie or token" />
+                <input className="input mono" placeholder="First account's email or username (so a leak can be proven)" value={cc.identityA ?? ''} onChange={(e) => setC({ identityA: e.target.value })} aria-label="First account's identifier" />
+              </>
+            )}
+            {ccOn && (
+              <label className="consent">
+                <input type="checkbox" checked={ccOk} onChange={(e) => setCcOk(e.target.checked)} />
+                <span>
+                  <strong style={{ color: 'var(--ink)' }}>I am allowed to run active tests on {valid ? new URL(target).host : 'this site'}.</strong> Each finding is repeated once before it is reported. Nothing is saved except the proof.
+                </span>
+              </label>
+            )}
+          </div>
+        </FlowStep>
+
+        <FlowStep n={5} title="Who writes the report" help="The AI reads every finding and explains what matters for your stack, with the exact configuration to fix it." state={valid ? 'current' : 'todo'}>
           <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
         </FlowStep>
 
@@ -154,9 +207,9 @@ export default function WebScan(): React.JSX.Element {
           </button>
           <button
             className="btn btn-primary btn-lg"
-            disabled={!valid || (needsOk && !ok) || (login !== 'none' && !signedIn) || busy.has('web')}
+            disabled={!valid || (needsOk && !ok) || (login !== 'none' && !signedIn) || !ccReady || busy.has('web')}
             onClick={async () => {
-              const s = await act('web', () => api.invoke('web:start', { target: where === 'local' ? { kind: 'local', name: site } : { kind: 'url', url: target }, mode, authorized: ok, headers: signedIn ? headers : undefined, reviewer }))
+              const s = await act('web', () => api.invoke('web:start', { target: where === 'local' ? { kind: 'local', name: site } : { kind: 'url', url: target }, mode, authorized: ok, headers: signedIn ? headers : undefined, confirm: ccOn ? cc : undefined, reviewer }))
               if (s) showSession(s.id)
             }}
           >

@@ -127,7 +127,30 @@ export interface WebScanRequest {
   authorized: boolean
   /** Extra request headers for scanning behind a login, one "Name: value" per line. */
   headers?: string
+  /** Control confirmations: active checks that prove a problem is real (see CLAUDE.md for the rules). */
+  confirm?: ConfirmOptions
   reviewer: Reviewer
+}
+
+export interface ConfirmOptions {
+  /** Hidden pages and hidden parameters. */
+  fuzz: boolean
+  /** Login: limits on wrong guesses, and whether usernames can be told apart. */
+  auth: boolean
+  /** Compare what two accounts can open. Needs the second account's headers. */
+  authz: boolean
+  /** Which web firewall answers, what it blocks, and whether a harmless marker gets past it. */
+  waf: boolean
+  /** Where the sign-in form is, when it is not at an obvious address. */
+  loginUrl?: string
+  /** A real user of this site (yours). Used for two wrong-password tries, to see if the login reveals who exists. */
+  knownUser?: string
+  /** Also try the "forgot password" form, which sends one reset email to knownUser. */
+  allowReset?: boolean
+  /** Account A's email or username, so a page that shows it to account B proves the leak. */
+  identityA?: string
+  /** The second account's cookie or token, one "Name: value" per line. */
+  headersB?: string
 }
 
 export interface ApiSpecInfo {

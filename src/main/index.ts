@@ -205,7 +205,16 @@ function validWeb(req: unknown): WebScanRequest {
   if (t?.kind === 'local' && typeof t.name === 'string') target = { kind: 'local', name: t.name }
   else if (t?.kind === 'url' && typeof t.url === 'string' && /^https?:\/\/[^\s'"<>]+$/.test(t.url.trim())) target = { kind: 'url', url: new URL(t.url.trim()).href }
   else throw new ValidationError('Enter the address to scan, starting with http:// or https://.')
-  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, reviewer: pick(r.reviewer, REVIEWERS, 'none') }
+  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, confirm: validConfirm(r.confirm), reviewer: pick(r.reviewer, REVIEWERS, 'none') }
+}
+
+/** Control confirmation settings: switches are strict booleans, text is short and single-line. */
+function validConfirm(v: unknown): WebScanRequest['confirm'] {
+  const c = (v ?? null) as Record<string, unknown> | null
+  if (!c || typeof c !== 'object') return undefined
+  const text = (x: unknown, max: number): string | undefined => (typeof x === 'string' && x.trim() ? x.replace(/[\r\n\t]+/g, ' ').trim().slice(0, max) : undefined)
+  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
+  return out.fuzz || out.auth || out.authz || out.waf ? out : undefined
 }
 
 /** A host name or IP address only: never something a tool could read as an option. */

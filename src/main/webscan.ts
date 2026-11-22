@@ -1,6 +1,7 @@
 /**
- * A web scan. Every mode only reads the site: it looks, it does not attack, fuzz or change
- * anything. For hands-on testing, open the site in Burp Suite.
+ * A web scan. Every mode only reads the site: it looks, it does not attack or change anything.
+ * Control confirmations (confirmtests.ts) are a separate, opt-in step that proves problems are real
+ * with harmless markers. For hands-on testing, open the site in Burp Suite.
  *
  *   Quick      fingerprint, headers and cookies, the most important exposed files, and Nuclei's
  *              critical to medium checks for known problems on the main address
@@ -25,6 +26,7 @@ import { getSettings } from './settings'
 import { log } from './logs'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
 import { checkTls, keysInJavaScript, signedOutCheck } from './webextra'
+import { accessChecks, ConfirmClient, risky, fuzzContent, fuzzParams, loginChecks, resetCheck, wafControl } from './confirmtests'
 
 /** Laramac's sites, from the www folder, at their .test addresses. */
 export function localSites(): { name: string; url: string }[] {
@@ -171,6 +173,9 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
   const m = MODE[req.mode]
   const host = new URL(url).host
   const headers = parseHeaders(req.headers)
+  const headersB = parseHeaders(req.confirm?.headersB)
+  const mk = (cap: number): ConfirmClient => new ConfirmClient(url, { headers, cap, cancelled: () => s.cancelled })
+  let carrier: string | undefined
   const urlsFile = join(s.raw, 'urls.txt')
   let urls: string[] = [url]
   let fp: Fingerprint[] = []
@@ -184,6 +189,10 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     files: s.step('exposed', `Look for files that should not be public (${m.paths})`),
     js: m.depth ? s.step('js', 'Look for keys in the site’s public JavaScript') : null,
     access: m.depth && Object.keys(headers).length ? s.step('access', 'Compare private pages signed in and signed out') : null,
+    fuzz: req.confirm?.fuzz ? s.step('fuzz', 'Control confirmation: hidden pages and parameters') : null,
+    waf: req.confirm?.waf ? s.step('waf', 'Control confirmation: web firewall tests') : null,
+    login: req.confirm?.auth ? s.step('login', 'Control confirmation: login checks') : null,
+    authz: req.confirm?.authz && Object.keys(headers).length && Object.keys(headersB).length ? s.step('authz', 'Control confirmation: what a second account can open') : null,
     wp: s.step('wpscan', 'WordPress: version, plugins and themes (when the site uses it)'),
     templates: s.step('templates', 'Update Nuclei’s community checks'),
     zap: req.mode === 'thorough' && dockerPath() ? s.step('zap', 'ZAP baseline: passive checks while it browses (it never attacks)') : null,
@@ -228,6 +237,32 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
 
     if (st.js) await s.run(st.js, (note) => keysInJavaScript(urls, host, s.raw, op, headers, note))
     if (st.access) await s.run(st.access, (note) => signedOutCheck(urls, headers, () => s.cancelled, note))
+
+    if (st.fuzz)
+      await s.run(st.fuzz, async (note) => {
+        const found = await fuzzContent(mk(1200), note)
+        // Parameters on the home page and a few pages the crawl found, without query strings.
+        const pages = [url, ...urls.filter((u) => !u.includes('?') && u !== url && !risky(u) && !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|pdf|zip)$/i.test(u))].slice(0, 5)
+        for (const p of pages) {
+          if (s.cancelled) break
+          const r = await fuzzParams(mk(150), p, note)
+          found.push(...r.findings)
+          const hit = r.hits.find((h) => h.how === 'reflected')
+          if (hit && !carrier) carrier = `${new URL(p).pathname}?${hit.name}`
+        }
+        return found
+      })
+
+    if (st.waf) await s.run(st.waf, (note) => wafControl(mk(150), note, carrier))
+
+    if (st.login)
+      await s.run(st.login, async (note) => {
+        const found = await loginChecks(mk(120), { loginUrl: req.confirm?.loginUrl, knownUser: req.confirm?.knownUser }, note)
+        if (req.confirm?.allowReset && req.confirm.knownUser?.includes('@')) found.push(...(await resetCheck(mk(30), req.confirm.knownUser, note).catch(() => [])))
+        return found
+      })
+
+    if (st.authz) await s.run(st.authz, (note) => accessChecks(mk(400), urls, { headersB, identityA: req.confirm?.identityA }, note))
 
     await s.run(st.wp, async (note, line) => {
       const isWp = fp.some((f) => f.tech.some((t) => /wordpress/i.test(t)))

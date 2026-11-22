@@ -150,6 +150,11 @@ export function stripSecrets(req: unknown): unknown {
   const r = { ...(req as Record<string, unknown>) }
   delete r.headers
   delete r.token
+  if (r.confirm && typeof r.confirm === 'object') {
+    const c = { ...(r.confirm as Record<string, unknown>) }
+    delete c.headersB
+    r.confirm = c
+  }
   if (r.auth && typeof r.auth === 'object') r.auth = { kind: 'none' }
   return r
 }
