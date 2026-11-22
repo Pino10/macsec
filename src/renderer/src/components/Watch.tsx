@@ -14,7 +14,7 @@ export default function Watch(): React.JSX.Element | null {
     return api.on('watch:alert', () => void api.invoke('watch:get').then(setW))
   }, [api])
   if (!w) return null
-  const set = async (patch: { packages?: boolean; retest?: boolean }): Promise<void> => {
+  const set = async (patch: { packages?: boolean; retest?: boolean; window?: { on?: boolean; from?: number; to?: number } }): Promise<void> => {
     const r = await act('watch', () => api.invoke('watch:set', patch))
     if (r) setW(r)
   }
@@ -45,6 +45,29 @@ export default function Watch(): React.JSX.Element | null {
             <span className="hint">The newest code review of each project runs again while MacSec is open. You hear about it only when it finds serious problems that were not there before.</span>
           </div>
           <Switch on={w.retest} label="Weekly re-test" onChange={() => void set({ retest: !w.retest })} />
+        </div>
+        <div className="watch-row">
+          <div>
+            <strong>Only scan at quiet hours</strong>
+            <span className="hint">Automatic checks wait for this window, so they never run while you work. Hours use this Mac's clock.</span>
+            {w.window.on && (
+              <span className="hint" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                From
+                <select aria-label="From hour" value={w.window.from} onChange={(e) => void set({ window: { from: Number(e.target.value) } })}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+                to
+                <select aria-label="To hour" value={w.window.to} onChange={(e) => void set({ window: { to: Number(e.target.value) } })}>
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+              </span>
+            )}
+          </div>
+          <Switch on={w.window.on} label="Quiet hours only" onChange={() => void set({ window: { on: !w.window.on } })} />
         </div>
         {w.alerts.length > 0 && (
           <div className="watch-alerts">

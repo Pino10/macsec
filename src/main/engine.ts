@@ -16,11 +16,13 @@ import { log, redact } from './logs'
 export interface Op {
   children: Set<ChildProcess>
   cancelled: boolean
+  /** Paused: tools are stopped where they are, and MacSec's own requests wait. */
+  paused: boolean
 }
 const ops = new Map<string, Op>()
 
 export function beginOp(id: string): Op {
-  const op: Op = { children: new Set(), cancelled: false }
+  const op: Op = { children: new Set(), cancelled: false, paused: false }
   ops.set(id, op)
   return op
 }
@@ -29,9 +31,29 @@ export function cancelOp(id: string): void {
   const op = ops.get(id)
   if (!op) return
   op.cancelled = true
-  for (const c of op.children) c.kill('SIGTERM')
+  op.paused = false
+  for (const c of op.children) {
+    c.kill('SIGCONT')
+    c.kill('SIGTERM')
+  }
 }
 export const isRunning = (id: string): boolean => ops.has(id)
+
+/** Pauses a running test: its tools are stopped where they are (SIGSTOP), and MacSec's own requests wait. */
+export function pauseOp(id: string, on: boolean): boolean {
+  const op = ops.get(id)
+  if (!op || op.cancelled) return false
+  op.paused = on
+  for (const c of op.children) {
+    try {
+      c.kill(on ? 'SIGSTOP' : 'SIGCONT')
+    } catch {
+      /* the tool already ended */
+    }
+  }
+  return true
+}
+export const isPaused = (id: string): boolean => ops.get(id)?.paused ?? false
 
 export interface ToolRun {
   bin: string

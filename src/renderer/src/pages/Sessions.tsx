@@ -1,8 +1,9 @@
 import ProofBlock, { ConfidenceTag, ExploitTag } from '../components/ProofBlock'
+import FixPlan from '../components/FixPlan'
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
 import { issueText } from '@shared/insights'
-import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText } from 'lucide-react'
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
@@ -98,6 +99,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [sevs, setSevs] = useState<Set<Severity>>(new Set(['critical', 'high', 'medium', 'low']))
   const [cat, setCat] = useState<FindingCategory | 'all'>('all')
   const [showFp, setShowFp] = useState(false)
+  const [paused, setPaused] = useState(false)
   const [onlyProven, setOnlyProven] = useState(false)
   const [tab, setTab] = useState<'findings' | 'owasp' | 'report' | 'run' | 'surface'>('findings')
   const [sel, setSel] = useState<string | null>(null)
@@ -152,9 +154,14 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
         </div>
         <div className="end">
           {running ? (
-            <button className="btn btn-danger" onClick={() => void act('cancel', () => api.invoke('sessions:cancel', id))}>
-              <CircleStop size={14} /> Stop
-            </button>
+            <>
+              <button className="btn" aria-pressed={paused} onClick={() => void act('pause', () => api.invoke('sessions:pause', id, !paused)).then((v) => setPaused(v === true))} data-tip="Pauses the tools and MacSec's own requests where they are. Resume carries on.">
+                {paused ? <Play size={14} /> : <Pause size={14} />} {paused ? 'Resume' : 'Pause'}
+              </button>
+              <button className="btn btn-danger" onClick={() => void act('cancel', () => api.invoke('sessions:cancel', id))}>
+                <CircleStop size={14} /> Stop
+              </button>
+            </>
           ) : (
             <>
               {hasCode && (
@@ -169,6 +176,9 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               )}
               <button className="btn" disabled={busy.has('pdf')} onClick={() => void act('pdf', () => api.invoke('sessions:pdf', id)).then((p) => p && notify({ kind: 'info', text: 'Saved the PDF in the session folder.' }))}>
                 <FileDown size={14} /> {busy.has('pdf') ? 'Making PDF…' : 'PDF'}
+              </button>
+              <button className="btn" disabled={busy.has('pdfx')} onClick={() => void act('pdfx', () => api.invoke('sessions:pdf-executive', id)).then((p) => p && notify({ kind: 'info', text: 'Saved the one-page summary in the session folder.' }))} data-tip="A short summary for people who decide: the score, what to fix first and how problems connect.">
+                <FileText size={14} /> {busy.has('pdfx') ? 'Making summary…' : 'Summary'}
               </button>
             </>
           )}
@@ -346,6 +356,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               <ExploitStrip findings={detail.findings} />
             </div>
           </div>
+          <FixPlan detail={detail} />
           {s.children && s.children.length > 0 && (
             <div className="panel" style={{ marginBottom: 18 }}>
               {s.children.map((c) => {
@@ -465,6 +476,7 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
         <ConfidenceTag f={f} />
         <ExploitTag f={f} />
         <span className="tag">{f.tool}</span>
+        {f.checkId && <span className="tag" data-tip="The stable id of the check that found this, so a report and a re-test can name it.">{f.checkId}</span>}
         {f.cwe && (
           <button className="tag" style={{ border: 0, cursor: 'pointer' }} onClick={() => void api.invoke('app:open-external', `https://cwe.mitre.org/data/definitions/${f.cwe!.replace('CWE-', '')}.html`)}>
             {f.cwe} <ExternalLink size={10} />
@@ -545,6 +557,7 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
           </button>
         )}
       </div>
+      <TicketBar f={f} id={id} onChange={onChange} />
       <div className="triage">
         {f.triage ? (
           <>
@@ -754,6 +767,62 @@ function SinceLastTime({ id }: { id: string }): React.JSX.Element | null {
             </div>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+const RETEST_TEXT = { still: 'Still there', changed: 'The answer changed: look again', gone: 'No longer there', unreachable: 'Could not reach it', unsupported: 'Cannot be repeated automatically' } as const
+
+/** Re-test one finding, copy it as a ticket, or open a GitHub issue. */
+function TicketBar({ f, id, onChange }: { f: Finding; id: string; onChange: (d: SessionDetail) => void }): React.JSX.Element {
+  const api = window.macsec
+  const { act, busy, notify } = useApp()
+  const [repo, setRepo] = useState('')
+  const [ask, setAsk] = useState(false)
+  const copy = async (format: 'markdown' | 'jira'): Promise<void> => {
+    const t = await act('ticket', () => api.invoke('findings:ticket', id, f.id, format))
+    if (t) {
+      await navigator.clipboard.writeText(t)
+      notify({ kind: 'info', text: format === 'jira' ? 'Copied for Jira. Paste it into a new ticket.' : 'Copied as Markdown. Paste it into GitHub, Linear or anywhere.' })
+    }
+  }
+  return (
+    <div className="triage" style={{ flexWrap: 'wrap' }}>
+      <button className="btn btn-sm" disabled={busy.has('retest')} onClick={async () => {
+        const d = await act('retest', () => api.invoke('findings:retest', id, f.id))
+        if (d) onChange(d)
+      }} data-tip="Repeats the request from the proof and tells you what it sees now. It never marks anything fixed by itself.">
+        <RotateCcw size={13} /> {busy.has('retest') ? 'Checking…' : 'Re-test'}
+      </button>
+      {f.retest && (
+        <span className="hint" role="status">
+          {RETEST_TEXT[f.retest.state]}. {f.retest.detail} ({ago(f.retest.at)})
+        </span>
+      )}
+      <button className="btn btn-sm" onClick={() => void copy('markdown')}>
+        <Ticket size={13} /> Copy as ticket
+      </button>
+      <button className="btn btn-sm" onClick={() => void copy('jira')}>
+        Jira text
+      </button>
+      <button className="btn btn-sm" onClick={() => setAsk((x) => !x)} aria-expanded={ask}>
+        <Bug size={13} /> GitHub issue
+      </button>
+      {ask && (
+        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input aria-label="Repository, owner/name" placeholder="owner/name" value={repo} onChange={(e) => setRepo(e.target.value)} />
+          <button className="btn btn-sm btn-primary" disabled={!repo.trim() || busy.has('gh')} onClick={async () => {
+            const r = await act('gh', () => api.invoke('findings:github-issue', id, f.id, repo.trim()))
+            if (r) {
+              setAsk(false)
+              notify({ kind: 'info', text: `Created issue #${r.number}.` })
+              void api.invoke('app:open-external', r.url)
+            }
+          }}>
+            Create
+          </button>
+        </span>
       )}
     </div>
   )

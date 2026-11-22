@@ -198,6 +198,7 @@ export interface CrawlOptions {
   headers?: Record<string, string>
   fetchImpl?: typeof fetch
   cancelled?: () => boolean
+  paused?: () => boolean
   note?: (t: string) => void
   /** Where recovered original source is written. Left out: source maps are checked but not written. */
   sourceDir?: string
@@ -227,6 +228,7 @@ export async function crawlJs(o: CrawlOptions): Promise<JsCrawl> {
     }
   }
   while (queue.length && res.scripts.length < cap && !o.cancelled?.()) {
+    while (o.paused?.() && !o.cancelled?.()) await sleep(300)
     const url = queue.shift()!.replace(/#.*$/, '')
     if (seen.has(url) || !o.allowed(url)) continue
     seen.add(url)

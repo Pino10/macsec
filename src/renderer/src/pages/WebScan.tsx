@@ -35,10 +35,10 @@ export default function WebScan(): React.JSX.Element {
   const [login, setLogin] = useState<Login>('none')
   const [headers, setHeaders] = useState('')
   const [captured, setCaptured] = useState<number | null>(null)
-  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false })
+  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false, logic: false })
   const [ccOk, setCcOk] = useState(false)
   const setC = (p: Partial<ConfirmOptions>): void => setCc((x) => ({ ...x, ...p }))
-  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf
+  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf || cc.logic
 
   useEffect(() => {
     void api.invoke('web:sites').then((s) => {
@@ -141,16 +141,32 @@ export default function WebScan(): React.JSX.Element {
 
         <FlowStep n={4} title="Control confirmations (optional)" help="Active checks that try a harmless version of a problem, so every finding comes with proof and nothing is a guess. They only use harmless test strings, never change data, and stop if the server struggles." state={valid ? 'current' : 'todo'}>
           <div className="stack" style={{ display: 'grid', gap: 10 }}>
+            <div role="group" aria-label="Quick choices" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span className="hint">Quick choices:</span>
+              {(
+                [
+                  ['None', { fuzz: false, waf: false, auth: false, authz: false, logic: false }],
+                  ['Public site', { fuzz: true, waf: true, auth: false, authz: false, logic: true }],
+                  ['Login and accounts', { fuzz: false, waf: false, auth: true, authz: false, logic: true }],
+                  ['Shop or booking flow', { fuzz: true, waf: false, auth: true, authz: false, logic: true }]
+                ] as const
+              ).map(([name, set]) => (
+                <button key={name} className="btn btn-sm" onClick={() => setC(set)}>
+                  {name}
+                </button>
+              ))}
+            </div>
             {(
               [
                 ['fuzz', 'Hidden pages and parameters', 'Looks for pages and settings that are not linked, and tells you which are real. Sites that answer yes to everything are detected and ignored.'],
                 ['waf', 'Web firewall tests', 'Finds which firewall answers, what it blocks, and whether a harmless marker gets past it. A way through is reported at once so the owner can tighten the rule.'],
+                ['logic', 'Business logic checks', 'Tests for open redirects, a poisoned host header, forms that accept endless wrong codes, price or role fields the browser sends, and steps of a flow that can be skipped. Anything that would change data is listed as a lead for you to test by hand.'],
                 ['auth', 'Login checks', 'Eight wrong guesses for a user that does not exist (to see if anything slows them), and whether the login reveals which usernames exist.'],
                 ['authz', 'Two-account access check', 'Compares what a second account can open with what the first can. Needs you to be signed in above, and a second account below.']
               ] as const
             ).map(([k, t, d]) => (
               <div key={k} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <Switch on={cc[k]} onChange={() => setC({ [k]: !cc[k] })} label={t} />
+                <Switch on={!!cc[k]} onChange={() => setC({ [k]: !cc[k] })} label={t} />
                 <div>
                   <strong>{t}</strong>
                   <div className="hint">{d}</div>

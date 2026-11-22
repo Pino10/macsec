@@ -98,6 +98,48 @@ function findingHtml(f: Finding): string {
 </div>`
 }
 
+/** One or two pages for someone who will not read the findings: how it stands, what to fix first, and how it connects. */
+export function executiveHtml(s: SessionDetail, plan: { actions: { title: string; fix: string; count: number; worst: string; drop: number }[]; before: number; after: number }, chains: { name: string; story: string; severity: string; members: { title: string }[] }[]): string {
+  const open = s.findings.filter((f) => f.verdict !== 'false-positive' && !f.triage && f.severity !== 'info')
+  const n = (state: string): number => open.filter((f) => f.exploit?.state === state).length
+  const sc = score(s.counts)
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(s.title)}: summary for decision makers</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<style>
+  @page { margin: 18mm 16mm; }
+  body { font: 11pt -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #111827; line-height: 1.55; margin: 0; }
+  h1 { font-size: 24pt; margin: 0 0 2px; letter-spacing: -0.02em; }
+  .sub { color: #6b7280; margin-bottom: 18px; }
+  .hero { display: flex; gap: 22px; align-items: center; padding: 16px 18px; border-radius: 14px; background: #f3f4f6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .hero b { font-size: 44pt; line-height: 1; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+  .chip { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px 12px; min-width: 96px; }
+  .chip b { display: block; font-size: 17pt; }
+  .chip span { font-size: 9pt; color: #6b7280; }
+  h2 { font-size: 14pt; margin: 22px 0 8px; padding-bottom: 5px; border-bottom: 2px solid #e5e7eb; }
+  .act { border: 1px solid #e5e7eb; border-radius: 10px; padding: 9px 12px; margin: 8px 0; page-break-inside: avoid; }
+  .act small { color: #6b7280; }
+  .chain { border-left: 4px solid #6d28d9; padding: 6px 12px; margin: 10px 0; }
+  .foot { margin-top: 24px; color: #9ca3af; font-size: 8.5pt; }
+</style></head><body>
+<h1>${esc(s.title)}</h1>
+<div class="sub">${esc(s.target)} · ${new Date(s.createdAt).toLocaleDateString('en-GB', { dateStyle: 'long' })} · summary for decision makers</div>
+<div class="hero"><b>${sc}</b><div>Security posture out of 100.<br>${open.length} open finding${open.length === 1 ? '' : 's'}: ${s.counts.critical} critical, ${s.counts.high} high, ${s.counts.medium} medium, ${s.counts.low} low.</div></div>
+<div class="chips">
+  <div class="chip"><b>${n('proven')}</b><span>proven: seen with a harmless request</span></div>
+  <div class="chip"><b>${n('known-exploited')}</b><span>known exploited (CISA list)</span></div>
+  <div class="chip"><b>${n('likely')}</b><span>likely to be used</span></div>
+  <div class="chip"><b>${n('unproven')}</b><span>leads, not proven</span></div>
+</div>
+<h2>Fix these first</h2>
+${plan.actions.length ? `<p>Doing the ${plan.actions.length} actions below takes the risk score from <b>${plan.before}</b> to <b>${plan.after}</b> (out of 100, lower is better).</p>${plan.actions.map((a, i) => `<div class="act"><b>${i + 1}. ${esc(a.title)}</b><br><small>${esc(a.worst)} · ${a.count} finding${a.count === 1 ? '' : 's'} · removes ${a.drop} point${a.drop === 1 ? '' : 's'}</small>${a.fix ? `<br>${esc(a.fix.slice(0, 300))}` : ''}</div>`).join('')}` : '<p>Nothing open needs fixing.</p>'}
+${chains.length ? `<h2>How the problems connect</h2>${chains.map((c) => `<div class="chain"><b>${esc(c.name)}</b> (${esc(c.severity)})<br>${esc(c.story)}<br><small>${c.members.map((m) => esc(m.title)).join(' + ')}</small></div>`).join('')}` : ''}
+<h2>What was checked</h2>
+<p>${s.steps.filter((x) => x.status === 'done').length} of ${s.steps.length} steps finished${s.steps.some((x) => x.status === 'failed') ? ` (${s.steps.filter((x) => x.status === 'failed').length} could not run)` : ''}.</p>
+<div class="foot">"Proven" means a harmless request showed the problem and the proof can be repeated. Nothing was exploited and no data was changed. Findings marked "not proven" are leads for a person to test. Session ${esc(s.id)}.</div>
+</body></html>`
+}
+
 export function sessionHtml(s: SessionDetail, owasp?: OwaspChecklist): string {
   const real = s.findings.filter((f) => f.verdict !== 'false-positive')
   const ruledOut = s.findings.length - real.length

@@ -97,6 +97,10 @@ export interface Finding {
   cves?: { count: number; kev: number; topEpss: number; top: { id: string; score?: number; kev: boolean; epss?: number }[] }
   /** How far this is proven, in the words a report uses. Worked out when the test finishes. */
   exploit?: { state: 'proven' | 'known-exploited' | 'likely' | 'unproven'; label: string; why: string; risk: number }
+  /** The id of the check that makes this kind of finding, stable across scans. */
+  checkId?: string
+  /** The last re-test of this one finding. */
+  retest?: { at: string; state: 'still' | 'changed' | 'gone' | 'unreachable' | 'unsupported'; detail: string }
   /** The lines around the problem, with secrets masked. */
   context?: { start: number; lines: string[]; at: number }
   /** The AI's explanation: why it has this severity. */
@@ -145,6 +149,8 @@ export interface ConfirmOptions {
   authz: boolean
   /** Which web firewall answers, what it blocks, and whether a harmless marker gets past it. */
   waf: boolean
+  /** Business logic: open redirects, host header poisoning, code limits, trusted fields, skipped steps. */
+  logic?: boolean
   /** Where the sign-in form is, when it is not at an obvious address. */
   loginUrl?: string
   /** A real user of this site (yours). Used for two wrong-password tries, to see if the login reveals who exists. */
@@ -571,7 +577,7 @@ export interface Channels {
   'desktop:connect': { args: []; result: { connected: boolean; path: string } }
   'review:skill-plan': { args: [string | null]; result: SkillPlan }
   'watch:get': { args: []; result: WatchInfo }
-  'watch:set': { args: [{ packages?: boolean; retest?: boolean }]; result: WatchInfo }
+  'watch:set': { args: [{ packages?: boolean; retest?: boolean; window?: Partial<WatchWindow> }]; result: WatchInfo }
   'watch:check-now': { args: []; result: WatchInfo }
   'web:sites': { args: []; result: LocalSite[] }
   'web:start': { args: [WebScanRequest]; result: SessionInfo }
@@ -591,6 +597,14 @@ export interface Channels {
   'tools:optional': { args: []; result: OptionalTool[] }
   'sessions:rerun': { args: [string]; result: SessionInfo }
   'sessions:rerun-latest': { args: []; result: SessionInfo[] }
+  'findings:retest': { args: [string, string]; result: SessionDetail }
+  'findings:ticket': { args: [string, string, 'markdown' | 'jira']; result: string }
+  'findings:github-issue': { args: [string, string, string]; result: { url: string; number: number } }
+  'assets:list': { args: []; result: AssetInfo[] }
+  'sessions:fixplan': { args: [string]; result: FixPlan }
+  'sessions:pause': { args: [string, boolean]; result: boolean }
+  'sessions:pdf-executive': { args: [string]; result: string | null }
+  'selftest:run': { args: []; result: SelfTestResult }
   'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null]; result: SessionDetail }
   'app:check-update': { args: []; result: UpdateInfo | null }
   'app:install-update': { args: []; result: void }
@@ -706,6 +720,7 @@ export interface WatchInfo {
   lastRetest: string | null
   projects: number
   alerts: WatchAlert[]
+  window: WatchWindow
 }
 
 export interface OwaspItemInfo {
@@ -753,4 +768,66 @@ export interface ReconPage {
   tech: string[]
   mixed: number
   notes: { severity: Severity; text: string }[]
+}
+
+// ---------------------------------------------------------------- Assets, plans and self-test
+
+export interface Chain {
+  id: string
+  name: string
+  story: string
+  members: { id: string; title: string; severity: Severity }[]
+  /** One level above the worst part, because together they are worse than any one alone. */
+  severity: Severity
+}
+
+export interface Action {
+  title: string
+  fix: string
+  count: number
+  worst: Severity
+  /** How much of the total risk goes away when this one action is done, in points of the 0 to 100 score. */
+  drop: number
+  ids: string[]
+}
+
+export interface AssetInfo {
+  key: string
+  name: string
+  kind: 'site' | 'api' | 'domain' | 'app' | 'project' | 'mac' | 'other'
+  scans: number
+  lastScan: string
+  lastSession: string
+  open: Record<Severity, number>
+  proven: number
+  risk: number
+  riskLabel: string
+  /** The risk after each finished scan, oldest first. */
+  trend: { at: string; risk: number; open: number }[]
+  fixed: number
+  /** Average days between a finding first being seen and the first scan that no longer had it. */
+  mttrDays?: number
+  actions: Action[]
+  dropIfDone: number
+  chains: Chain[]
+}
+
+export interface FixPlan {
+  actions: Action[]
+  before: number
+  after: number
+  chains: Chain[]
+}
+
+export interface SelfTestResult {
+  ok: boolean
+  at: string
+  items: { name: string; ok: boolean; detail: string }[]
+}
+
+/** Hours of the day (0 to 23, this Mac's time) when automatic scans may run. */
+export interface WatchWindow {
+  on: boolean
+  from: number
+  to: number
 }

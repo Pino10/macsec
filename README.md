@@ -57,6 +57,8 @@ Then open **Tools** and press **Install missing**. Each scanner is downloaded fr
 | Trivy | | ✓ | ✓ |
 | AI reviewer | the most exposed code | the project | every entry point, followed through |
 
+Web scans can also run business logic checks (open redirects, forwarded host trust, endless wrong codes, with leads for prices and skipped steps), and every result shows what to fix first and how problems connect. The Assets page gives each site, API and app a risk score over time. Findings can be re-tested one at a time and copied as tickets. The Tools page has a self-test that proves the checks find planted weaknesses and stay silent on a correct site.
+
 The AI reviewer works through 20 security skills: a review plan, then API security, sign-in and sessions, injection, browser-side issues, business logic, Docker and CI, supply chain, personal data, Supabase and Firebase rules, AI features and Electron apps, as they apply.
 
 ## Privacy and safety

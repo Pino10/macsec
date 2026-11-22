@@ -17,7 +17,7 @@ export interface Notice extends Toast {
   popup: boolean
 }
 
-export type Page = 'overview' | 'projects' | 'review' | 'web' | 'api' | 'mobile' | 'recon' | 'audit' | 'mac' | 'sessions' | 'tools' | 'logs' | 'settings' | 'updates'
+export type Page = 'overview' | 'projects' | 'review' | 'web' | 'api' | 'mobile' | 'recon' | 'audit' | 'mac' | 'sessions' | 'assets' | 'tools' | 'logs' | 'settings' | 'updates'
 
 interface AppCtx {
   page: Page

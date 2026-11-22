@@ -12,6 +12,7 @@
  * report can never claim more than it can show.
  */
 import type { Finding, Severity } from '../shared/types'
+import { checkIdOf } from './checks'
 
 const BASE: Record<Severity, number> = { critical: 90, high: 70, medium: 45, low: 20, info: 0 }
 const KINDS = new Set(['web', 'api', 'mobile', 'recon', 'network', 'cloud'])
@@ -35,7 +36,8 @@ export function label(findings: Finding[]): Finding[] {
   return findings.map((x) => {
     const h = honest(x)
     const e = labelExploit(h)
-    return e ? { ...h, exploit: e } : h
+    const withId = { ...h, checkId: h.checkId ?? checkIdOf(h) }
+    return e ? { ...withId, exploit: e } : withId
   })
 }
 

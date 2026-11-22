@@ -1,5 +1,5 @@
 import Logo from './Logo'
-import { ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar } from 'lucide-react'
+import { ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar, Boxes } from 'lucide-react'
 import { Bell_ } from './Notifications'
 import { useApp, type Page } from '../store'
 
@@ -19,7 +19,7 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
       { id: 'mac', label: 'This Mac', icon: <Laptop size={I} /> }
     ]
   },
-  { label: 'Results', items: [{ id: 'sessions', label: 'Results', icon: <History size={I} /> }] }
+  { label: 'Results', items: [{ id: 'sessions', label: 'Results', icon: <History size={I} /> }, { id: 'assets', label: 'Assets', icon: <Boxes size={I} /> }] }
 ]
 const FOOT: Item[] = [
   { id: 'tools', label: 'Tools', icon: <Wrench size={I} /> },

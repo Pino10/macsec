@@ -38,18 +38,23 @@ import { loadSpec, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
 import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from './mobilelive'
 import { reconData, startRecon } from './reconscan'
-import { readRequest, saveRequest, stripSecrets, triageFinding } from './sessions'
+import { readRequest, saveFindings, saveRequest, stripSecrets, triageFinding } from './sessions'
 import { checkForUpdate, installUpdate, releaseNotes, updateStatus } from './updater'
 import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
 import { expandTargets } from './targets'
 import { optionalTools } from './optional'
 import { startAudit } from './audit'
-import { cancelOp, finishEvents } from './engine'
+import { cancelOp, finishEvents, isPaused, pauseOp } from './engine'
+import { retestFinding } from './retest'
+import { createGithubIssue, ticketJira, ticketMarkdown, validRepo } from './tickets'
+import { buildAssets, remediationPlan } from './assets'
+import { chainsOf } from './chains'
+import { runSelfTest } from './selftest'
 import { accounts, azureProjects, connectAzure, connectGitHub, githubRepos, importIntoWww, listLocal } from './projects'
 import { cancelSession, sourceFiles, startReview } from './review'
 import { deleteSession, listSessions, readSession, recoverSessions, saveSession, sessionCodeDir, sessionDetail, sessionDir, sessionEvents, discardCode } from './sessions'
-import { sessionHtml } from './report'
+import { executiveHtml, sessionHtml } from './report'
 import { sessionOwasp } from './owaspmap'
 import { leakKit } from './leakkit'
 import { projectStats } from './scanners/plan'
@@ -214,8 +219,8 @@ function validConfirm(v: unknown): WebScanRequest['confirm'] {
   const c = (v ?? null) as Record<string, unknown> | null
   if (!c || typeof c !== 'object') return undefined
   const text = (x: unknown, max: number): string | undefined => (typeof x === 'string' && x.trim() ? x.replace(/[\r\n\t]+/g, ' ').trim().slice(0, max) : undefined)
-  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
-  return out.fuzz || out.auth || out.authz || out.waf ? out : undefined
+  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, logic: c.logic === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
+  return out.fuzz || out.auth || out.authz || out.waf || out.logic ? out : undefined
 }
 
 /** A host name or IP address only: never something a tool could read as an option. */
@@ -299,15 +304,16 @@ function signIn(url: string): Promise<{ cookie: string; count: number } | null> 
   })
 }
 
-async function exportPdf(id: string): Promise<string | null> {
+async function exportPdf(id: string, executive = false): Promise<string | null> {
   const detail = sessionDetail(id)
-  const html = join(sessionDir(id), 'report.html')
-  writeFileSync(html, sessionHtml(detail, sessionOwasp(detail)))
+  const html = join(sessionDir(id), executive ? 'executive.html' : 'report.html')
+  const open = detail.findings.filter((f) => f.verdict !== 'false-positive' && !f.triage)
+  writeFileSync(html, executive ? executiveHtml(detail, remediationPlan(detail.findings), chainsOf(open)) : sessionHtml(detail, sessionOwasp(detail)))
   const win = new BrowserWindow({ show: false, webPreferences: { javascript: false, sandbox: true, contextIsolation: true } })
   try {
     await win.loadFile(html)
     const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' })
-    const out = join(sessionDir(id), `${detail.title.replace(/[^A-Za-z0-9._-]+/g, '-')}-security-report.pdf`)
+    const out = join(sessionDir(id), `${detail.title.replace(/[^A-Za-z0-9._-]+/g, '-')}${executive ? '-summary' : '-security-report'}.pdf`)
     writeFileSync(out, pdf)
     return out
   } finally {
@@ -791,8 +797,9 @@ function registerIpc(): void {
   }
   handle('watch:get', () => watchInfo(listSessions()))
   handle('watch:set', (patch) => {
-    const p = (patch ?? {}) as { packages?: unknown; retest?: unknown }
-    setWatch({ packages: typeof p.packages === 'boolean' ? p.packages : undefined, retest: typeof p.retest === 'boolean' ? p.retest : undefined })
+    const p = (patch ?? {}) as { packages?: unknown; retest?: unknown; window?: { on?: unknown; from?: unknown; to?: unknown } }
+    const w = p.window && typeof p.window === 'object' ? p.window : undefined
+    setWatch({ packages: typeof p.packages === 'boolean' ? p.packages : undefined, retest: typeof p.retest === 'boolean' ? p.retest : undefined, window: w ? { on: typeof w.on === 'boolean' ? w.on : undefined, from: typeof w.from === 'number' ? w.from : undefined, to: typeof w.to === 'number' ? w.to : undefined } : undefined })
     return watchInfo(listSessions())
   })
   handle('watch:check-now', async () => {
@@ -947,6 +954,52 @@ function registerIpc(): void {
       throw new ValidationError((e as Error).message)
     }
   })
+  // ---- Re-test, tickets, assets, fix plan, pause, self-test
+  const findingOf = (sid: unknown, fidv: unknown): { s: ReturnType<typeof sessionDetail>; f: ReturnType<typeof sessionDetail>['findings'][number] } => {
+    const s = sessionDetail(String(sid))
+    const f = s.findings.find((x) => x.id === String(fidv))
+    if (!f) throw new ValidationError('That finding is not in this session.')
+    return { s, f }
+  }
+  handle('findings:retest', async (sid, fidv) => {
+    const { s, f } = findingOf(sid, fidv)
+    const r = await retestFinding(f)
+    f.retest = r
+    saveFindings(s.id, s.findings)
+    return sessionDetail(s.id)
+  })
+  handle('findings:ticket', (sid, fidv, format) => {
+    const { s, f } = findingOf(sid, fidv)
+    return format === 'jira' ? ticketJira(f, s) : ticketMarkdown(f, s)
+  })
+  handle('findings:github-issue', async (sid, fidv, repo) => {
+    const { s, f } = findingOf(sid, fidv)
+    const r = String(repo ?? '').trim()
+    if (!validRepo(r)) throw new ValidationError('Enter the repository as owner/name, for example acme/website.')
+    const token = getSecret('github')
+    if (!token) throw new ValidationError('Connect GitHub on the Projects page first. The token stays in your Keychain.')
+    try {
+      return await createGithubIssue(r, f, s, token)
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
+  handle('assets:list', () => buildAssets(listSessions(), (id) => sessionDetail(id).findings))
+  handle('sessions:fixplan', (id) => {
+    const d = sessionDetail(String(id))
+    return { ...remediationPlan(d.findings), chains: chainsOf(d.findings.filter((f) => f.verdict !== 'false-positive' && !f.triage)) }
+  })
+  handle('sessions:pause', (id, on) => {
+    const sid = String(id)
+    if (!pauseOp(sid, on === true)) return isPaused(sid)
+    return isPaused(sid)
+  })
+  handle('sessions:pdf-executive', async (id) => {
+    const out = await exportPdf(String(id), true)
+    if (out) shell.showItemInFolder(out)
+    return out
+  })
+  handle('selftest:run', () => jobs.run('Testing MacSec’s own checks', () => runSelfTest()))
   handle('sessions:pdf', async (id) => {
     const out = await exportPdf(String(id))
     if (out) shell.showItemInFolder(out)

@@ -15,6 +15,7 @@ import ApiSecurity from './pages/ApiSecurity'
 import Audits from './pages/Audits'
 import Mobile from './pages/Mobile'
 import Recon from './pages/Recon'
+import Assets from './pages/Assets'
 import Sessions from './pages/Sessions'
 import Tools from './pages/Tools'
 import Logs from './pages/Logs'
@@ -138,6 +139,7 @@ function Shell(): React.JSX.Element {
               {page === 'audit' && <Audits />}
               {page === 'mac' && <ThisMac />}
               {page === 'sessions' && <Sessions />}
+              {page === 'assets' && <Assets />}
               {page === 'tools' && <Tools />}
               {page === 'logs' && <Logs />}
               {page === 'settings' && <Settings />}

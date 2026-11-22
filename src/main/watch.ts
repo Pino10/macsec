@@ -13,7 +13,7 @@
 import { execFile } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import type { Finding, SessionInfo, WatchAlert, WatchInfo } from '../shared/types'
+import type { Finding, SessionInfo, WatchAlert, WatchInfo, WatchWindow } from '../shared/types'
 import { dirs } from './paths'
 import { parseOsv } from './scanners/parse'
 import { installTool, isInstalled, toolDef, toolEnv, toolPath } from './toolbox'
@@ -29,12 +29,13 @@ interface WatchState {
   /** Serious package flaws already reported, per project folder. */
   known: Record<string, string[]>
   alerts: WatchAlert[]
+  window: WatchWindow
 }
 
 const file = (): string => join(dirs.config(), 'watch.json')
 
 export function readWatch(): WatchState {
-  const base: WatchState = { packages: true, retest: false, known: {}, alerts: [] }
+  const base: WatchState = { packages: true, retest: false, known: {}, alerts: [], window: { on: false, from: 1, to: 6 } }
   try {
     return { ...base, ...(JSON.parse(readFileSync(file(), 'utf8')) as Partial<WatchState>) }
   } catch {
@@ -47,12 +48,23 @@ function writeWatch(s: WatchState): void {
   writeFileSync(file(), JSON.stringify(s, null, 2), { mode: 0o600 })
 }
 
-export function setWatch(patch: { packages?: boolean; retest?: boolean }): WatchState {
+export function setWatch(patch: { packages?: boolean; retest?: boolean; window?: Partial<WatchWindow> }): WatchState {
   const s = readWatch()
   if (typeof patch.packages === 'boolean') s.packages = patch.packages
   if (typeof patch.retest === 'boolean') s.retest = patch.retest
+  const w = patch.window
+  if (w) {
+    const hr = (x: unknown, d: number): number => (typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 23 ? x : d)
+    s.window = { on: typeof w.on === 'boolean' ? w.on : s.window.on, from: hr(w.from, s.window.from), to: hr(w.to, s.window.to) }
+  }
   writeWatch(s)
   return s
+}
+
+/** Whether automatic scans may run at this hour. With the window off, always. A window may cross midnight (22 to 5). */
+export function inWindow(w: WatchWindow, hour: number): boolean {
+  if (!w.on || w.from === w.to) return true
+  return w.from < w.to ? hour >= w.from && hour < w.to : hour >= w.from || hour < w.to
 }
 
 /** The key that says "the same problem": tool, advisory or title, and the file. */
@@ -77,7 +89,7 @@ export function watchedProjects(sessions: SessionInfo[]): { path: string; title:
 
 export function watchInfo(sessions: SessionInfo[]): WatchInfo {
   const s = readWatch()
-  return { packages: s.packages, retest: s.retest, lastPackages: s.lastPackages ?? null, lastRetest: s.lastRetest ?? null, projects: watchedProjects(sessions).length, alerts: s.alerts.slice(0, 20) }
+  return { packages: s.packages, retest: s.retest, lastPackages: s.lastPackages ?? null, lastRetest: s.lastRetest ?? null, projects: watchedProjects(sessions).length, alerts: s.alerts.slice(0, 20), window: s.window }
 }
 
 function osv(root: string): Promise<Finding[]> {
@@ -172,6 +184,7 @@ export function startWatch(o: { sessions: () => SessionInfo[]; rerun: (id: strin
     running = true
     try {
       const s = readWatch()
+      if (!inWindow(s.window, new Date().getHours())) return
       if (s.packages && due(s.lastPackages, EVERY.packages)) await checkPackages(o.sessions(), o.notify)
       if (s.retest && due(s.lastRetest, EVERY.retest)) await weeklyRetest(o.sessions(), o.rerun)
     } catch (e) {

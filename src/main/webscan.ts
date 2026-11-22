@@ -32,6 +32,7 @@ import { cveFindings, epssFor, liveCves } from './cvelive'
 import { devopsChecks, dnsChecks, protectionFinding } from './webposture'
 import { bannersOf, type Product } from './seckit/confirm'
 import { checkTls, keysInJavaScript, signedOutCheck } from './webextra'
+import { logicChecks } from './bizlogic'
 import { accessChecks, ConfirmClient, risky, fuzzContent, fuzzParams, loginChecks, resetCheck, wafControl } from './confirmtests'
 
 /** Laramac's sites, from the www folder, at their .test addresses. */
@@ -180,7 +181,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
   const host = new URL(url).host
   const headers = parseHeaders(req.headers)
   const headersB = parseHeaders(req.confirm?.headersB)
-  const mk = (cap: number): ConfirmClient => new ConfirmClient(url, { headers, cap, cancelled: () => s.cancelled })
+  const mk = (cap: number): ConfirmClient => new ConfirmClient(url, { headers, cap, cancelled: () => s.cancelled, paused: () => op.paused })
   let carrier: string | undefined
   const urlsFile = join(s.raw, 'urls.txt')
   let urls: string[] = [url]
@@ -201,6 +202,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     access: m.depth && Object.keys(headers).length ? s.step('access', 'Compare private pages signed in and signed out') : null,
     fuzz: req.confirm?.fuzz ? s.step('fuzz', 'Control confirmation: hidden pages and parameters') : null,
     waf: req.confirm?.waf ? s.step('waf', 'Control confirmation: web firewall tests') : null,
+    logic: req.confirm?.logic ? s.step('logic', 'Control confirmation: business logic (redirects, host header, code limits, skipped steps)') : null,
     login: req.confirm?.auth ? s.step('login', 'Control confirmation: login checks') : null,
     authz: req.confirm?.authz && Object.keys(headers).length && Object.keys(headersB).length ? s.step('authz', 'Control confirmation: what a second account can open') : null,
     wp: s.step('wpscan', 'WordPress: version, plugins and themes (when the site uses it)'),
@@ -273,7 +275,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     if (st.jsdeep)
       await s.run(st.jsdeep, async (note) => {
         const scripts = urls.filter((u) => /\.m?js(\?|$)/i.test(u))
-        const r = await crawlJs({ scripts, allowed: (u) => { try { return new URL(u).host === host } catch { return false } }, headers, cancelled: () => s.cancelled, note, sourceDir: join(s.raw, 'sources') })
+        const r = await crawlJs({ scripts, allowed: (u) => { try { return new URL(u).host === host } catch { return false } }, headers, cancelled: () => s.cancelled, paused: () => op.paused, note, sourceDir: join(s.raw, 'sources') })
         writeFileSync(join(s.raw, 'js-map.json'), JSON.stringify({ scripts: r.scripts, endpoints: r.endpoints, routes: r.routes, graphql: r.graphql, envVars: r.envVars, hosts: r.hosts, refs: r.refs }, null, 1))
         // What the scripts name joins the pages the test plan is built from.
         urls = [...new Set([...urls, ...r.endpoints.filter((e) => e.startsWith('/')).map((e) => new URL(e, url).href), ...r.routes.map((x) => new URL(x, url).href)])].slice(0, 3000)
@@ -313,6 +315,8 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       })
 
     if (st.waf) await s.run(st.waf, (note) => wafControl(mk(150), note, carrier))
+
+    if (st.logic) await s.run(st.logic, (note) => logicChecks(mk(400), { urls, pages: urls.filter((u) => !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|pdf|zip)$/i.test(u)).slice(0, 10) }, note))
 
     if (st.login)
       await s.run(st.login, async (note) => {
@@ -382,7 +386,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       })
 
     // The test plan: what to try by hand on this site, from the pages the crawl found. Always saved, with or without an AI.
-    const ran = [st.login && 'auth', st.fuzz && 'fuzz', st.waf && 'waf', st.authz && 'authz'].filter(Boolean) as string[]
+    const ran = [st.login && 'auth', st.fuzz && 'fuzz', st.waf && 'waf', st.authz && 'authz', st.logic && 'logic'].filter(Boolean) as string[]
     const profile = profileSite(urls)
     try {
       savePlan(id, planMarkdown(profile, url, ran))

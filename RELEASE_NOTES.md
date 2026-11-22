@@ -1,3 +1,26 @@
+## MacSec 1.5.0
+
+Business logic checks, a risk score for everything you test, and ways to hand findings on.
+
+### What is new
+- **Business logic checks** (a new switch in the web scan's control confirmations). It proves what can be proven without changing anything: an open redirect (a made-up address in "next" or "return" is followed), a site that writes a forwarded host name into links (password reset poisoning), and a code or PIN form that accepts ten wrong codes in a row. It also lists leads for you to test by hand: prices, roles and ids sent as hidden form fields, late steps of a checkout that open on their own, and numbered records. A lead says "possible" and has no proof, and nothing that would change data is ever tried.
+- **Quick choices** for the control confirmations: public site, login and accounts, shop or booking flow.
+- **Assets.** A new page with one line per site, API, domain, app or project: a risk score from 0 to 100, how it moved scan by scan, how many days fixes took, and what to fix first.
+- **Fix these first.** On every result: the few actions that take off the most risk, with the score before and after.
+- **How these connect.** Small problems that become serious together (an open Git folder and a key in it, a way to find accounts and no limit on guesses) are shown as a chain, only when every part was found.
+- **Check ids.** Every kind of finding has a stable id (for example MS-WEB-001) shown on the finding, so reports and re-tests can name it.
+- **Re-test one finding** without running the whole scan: it repeats the proof request and tells you if it is still there, changed or gone. It never marks anything fixed by itself.
+- **Copy as a ticket** (Markdown or Jira text) and **create a GitHub issue** with the token already in your Keychain.
+- **Pause and resume** a running test.
+- **Quiet hours** for automatic checks.
+- **A one-page summary PDF** for people who decide.
+- **A self-test** on the Tools page: MacSec starts a deliberately weak local app and a correct look-alike, and every planted weakness must be found with nothing reported on the correct one.
+
+### Honest limits
+- Real business logic bugs that need a data change (a price changed in transit, a coupon used twice, a race) are never proven by MacSec. You get leads and a test plan.
+- Jira is copy-as-text only. Recorded login replay is not built.
+- Pause stops the tools and MacSec's own requests, but a tool's own timeout keeps counting.
+
 ## MacSec 1.4.0
 
 A JavaScript analyzer, the setup behind a site, live vulnerability counts, and an honest label on every finding.

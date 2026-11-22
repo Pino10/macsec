@@ -37,6 +37,8 @@ export interface ClientOptions {
   cap?: number
   delayMs?: number
   cancelled?: () => boolean
+  /** While this says true, requests wait (a paused test). */
+  paused?: () => boolean
   fetchImpl?: typeof fetch
 }
 
@@ -67,6 +69,7 @@ export class ConfirmClient {
 
   /** `headers: 'none'` sends the request signed out; an object sends that account instead. */
   async send(method: 'GET' | 'POST', path: string, o: { headers?: Record<string, string> | 'none'; form?: Record<string, string>; cookie?: string } = {}): Promise<Reply> {
+    while (this.o.paused?.() && !this.o.cancelled?.()) await sleep(300)
     if (this.stopped) throw new Stop(this.stopped)
     if (this.o.cancelled?.()) throw new Stop('Cancelled')
     if (this.count >= (this.o.cap ?? 1500)) throw new Stop('The request limit for control confirmations was reached.')
