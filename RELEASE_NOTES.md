@@ -1,3 +1,10 @@
+## 1.12.0
+
+- **DKIM checks.** For a domain that sends mail, MacSec looks up the common DKIM selectors and reports keys that are too short (under 1024 bits), keys of 1024 bits, withdrawn keys and keys left in test mode. Each comes with the DNS record as proof. A selector that is not found says nothing, because DKIM has no public list of selectors.
+- **DNSSEC check.** MacSec asks Cloudflare's public DNS service (the domain name only) whether the domain is signed. An unsigned domain is shown as an information note, never as a confirmed problem.
+
+Still not built: KICS and Amass (their download files could not be checked here, so they are not added blind; Checkov and Hadolint already cover infrastructure files), LinkFinder and SecretFinder (the script scan already reads a site's own scripts), SQLFluff (a style linter, not a security tool), virtual host discovery, and the bigger AI items.
+
 ## 1.11.0
 
 - **Safer scans.** A network guard now sits in front of every confirmation test. It stops a scan if a site name points at a cloud metadata address, answers with a mix of public and private addresses, or switches from public to private halfway through (DNS rebinding).

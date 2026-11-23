@@ -84,7 +84,7 @@ const dnsProof = (what: string, cmd: string, shows: string[], body = ''): Proof 
 const never = async <T>(p: Promise<T>, empty: T): Promise<T> => p.catch(() => empty)
 
 /** DNS and mail settings for a site's own domain, plus a dangling CNAME on the host itself. */
-export async function dnsChecks(host: string, r: Resolver = dnsp as unknown as Resolver): Promise<Finding[]> {
+export async function dnsChecks(host: string, r: Resolver = dnsp as unknown as Resolver, doh: Doh | null = r === (dnsp as unknown as Resolver) ? realDoh : null): Promise<Finding[]> {
   const out: Finding[] = []
   if (/^\d+\.\d+\.\d+\.\d+$/.test(host) || /^localhost$|\.(test|localhost|local)$/.test(host)) return out
   const root = rootDomain(host)
@@ -105,12 +105,82 @@ export async function dnsChecks(host: string, r: Resolver = dnsp as unknown as R
     const dmarc = (await never(r.resolveTxt(`_dmarc.${root}`), [] as string[][])).map((x) => x.join('')).find((t) => /^v=DMARC1/i.test(t))
     if (!dmarc) out.push(f({ severity: 'low', confidence: 'confirmed', title: `${root} has no DMARC record`, file: root, cwe: 'CWE-290', description: 'DMARC tells receivers to reject mail that fails SPF and DKIM. Without it, spoofed mail from this domain is usually delivered.', fix: 'Publish _dmarc TXT "v=DMARC1; p=quarantine; rua=mailto:you@example.com", then move to p=reject.', proof: dnsProof(`DNS TXT _dmarc.${root}`, `dig +short TXT _dmarc.${root}`, ['no TXT record at _dmarc starts with v=DMARC1']) }, 'dmarc'))
     else if (/\bp=none\b/i.test(dmarc)) out.push(f({ severity: 'info', confidence: 'confirmed', title: `DMARC on ${root} only watches (p=none)`, file: root, description: 'Spoofed mail is reported but still delivered.', fix: 'Move to p=quarantine, then p=reject, once the reports look clean.', proof: dnsProof(`DNS TXT _dmarc.${root}`, `dig +short TXT _dmarc.${root}`, [`DMARC: ${dmarc.slice(0, 120)}`], dmarc) }, 'dmarc-none'))
+    const found: { selector: string; txt: string }[] = []
+    for (const selector of DKIM_SELECTORS) {
+      const t = (await never(r.resolveTxt(`${selector}._domainkey.${root}`), [] as string[][])).map((x) => x.join('')).find((x) => /(^|;)\s*v\s*=\s*DKIM1|(^|;)\s*p\s*=/i.test(x))
+      if (t) found.push({ selector, txt: t })
+    }
+    out.push(...dkimChecks(root, found))
   }
+  if (doh) out.push(...(await dnssecCheck(root, doh)))
   if (r.resolveCaa) {
     const caa = await never(r.resolveCaa(root), [] as { critical: number }[])
     if (!caa.length) out.push(f({ severity: 'info', confidence: 'confirmed', title: `${root} has no CAA record`, file: root, description: 'A CAA record limits which companies may issue certificates for the domain.', fix: 'Publish a CAA record for the authority you use, for example: 0 issue "letsencrypt.org".', proof: dnsProof(`DNS CAA ${root}`, `dig +short CAA ${root}`, ['no CAA record was returned']) }, 'caa'))
   }
   return out
+}
+
+// ---------------------------------------------------------------- DKIM and DNSSEC
+
+/** Selectors that big mail providers and common tools use. DKIM has no list of selectors, so only these are asked. */
+export const DKIM_SELECTORS = ['default', 'google', 'selector1', 'selector2', 'k1', 'k2', 's1', 's2', 'dkim', 'mail', 'mandrill', 'smtp', 'mxvault']
+
+/** Size in bits of the RSA key inside a DKIM p= value, rounded the way a person would say it, or null when it is not RSA. */
+export function dkimKeyBits(p: string): number | null {
+  let der: Buffer
+  try {
+    der = Buffer.from(p.replace(/\s+/g, ''), 'base64')
+  } catch {
+    return null
+  }
+  if (der.length < 30 || der[0] !== 0x30) return null
+  // A 2048-bit public key is about 294 bytes, 1024 about 162, 512 about 94: the modulus is almost all of it.
+  const bits = Math.round(((der.length - 38) * 8) / 256) * 256
+  return bits >= 256 ? bits : null
+}
+
+export function dkimChecks(root: string, records: { selector: string; txt: string }[]): Finding[] {
+  const out: Finding[] = []
+  const cmd = (sel: string): string => `dig +short TXT ${sel}._domainkey.${root}`
+  for (const { selector, txt } of records) {
+    const tag = (k: string): string | undefined => new RegExp(`(?:^|;)\\s*${k}\\s*=\\s*([^;]*)`, 'i').exec(txt)?.[1]?.trim()
+    const name = `${selector}._domainkey.${root}`
+    const proof = dnsProof(`DNS TXT ${name}`, cmd(selector), [`a DKIM record exists for the selector ${selector}`], txt)
+    const key = tag('p')
+    if (key === '') {
+      out.push(f({ severity: 'info', confidence: 'confirmed', title: `The DKIM key for ${selector} on ${root} is switched off`, file: name, description: 'The p= value is empty, which means the key was withdrawn on purpose. Mail signed with it will fail. This is only a problem if you still send mail with this selector.', proof }, `dkim-off-${selector}`))
+      continue
+    }
+    const bits = key && (tag('k') ?? 'rsa').toLowerCase() === 'rsa' ? dkimKeyBits(key) : null
+    if (bits !== null && bits < 1024)
+      out.push(f({ severity: 'medium', confidence: 'confirmed', title: `The DKIM key for ${selector} on ${root} is only about ${bits} bits`, file: name, cwe: 'CWE-326', description: `Keys under 1024 bits can be broken, which lets an attacker sign mail as ${root}.`, fix: 'Create a new 2048-bit DKIM key with your mail provider and publish it.', proof: { ...proof, shows: [`the key is about ${bits} bits`] } }, `dkim-short-${selector}`))
+    else if (bits === 1024)
+      out.push(f({ severity: 'low', confidence: 'confirmed', title: `The DKIM key for ${selector} on ${root} is 1024 bits`, file: name, cwe: 'CWE-326', description: 'A 1024-bit key still works but 2048 bits is the current advice.', fix: 'Rotate to a 2048-bit key when your mail provider allows it.', proof: { ...proof, shows: ['the key is about 1024 bits'] } }, `dkim-1024-${selector}`))
+    if (/(^|;)\s*t\s*=\s*[^;]*\by\b/i.test(txt))
+      out.push(f({ severity: 'info', confidence: 'confirmed', title: `The DKIM key for ${selector} on ${root} is in test mode`, file: name, description: 'The t=y flag tells receivers to treat failures as harmless. Remove it once DKIM works.', proof: { ...proof, shows: ['the record has the t=y flag'] } }, `dkim-test-${selector}`))
+  }
+  return out
+}
+
+/** Asks a DNS over HTTPS service (name only, a read) whether the domain is signed. Injected in tests. */
+export type Doh = (name: string, type: 'DS') => Promise<{ status: number; ad: boolean; answers: number } | null>
+
+export const realDoh: Doh = async (name, type) => {
+  try {
+    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`, { headers: { accept: 'application/dns-json' }, redirect: 'error', signal: AbortSignal.timeout(8000) })
+    if (!res.ok) return null
+    const j = (await res.json()) as { Status?: number; AD?: boolean; Answer?: unknown[] }
+    return { status: Number(j.Status ?? -1), ad: j.AD === true, answers: Array.isArray(j.Answer) ? j.Answer.length : 0 }
+  } catch {
+    return null
+  }
+}
+
+export async function dnssecCheck(root: string, doh: Doh): Promise<Finding[]> {
+  const a = await doh(root, 'DS')
+  // Only a clean "no such record" answer counts. An error, a timeout or a missing domain says nothing.
+  if (!a || a.status !== 0 || a.answers > 0) return []
+  return [f({ severity: 'info', confidence: 'possible', title: `${root} is not signed with DNSSEC`, file: root, description: 'No DS record was found at the parent zone, so answers for this domain cannot be checked for tampering. Many sites do without DNSSEC; it matters most for banks and mail.', fix: 'Turn on DNSSEC at your DNS provider and add the DS record at your registrar.', proof: dnsProof(`DNS DS ${root}`, `dig +short DS ${root}`, ['the DS lookup answered with no record'], '') }, 'dnssec')]
 }
 
 // ---------------------------------------------------------------- DevOps and infrastructure
