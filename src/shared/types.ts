@@ -606,6 +606,10 @@ export interface Channels {
   'mobile:live-setup': { args: []; result: LiveSetupInfo }
   'mobile:avd-start': { args: [string]; result: LiveSetupInfo }
   'mobile:avd-create': { args: []; result: LiveSetupInfo }
+  'traffic:status': { args: []; result: TrafficStatus }
+  'traffic:start': { args: [string]; result: TrafficStatus }
+  'traffic:stop': { args: [string]; result: SessionInfo }
+  'traffic:import': { args: []; result: SessionInfo | null }
   'cloud:status': { args: []; result: { azure: string | null; aws: string | null } }
   'cloud:azure-login': { args: []; result: { azure: string | null; aws: string | null } }
   'tools:optional': { args: []; result: OptionalTool[] }
@@ -888,3 +892,11 @@ export interface ChecklistData {
   checklist: ChecklistInfo | null
   user: Record<string, { state: 'done' | 'problem' | 'na'; note?: string; at: string }>
 }
+
+/** A traffic capture with mitmproxy: where the phone should send its traffic. */
+export interface TrafficCaptureInfo {
+  running: boolean
+  host: string
+  port: number
+}
+export type TrafficStatus = TrafficCaptureInfo & { installed: boolean; lan: string[] }

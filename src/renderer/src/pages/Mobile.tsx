@@ -4,6 +4,7 @@ import type { LiveSetupInfo, LocalProject, Reviewer } from '@shared/types'
 import { useApp } from '../store'
 import { FlowStep, PageHead } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
+import TrafficCapture from '../components/TrafficCapture'
 
 /** Choosing a mobile app and starting the check. Used on its own page and in Special audits. */
 export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element {
@@ -147,6 +148,7 @@ export default function Mobile(): React.JSX.Element {
     <>
       <PageHead title="Mobile apps" desc="Android and iOS apps, from source or a built file. MacSec reads the app. For an Android .apk you can also run it on a test phone and watch what it does." />
       <MobileFlow />
+      <TrafficCapture />
     </>
   )
 }

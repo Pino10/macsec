@@ -3,8 +3,8 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, safeStora
 import { installedEditors, isAppBundle, isEditorChoice, openInEditorOf, pickEditor } from './seckit/editors'
 import { execFile } from 'child_process'
 import type { Server } from 'http'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
-import { join, normalize, resolve, sep } from 'path'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { basename, join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
 import type { FreeLlmInfo, IntegrationsInfo, SkillPackInfo, ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest, SessionInfo } from '../shared/types'
@@ -37,6 +37,7 @@ import { MCP_PORT, mcpToken, mcpUrl, startMcpServer } from './mcp'
 import { macsecCli, macsecTools } from './mcptools'
 import { loadSpec, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
+import { captureStatus, sessionFromHar, startCapture, stopCapture, stopCaptureQuietly } from './trafficcapture'
 import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from './mobilelive'
 import { reconData, startRecon } from './reconscan'
 import { markChecklistItem, readChecklist, readRequest, saveFindings, saveRequest, stripSecrets, triageFinding } from './sessions'
@@ -913,6 +914,34 @@ function registerIpc(): void {
     picked.add(p)
     return p
   })
+  handle('traffic:status', () => captureStatus())
+  handle('traffic:start', async (host) => {
+    try {
+      await startCapture(host)
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+    return captureStatus()
+  })
+  handle('traffic:stop', async (title) => {
+    try {
+      return await stopCapture(typeof title === 'string' ? title.slice(0, 80) : '')
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
+  handle('traffic:import', async () => {
+    if (!mainWindow) return null
+    const r = await dialog.showOpenDialog(mainWindow, { title: 'Choose a HAR capture', buttonLabel: 'Check', properties: ['openFile'], filters: [{ name: 'HAR capture', extensions: ['har', 'json'] }] })
+    if (r.canceled || !r.filePaths[0]) return null
+    const file = resolve(r.filePaths[0])
+    if (statSync(file).size > 200 * 1024 * 1024) throw new ValidationError('That capture is too big (200 MB at most).')
+    try {
+      return await sessionFromHar(readFileSync(file, 'utf8'), basename(file).replace(/\.(har|json)$/i, ''))
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
   handle('mobile:live-setup', () => liveSetup())
   handle('mobile:avd-start', async (name) => {
     if (!validAvd(name)) throw new ValidationError('That test phone name is not valid.')
@@ -1182,3 +1211,5 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (!isMac) app.quit()
 })
+
+app.on('before-quit', () => stopCaptureQuietly())

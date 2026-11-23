@@ -56,6 +56,7 @@ export const CATALOG: ToolDef[] = [
   { id: 'mobsfscan', name: 'mobsfscan', category: 'mobile', method: 'python', pkg: 'mobsfscan', binaries: ['mobsfscan'], languages: ['Java', 'Kotlin', 'Swift', 'Objective-C'], purpose: 'MobSF’s rules for Android and iOS source: insecure storage, weak crypto, WebView and network settings.', homepage: 'https://github.com/MobSF/mobsfscan' },
   { id: 'androguard', name: 'Androguard', category: 'mobile', method: 'python', pkg: 'androguard', binaries: ['androguard'], purpose: 'Reads a built Android app (.apk): its manifest, permissions and exported parts.', homepage: 'https://github.com/androguard/androguard' },
 
+  { id: 'mitmproxy', name: 'mitmproxy', category: 'mobile', method: 'python', pkg: 'mitmproxy', binaries: ['mitmdump'], purpose: 'Listens to what an app on your own test phone sends over the network (it only watches). Used for the traffic check.', homepage: 'https://mitmproxy.org' },
   { id: 'frida-tools', name: 'Frida', category: 'mobile', method: 'python', pkg: 'frida-tools', binaries: ['frida', 'frida-ps'], purpose: 'Watches a built Android app while it runs on a test phone: certificate pinning, root checks and plain HTTP. Used only by the live phone test, and only to watch.', homepage: 'https://frida.re' },
 
   // Cloud accounts (read-only)

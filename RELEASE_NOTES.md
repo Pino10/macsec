@@ -1,3 +1,9 @@
+## 1.13.0
+
+- **Watch an app's network traffic.** On the Mobile apps page, install mitmproxy with one button (free, stays inside MacSec), start listening, point your own test phone or emulator at it, use the app, and press Stop. MacSec then lists plain http, passwords and tokens sent in the clear, secrets in web addresses, cookies without the Secure flag and every server the app talked to, each with proof. You can also check a .har file you already have (from Burp, Charles or a browser).
+- **Safe by design.** MacSec only listens on this Mac or its own local network address, never changes your phone, deletes the capture file as soon as it has been read, and keeps only names, never values.
+- Limits: an empty capture does not prove certificate pinning, and Android apps from Android 7 on may ignore the capture certificate unless the test build allows it.
+
 ## 1.12.0
 
 - **DKIM checks.** For a domain that sends mail, MacSec looks up the common DKIM selectors and reports keys that are too short (under 1024 bits), keys of 1024 bits, withdrawn keys and keys left in test mode. Each comes with the DNS record as proof. A selector that is not found says nothing, because DKIM has no public list of selectors.
