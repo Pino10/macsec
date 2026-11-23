@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Finding, SessionInfo, SessionStep } from '../shared/types'
 import { countBySeverity, mergeFindings } from './scanners/parse'
+import { correlate } from './correlate'
 import { readSession, saveFindings, saveSession, sessionDir } from './sessions'
 import { toolEnv, toolPath } from './toolbox'
 import { log, redact } from './logs'
@@ -173,7 +174,7 @@ export class SessionRun {
     saveSession(this.info)
   }
   add(found: Finding[]): void {
-    this.findings = label(mergeFindings([...this.findings, ...found.map(honest)]))
+    this.findings = label(correlate(mergeFindings([...this.findings, ...found.map(honest)])))
     this.info.counts = countBySeverity(this.findings.filter((f) => f.verdict !== 'false-positive'))
     saveFindings(this.info.id, this.findings)
     saveSession(this.info)
@@ -210,7 +211,7 @@ export class SessionRun {
     if (error) this.info.error = error
     this.info.finishedAt = new Date().toISOString()
     this.info.steps = this.info.steps.map((s) => (s.status === 'running' || s.status === 'waiting' ? { ...s, status: 'skipped' } : s))
-    this.findings = label(this.findings)
+    this.findings = label(correlate(this.findings))
     this.info.counts = countBySeverity(this.findings.filter((f) => f.verdict !== 'false-positive'))
     saveFindings(this.info.id, this.findings)
     saveSession(this.info)

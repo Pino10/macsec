@@ -4,6 +4,7 @@ import FixPlan from '../components/FixPlan'
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
 import { issueText } from '@shared/insights'
+import { verificationOf, VERIFICATION_TEXT, asvsOf } from '@shared/verification'
 import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText } from 'lucide-react'
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
@@ -488,7 +489,10 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
         {f.verdict === 'false-positive' && <span className="tag tag-warn">Ruled out by AI</span>}
         <ConfidenceTag f={f} />
         <ExploitTag f={f} />
+        <span className="tag" data-tip={VERIFICATION_TEXT[verificationOf(f)]}>{VERIFICATION_TEXT[verificationOf(f)].split(":")[0]}</span>
+        {asvsOf(f.cwe) && <span className="tag" data-tip="The OWASP ASVS chapter this kind of problem belongs to.">{asvsOf(f.cwe)}</span>}
         <span className="tag">{f.tool}</span>
+        {f.alsoFoundBy?.length ? <span className="tag" data-tip="Other tools reported the same problem in the same place. MacSec shows it once.">Also found by {f.alsoFoundBy.join(', ')}</span> : null}
         {f.checkId && <span className="tag" data-tip="The stable id of the check that found this, so a report and a re-test can name it.">{f.checkId}</span>}
         {f.cwe && (
           <button className="tag" style={{ border: 0, cursor: 'pointer' }} onClick={() => void api.invoke('app:open-external', `https://cwe.mitre.org/data/definitions/${f.cwe!.replace('CWE-', '')}.html`)}>

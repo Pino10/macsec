@@ -11,6 +11,7 @@
  * request limit, a pause between requests, and a stop when the server starts to struggle. Only
  * harmless markers are sent. Nothing is reported until a second request has repeated it.
  */
+import { NetGuard } from './netguard'
 import { createHash, randomBytes } from 'crypto'
 import type { Finding, Severity } from '../shared/types'
 import { fid } from './scanners/parse'
@@ -40,6 +41,8 @@ export interface ClientOptions {
   /** While this says true, requests wait (a paused test). */
   paused?: () => boolean
   fetchImpl?: typeof fetch
+  /** Checks where the site's name points before each request. On by default for real requests. */
+  guard?: NetGuard | false
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -50,10 +53,13 @@ export class ConfirmClient {
   count = 0
   stopped: string | null = null
   private bad = 0
+  private guard: NetGuard | null
   readonly origin: string
 
   constructor(readonly base: string, private o: ClientOptions = {}) {
     this.origin = new URL(base).origin
+    // Tests that bring their own fetch have no real network, so the guard is for real requests only.
+    this.guard = o.guard === false || o.fetchImpl ? null : (o.guard ?? new NetGuard())
   }
 
   left(): number {
@@ -74,6 +80,12 @@ export class ConfirmClient {
     if (this.o.cancelled?.()) throw new Stop('Cancelled')
     if (this.count >= (this.o.cap ?? 1500)) throw new Stop('The request limit for control confirmations was reached.')
     const url = this.resolve(path)
+    try {
+      await this.guard?.check(new URL(url).hostname)
+    } catch (e) {
+      this.stopped = (e as Error).message
+      throw new Stop(this.stopped)
+    }
     this.count++
     await sleep(this.o.delayMs ?? 120)
     const who = o.headers === 'none' ? {} : (o.headers ?? this.o.headers ?? {})

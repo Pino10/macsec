@@ -116,6 +116,8 @@ export interface Finding {
   /** What you decided: fixed, accepted risk, or not a problem. It then stops counting. */
   triage?: 'fixed' | 'accepted' | 'not-a-problem'
   triagedAt?: string
+  /** Other tools that found the same thing in the same place (merged into this finding). */
+  alsoFoundBy?: string[]
   /** Marked "not a problem" by a rule you saved earlier, not by hand in this session. */
   remembered?: boolean
 }

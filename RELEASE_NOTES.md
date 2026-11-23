@@ -1,3 +1,12 @@
+## 1.11.0
+
+- **Safer scans.** A network guard now sits in front of every confirmation test. It stops a scan if a site name points at a cloud metadata address, answers with a mix of public and private addresses, or switches from public to private halfway through (DNS rebinding).
+- **One finding, not three.** When two tools report the same problem in the same place, MacSec shows it once and says "Also found by" the others. Proofs are never merged away.
+- **How sure are we?** Every finding now says Confirmed, Likely, Suspected, Unverified or Ruled out, and shows its OWASP ASVS chapter when the weakness type is clear.
+- **Accuracy score.** A small scorer counts hits, misses and false alarms (precision and recall) for a check against a known bad and a known good sample. It is used in tests.
+
+Not in this release: CodeQL (its licence does not allow free use on private or commercial code), Joern, KICS, Amass, LinkFinder, SecretFinder, SQLFluff, DNSSEC and DKIM checks, virtual host discovery, source-to-sink data flow, AI agents for IDOR and business logic, an AI verification agent, patch generation, and one database with attack paths across all engines. The guard covers confirmation tests; the web posture and script checks do not use it yet.
+
 ## MacSec 1.10.0
 
 DeepSeek is now a choice in every reviewer list, and mobile checks can produce a full report.
