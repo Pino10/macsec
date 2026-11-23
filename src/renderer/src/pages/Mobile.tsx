@@ -21,6 +21,7 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
     void api.invoke('projects:local').then(setProjects)
   }, [api])
   const isApk = /\.apk$/i.test(path)
+  const built = /\.(apk|ipa|aab|apks|xcarchive)\/?$/i.test(path)
   const refresh = async (): Promise<void> => {
     const r = await act('live-setup', () => api.invoke('mobile:live-setup'))
     if (r) {
@@ -35,7 +36,7 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
   const device = setup?.devices.find((d) => d.serial === serial)
   const liveReady = !liveOn || (isApk && !!device && device.state === 'device' && ok)
   const name = path.split('/').pop() ?? ''
-  const kind = /\.apk$/i.test(path) ? 'Android app (.apk)' : /\.ipa$/i.test(path) ? 'iOS app (.ipa)' : path ? 'Source folder' : ''
+  const kind = /\.apk$/i.test(path) ? 'Android app (.apk)' : /\.aab$/i.test(path) ? 'Android App Bundle (.aab)' : /\.apks$/i.test(path) ? 'Android app set (.apks)' : /\.ipa$/i.test(path) ? 'iOS app (.ipa)' : /\.xcarchive\/?$/i.test(path) ? 'Xcode archive (.xcarchive)' : path ? 'Source folder' : ''
   const choose = async (what: 'folder' | 'file'): Promise<void> => {
     const p = await act('mpick', () => api.invoke('mobile:pick', what))
     if (p) setPath(p)
@@ -43,7 +44,7 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
 
   return (
     <div className="flow">
-      <FlowStep n={start} title="Which app" help="Android or iOS source code (Java, Kotlin, Swift, Objective-C, Flutter, React Native), or a built .apk or .ipa. A built app is unpacked inside the session and removed afterwards." state={path ? 'done' : 'current'}>
+      <FlowStep n={start} title="Which app" help="Android or iOS source code (Java, Kotlin, Swift, Objective-C, Flutter, React Native), or a built .apk, .aab, .apks, .ipa or .xcarchive. An Xcode project folder works as source. A built app is unpacked inside the session and removed afterwards." state={path ? 'done' : 'current'}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <select className="input" style={{ maxWidth: 300 }} value={projects.some((p) => p.path === path) ? path : ''} onChange={(e) => setPath(e.target.value)} aria-label="Project">
             <option value="">A project in your www folder…</option>
@@ -57,7 +58,7 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
             <FolderOpen size={15} /> Another folder
           </button>
           <button className="btn" onClick={() => void choose('file')}>
-            <FileBox size={15} /> An .apk or .ipa
+            <FileBox size={15} /> A built app (.apk, .aab, .apks, .ipa, .xcarchive)
           </button>
         </div>
         {path && (
@@ -111,7 +112,7 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
           )}
         </FlowStep>
       )}
-      {(isApk || path.toLowerCase().endsWith('.ipa')) && (
+      {built && (
         <label className="consent" style={{ margin: '0 0 14px' }}>
           <input type="checkbox" checked={onlineOn} onChange={(e) => setOnlineOn(e.target.checked)} />
           <span>
@@ -130,7 +131,7 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
           className="btn btn-primary btn-lg"
           disabled={!path || !liveReady || busy.has('mobile')}
           onClick={async () => {
-            const s = await act('mobile', () => api.invoke('mobile:start', { path, reviewer, live: liveOn && isApk ? { serial, confirmed: ok } : undefined, online: onlineOn && (isApk || path.toLowerCase().endsWith('.ipa')) }))
+            const s = await act('mobile', () => api.invoke('mobile:start', { path, reviewer, live: liveOn && isApk ? { serial, confirmed: ok } : undefined, online: onlineOn && built }))
             if (s) showSession(s.id)
           }}
         >

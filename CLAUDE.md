@@ -28,6 +28,7 @@ with free scanners plus an AI reviewer, and keeps every run as a session. Read M
 - Service probes (`servicedeep.ts`) send only read-only questions (PING, banner, version) on ports already found open, and recognise a hit by the answer, never by the port alone.
 - This Mac checks (`machecks2.ts`) only read. Secrets found in files or shell history are reported as kind, file and line, never the value.
 - Deep recon (`recondeep.ts`) only reads: headers, TLS, DNS and the DevOps probe list, through the shared clients.
+- More mobile checks (`mobiledeep.ts`) and the MASVS checklist (`masvs.ts`) only read the files of an app and the findings of a session. They never run the app or send a request. A MASVS control reads "Clear" only when the step that can see it ran and no finding belongs to it; a control that needs a person never reads "Clear".
 - Decoys and ignore memory (`decoys.ts`, `ignored.ts`): they only read what a scan already saw and never send a request. A decoy is turned down to `info` with the reason and is never removed from the report. Only your own choice (`ignored.json` in `~/MacSec/config`) marks a finding "Not a problem" on later scans, and a rule holds the finding id or title and place, never a secret value. Keys are shown as the first four characters and the length only.
 - Every AI agent run (`claude -p ... --permission-mode plan`) also passes `--strict-mcp-config`, so it never loads the person's own MCP servers (a test checks this).
 - UI and docs: plain, friendly English for non-experts. Never use em dashes; use a colon and a space instead.

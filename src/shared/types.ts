@@ -635,6 +635,7 @@ export interface Channels {
   'overview:top': { args: []; result: import('./insights').TopFinding[] }
   'sessions:get': { args: [string]; result: SessionDetail }
   'sessions:owasp': { args: [string]; result: OwaspChecklistInfo }
+  'sessions:masvs': { args: [string]; result: MasvsInfo }
   'sessions:compare': { args: [string]; result: SessionCompare }
   'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json']; result: string | null }
   'projects:save-hook': { args: [string]; result: string | null }
@@ -750,6 +751,28 @@ export interface OwaspItemInfo {
   worst: Severity | null
   examples: string[]
   checkedBy: string[]
+}
+
+/** One MASVS control for a mobile check. */
+export interface MasvsItem {
+  id: string
+  group: string
+  name: string
+  about: string
+  /** found: needs work. clear: looked at and fine. partly: nothing found, a person must still test part. not-tested: no check can see it. */
+  status: 'found' | 'clear' | 'partly' | 'not-tested'
+  findings: { id: string; title: string; severity: Severity }[]
+  /** What a person tests by hand. */
+  manual: string
+}
+
+/** A mobile check under OWASP MASVS 2.0. */
+export interface MasvsInfo {
+  items: MasvsItem[]
+  found: number
+  clear: number
+  partly: number
+  notTested: number
 }
 
 /** A session's findings under the OWASP Top 10 (2025), and what the session could see. */

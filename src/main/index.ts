@@ -57,6 +57,7 @@ import { cancelSession, sourceFiles, startReview } from './review'
 import { deleteSession, listSessions, readSession, recoverSessions, saveSession, sessionCodeDir, sessionDetail, sessionDir, sessionEvents, discardCode } from './sessions'
 import { executiveHtml, sessionHtml } from './report'
 import { sessionOwasp } from './owaspmap'
+import { sessionMasvs } from './masvs'
 import { leakKit } from './leakkit'
 import { projectStats } from './scanners/plan'
 import { findApp, findCli, installAgent, listAgents, openBurp, openTerminal, shellQuote } from './agents'
@@ -839,6 +840,7 @@ function registerIpc(): void {
     })
     return sessionOwasp(s, kids)
   })
+  handle('sessions:masvs', (id) => sessionMasvs(sessionDetail(String(id))))
   handle('sessions:delete', (id) => {
     cancelSession(String(id))
     deleteSession(String(id))
@@ -900,7 +902,7 @@ function registerIpc(): void {
   handle('mobile:pick', async (what) => {
     if (!mainWindow) return null
     const r = await dialog.showOpenDialog(mainWindow, what === 'file'
-      ? { title: 'Choose a built app', buttonLabel: 'Check', properties: ['openFile'], filters: [{ name: 'Android or iOS app', extensions: ['apk', 'ipa'] }] }
+      ? { title: 'Choose a built app', buttonLabel: 'Check', properties: ['openFile'], filters: [{ name: 'Android or iOS app', extensions: ['apk', 'aab', 'apks', 'ipa', 'xcarchive'] }] }
       : { title: 'Choose the app’s source folder', buttonLabel: 'Check', properties: ['openDirectory'] })
     if (r.canceled || !r.filePaths[0]) return null
     const p = resolve(r.filePaths[0])

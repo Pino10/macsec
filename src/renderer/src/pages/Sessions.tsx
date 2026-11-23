@@ -8,7 +8,7 @@ import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown,
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
-import { SessionOwasp } from '../components/OwaspList'
+import { SessionMasvs, SessionOwasp } from '../components/OwaspList'
 import { ReconPages } from '../components/ReconPages'
 import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
 import { FixDiff, LeakHelp } from '../components/FixHelp'
@@ -273,7 +273,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
             Findings
           </button>
           <button role="tab" aria-selected={tab === 'owasp'} onClick={() => setTab('owasp')}>
-            OWASP Top 10
+            {live?.kind === 'mobile-scan' ? 'OWASP' : 'OWASP Top 10'}
           </button>
           <button role="tab" aria-selected={tab === 'report'} onClick={() => setTab('report')}>
             Report
@@ -346,7 +346,12 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
 
       {tab === 'surface' && <Surface id={id} />}
       {tab === 'checklist' && <ChecklistView id={id} />}
-      {tab === 'owasp' && <SessionOwasp id={id} stamp={stamp} />}
+      {tab === 'owasp' && (
+        <>
+          {live?.kind === 'mobile-scan' && <SessionMasvs id={id} stamp={stamp} />}
+          <SessionOwasp id={id} stamp={stamp} />
+        </>
+      )}
 
       {tab === 'report' && (
         <>

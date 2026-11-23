@@ -1,3 +1,22 @@
+## MacSec 1.9.0
+
+Mobile checks now cover more file types and more of the app, and the app shows which OWASP MASVS controls are met.
+
+### What is new
+- **OWASP MASVS 2.0 checklist.** On every mobile check, the OWASP tab now starts with all 24 MASVS controls (storage, crypto, authentication, network, platform, code, resilience, privacy). Each one says **Needs work** (with the findings), **Clear** (the checks that can see it ran and found nothing), **Partly clear** (nothing found, but a person must still test part of it) or **Needs a person** (no automatic check can see it, such as biometrics, PIN and OTP flows, session handling and business logic). Controls a person must test say what to do by hand. "Clear" is not a pass mark for the app.
+- **More app files.** Besides .apk and .ipa: Android App Bundles (.aab), .apks sets (the base .apk is read) and Xcode archives (.xcarchive). An Xcode project folder works as source.
+- **Deep links.** Custom link schemes that other apps can claim, and web links that open the app without verification.
+- **Entitlements and privacy.** A Keychain group shared with every app of your team, universal links and shared sign-in domains, and the iOS privacy manifest (missing, or declaring tracking).
+- **Third-party SDKs.** The SDKs found in the app (analytics, advertising, crash, payments, support, session replay), with a warning for tracking ones in a banking app.
+- **Addresses in the app.** The full web addresses written into the code, with the API-looking ones first, as the starting map for API testing.
+- **Vulnerable libraries in source.** Source projects now also run osv-scanner on their library lists.
+
+### Limits
+- The .aab manifest reader was tested on a manifest built by hand to the aapt2 format, not on a real store bundle. If a bundle's manifest cannot be read, the check says so.
+- For an .aab or .apks, signing is not checked (the store signs a bundle itself) and the network rules file is not decoded.
+- SDK names are found from names in the code: an obfuscated app can hide some of them.
+- Not in this release: running the app on an Android emulator or the iOS Simulator, Burp traffic interception, Objection and a PDF report. The live test is still Android only, on a phone you confirm.
+
 ## MacSec 1.8.1
 
 DeepSeek works with Claude Code, and online models are shown as online.
