@@ -1,3 +1,14 @@
+## MacSec 1.10.0
+
+DeepSeek is now a choice in every reviewer list, and mobile checks can produce a full report.
+
+### What is new
+- **DeepSeek in the reviewer lists.** Once the DeepSeek servers and your key are saved (Tools, Model servers), "Claude Code on DeepSeek" and "DeepSeek (API)" appear in the reviewer choice of code review, web scan, API scan, mobile and recon. One click sets the server and the model, so nothing else has to be chosen first. Both say that the code or findings are sent to DeepSeek.
+- **MASVS report.** On a mobile check, Export now has "MASVS report". It is one page you open and save as a PDF (Print, then Save as PDF): the summary, what was checked, all 24 MASVS controls with their status and the OWASP Mobile Top 10 category, every finding with its confidence, evidence, steps to see it again and how to fix it, and a list of what a person must still test by hand. Values of keys and passwords are never in it.
+
+### Not in this release
+- JADX, Apktool, Ghidra and LIEF, iOS and Android runtime testing (emulator, Simulator, Frida, Objection, traffic capture), the Burp connection and the AI that investigates decompiled code. These need tools and devices that MacSec cannot try here, and several would need new safety rules first. They come one at a time, each tested before it ships.
+
 ## MacSec 1.9.0
 
 Mobile checks now cover more file types and more of the app, and the app shows which OWASP MASVS controls are met.

@@ -637,7 +637,7 @@ export interface Channels {
   'sessions:owasp': { args: [string]; result: OwaspChecklistInfo }
   'sessions:masvs': { args: [string]; result: MasvsInfo }
   'sessions:compare': { args: [string]; result: SessionCompare }
-  'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json']; result: string | null }
+  'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json' | 'masvs-report']; result: string | null }
   'projects:save-hook': { args: [string]; result: string | null }
   'projects:save-ci': { args: [string, 'github' | 'azure']; result: string | null }
   'checkup:run': { args: []; result: CheckupResult }

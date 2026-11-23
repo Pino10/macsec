@@ -203,11 +203,12 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               value=""
               aria-label="Export findings"
               onChange={(e) => {
-                const f = e.target.value as 'sarif' | 'defectdojo' | 'cyclonedx' | 'json'
+                const f = e.target.value as 'sarif' | 'defectdojo' | 'cyclonedx' | 'json' | 'masvs-report'
                 if (f) void act('export', () => api.invoke('sessions:export', id, f)).then((p) => p && notify({ kind: 'info', text: 'Exported.' }))
               }}
             >
               <option value="">Export…</option>
+              {live?.kind === 'mobile-scan' && <option value="masvs-report">MASVS report (open, then Print to PDF)</option>}
               <option value="sarif">SARIF (GitHub, editors)</option>
               <option value="defectdojo">DefectDojo</option>
               <option value="cyclonedx">SBOM (CycloneDX)</option>

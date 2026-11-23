@@ -58,6 +58,7 @@ import { deleteSession, listSessions, readSession, recoverSessions, saveSession,
 import { executiveHtml, sessionHtml } from './report'
 import { sessionOwasp } from './owaspmap'
 import { sessionMasvs } from './masvs'
+import { masvsReportHtml } from './masvsreport'
 import { leakKit } from './leakkit'
 import { projectStats } from './scanners/plan'
 import { findApp, findCli, installAgent, listAgents, openBurp, openTerminal, shellQuote } from './agents'
@@ -493,7 +494,7 @@ function registerIpc(): void {
   handle('sessions:export', async (id, format) => {
     const d = sessionDetail(String(id))
     if (!mainWindow) return null
-    const ext = format === 'sarif' ? 'sarif' : format === 'cyclonedx' ? 'cdx.json' : 'json'
+    const ext = format === 'sarif' ? 'sarif' : format === 'cyclonedx' ? 'cdx.json' : format === 'masvs-report' ? 'html' : 'json'
     let text: string
     if (format === 'sarif') text = JSON.stringify(toSarif(d.findings, app.getVersion()), null, 2)
     else if (format === 'defectdojo') text = JSON.stringify(toDefectDojo(d.findings, d), null, 2)
@@ -502,7 +503,10 @@ function registerIpc(): void {
       if (!existsSync(sbom)) throw new ValidationError('This session has no SBOM. Run a Standard or Deep code review (Syft makes it).')
       text = readFileSync(sbom, 'utf8')
     } else if (format === 'json') text = JSON.stringify({ session: { ...d, findings: undefined }, findings: d.findings }, null, 2)
-    else throw new ValidationError('Choose SARIF, DefectDojo, CycloneDX or JSON.')
+    else if (format === 'masvs-report') {
+      if (d.kind !== 'mobile-scan') throw new ValidationError('The MASVS report is for mobile checks.')
+      text = masvsReportHtml(d, app.getVersion())
+    } else throw new ValidationError('Choose SARIF, DefectDojo, CycloneDX, JSON or the MASVS report.')
     const r = await dialog.showSaveDialog(mainWindow, { title: 'Export findings', defaultPath: join(app.getPath('downloads'), `macsec-${d.id}.${ext}`) })
     if (r.canceled || !r.filePath) return null
     writeFileSync(r.filePath, text)
