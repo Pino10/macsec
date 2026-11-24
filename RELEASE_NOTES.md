@@ -1,3 +1,35 @@
+## 1.39.0
+
+Plugins can now run in a **container on an internal Docker network**, with the metering proxy as the
+only route to the target. This is real network isolation when Docker or Colima is running, not an
+environment-variable label.
+
+### What it does
+
+- A plugin can declare a **container image** and run its arguments inside that image.
+- MacSec creates an **internal** Docker network, starts the metering proxy on the host gateway, and
+  runs the container with `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `MACSEC_PLUGIN_PROXY`.
+- The container has no route to the target except through the proxy. The proxy counts requests and
+  refuses past the engagement budget, then MacSec kills the container and removes the network.
+- The result reports the container flag, counted requests and whether the budget was exhausted.
+- The Plugins page has a container image field and says the tool must already be in the image.
+
+### Limits, said plainly
+
+- The isolation is **network-only**. The container still has its image's filesystem and whatever the
+  image runs. MacSec does not mount the target into it.
+- A container image with a hostile entrypoint has the same privileges Docker gives it. Use a trusted
+  image and a pinned tag.
+- Docker/Colima must be installed and running. If it is not, the run fails with a clear message; no
+  silent fallback.
+- The proxy counts HTTP and CONNECT; the container cannot reach the target directly, which is the
+  point. It does not inspect TLS contents.
+- The image must already be pulled; MacSec does not pull arbitrary images inside a run.
+
+657 tests (652 passed, 5 skipped).
+
+---
+
 ## 1.38.0
 
 Plugin tools can now be **metered** through a local proxy. It is metering, not a sandbox, and the

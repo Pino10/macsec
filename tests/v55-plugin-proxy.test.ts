@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createServer, request as httpRequest, type Server } from 'http'
 import { startMeteredProxy } from '../src/main/pluginproxy'
+import { containerArgs } from '../src/main/plugins'
 
 const close = (s: Server): Promise<void> => new Promise((r) => s.close(() => r()))
 let target: Server | null = null
@@ -11,6 +12,18 @@ afterEach(async () => {
   if (target) await close(target)
   target = null
   proxy = null
+})
+
+describe('the container runner', () => {
+  it('runs the image on the internal network with the proxy as the only route', () => {
+    const args = containerArgs({ id: 'p', name: 'Tool', bin: '', args: ['-u', '{target}'], parser: 'json', containerImage: 'example/tool:1' }, 'c1', 'net1', 'http://host.docker.internal:1234', 'https://app/x', 'app')
+    expect(args).toContain('--network')
+    expect(args).toContain('net1')
+    expect(args).toContain('host.docker.internal:host-gateway')
+    expect(args).toContain('HTTP_PROXY=http://host.docker.internal:1234')
+    expect(args).toContain('example/tool:1')
+    expect(args).not.toContain('app') // the target is only in the placeholder, not a direct arg here
+  })
 })
 
 describe('the metering proxy', () => {
