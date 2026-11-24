@@ -9,6 +9,7 @@
  * Only the packs listed here can be installed, so a review never loads instructions from an
  * address someone typed in.
  */
+import { gitBin } from '../git'
 import { execFile } from 'child_process'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -160,7 +161,7 @@ export function packState(root: string, id: string): PackState {
 
 function git(args: string[], cwd: string): Promise<string> {
   return new Promise((resolve, reject) =>
-    execFile('git', args, { cwd, timeout: 180_000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (err, out, errOut) => (err ? reject(new Error(String(errOut || err.message).trim().split('\n').pop())) : resolve(String(out).trim())))
+    execFile(gitBin(), args, { cwd, timeout: 180_000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (err, out, errOut) => (err ? reject(new Error(String(errOut || err.message).trim().split('\n').pop())) : resolve(String(out).trim())))
   )
 }
 

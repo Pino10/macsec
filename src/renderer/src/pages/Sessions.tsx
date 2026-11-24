@@ -7,7 +7,7 @@ import { issueText } from '@shared/insights'
 import { tokensText } from '@shared/estimate'
 import { verificationOf, VERIFICATION_TEXT, asvsOf } from '@shared/verification'
 import { ArrowLeft, Bot, Check, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText, Globe } from 'lucide-react'
-import { SEVERITIES, type Finding, type FindingCategory, type SearchHit, type SessionDetail, type SessionInfo, type Severity, type SessionCompare, type VhostHit } from '@shared/types'
+import { SEVERITIES, type Finding, type FindingCategory, type SearchHit, type SessionDetail, type SessionInfo, type Severity, type SessionCompare, type VhostHit, type PatchRecord } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
 import { SessionMasvs, SessionOwasp } from '../components/OwaspList'
@@ -572,6 +572,9 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
   const { act, settings, notify } = useApp()
   const simple = !!settings?.explainSimply
   const [asking, setAsking] = useState(false)
+  const [patch, setPatch] = useState<PatchRecord | null>(null)
+  const [phrase, setPhrase] = useState('')
+  const [patching, setPatching] = useState(false)
   const triage = async (t: Finding['triage'] | null, remember?: 'site' | 'everywhere'): Promise<void> => {
     const d = await act('triage', () => api.invoke('findings:triage', id, f.id, t ?? null, remember))
     if (d) onChange(d)
@@ -615,6 +618,66 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
         >
           <Bot size={13} /> {asking ? 'Asking a second AI…' : 'Ask a second AI to try to disprove this'}
         </button>
+      )}
+      {canOpen && !f.triage && f.severity !== 'info' && (
+        <div className="patch-box">
+          {!patch && (
+            <button
+              className="btn btn-sm"
+              disabled={patching}
+              onClick={async () => {
+                setPatching(true)
+                try {
+                  const p = await api.invoke('patches:propose', id, f.id)
+                  setPatch(p)
+                  setPhrase('')
+                } catch (e) {
+                  notify({ kind: 'error', text: (e as Error).message })
+                } finally {
+                  setPatching(false)
+                }
+              }}
+            >
+              <Sparkles size={13} /> {patching ? 'Preparing a patch in a scratch copy…' : 'Prepare a fix in a scratch copy'}
+            </button>
+          )}
+          {patch && (
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div className="hint">
+                <strong style={{ color: 'var(--ink)' }}>{patch.id}</strong> in a scratch copy, never in your project.
+                {patch.tests.ran ? ` Tests: ${patch.tests.passed ? 'passed' : 'failed'} (${patch.tests.command}).` : ' No test command found, so this cannot be applied.'}
+              </div>
+              {patch.error && <div className="hint" style={{ color: 'var(--warn)' }}>{patch.error}</div>}
+              {!!patch.diff && <pre className="patch-diff">{patch.diff.slice(0, 20000)}</pre>}
+              {patch.tests.output && <details><summary className="hint">Test output</summary><pre className="patch-diff">{patch.tests.output.slice(-4000)}</pre></details>}
+              {!patch.applied ? (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input className="input mono" style={{ width: 260, height: 32 }} placeholder={`Type APPLY ${patch.id}`} value={phrase} onChange={(e) => setPhrase(e.target.value)} aria-label="Confirmation phrase" />
+                  <button
+                    className="btn btn-sm btn-primary"
+                    disabled={!patch.tests.passed || phrase !== `APPLY ${patch.id}`}
+                    onClick={async () => {
+                      try {
+                        setPatch(await api.invoke('patches:apply', patch.id, phrase))
+                        notify({ kind: 'info', text: 'Patch applied. Roll it back here if anything is wrong.' })
+                      } catch (e) {
+                        notify({ kind: 'error', text: (e as Error).message })
+                      }
+                    }}
+                  >
+                    Apply
+                  </button>
+                  <button className="btn btn-sm" onClick={async () => { await api.invoke('patches:discard', patch.id); setPatch(null) }}>Discard</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span className="tag tag-ok">Applied {patch.appliedAt ? new Date(patch.appliedAt).toLocaleString('en-GB') : ''}</span>
+                  <button className="btn btn-sm" onClick={async () => { try { setPatch(await api.invoke('patches:rollback', patch.id)) } catch (e) { notify({ kind: 'error', text: (e as Error).message }) } }}>Roll back</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
       {(f.owner || f.due) && (
         <p className="hint" style={{ margin: '0 0 8px' }}>
