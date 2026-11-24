@@ -24,15 +24,15 @@ describe('the SQL corpus', () => {
 
   it('scores a hit inside the tolerance, a miss, and a finding at the wrong line', () => {
     const s = scoreSqlCorpus(corpus, [
-      { file: 'php/vulnerable.php', line: 5 },
-      { file: 'python/vulnerable.py', line: 20 },
-      { file: 'javascript/clean.js', line: 8 }
+      { file: 'php/raw.php', line: 5 },
+      { file: 'python/fstring.py', line: 20 },
+      { file: 'javascript/concat-clean.js', line: 7 }
     ])
-    const php = s.cases.find((c) => c.id === 'php-request-to-query')!
+    const php = s.cases.find((c) => c.id === 'php-raw')!
     expect(php.tp).toBe(1)
-    const py = s.cases.find((c) => c.id === 'python-format-to-execute')!
+    const py = s.cases.find((c) => c.id === 'python-fstring')!
     expect(py.fn).toBe(1)
-    const js = s.cases.find((c) => c.id === 'javascript-parameterised')!
+    const js = s.cases.find((c) => c.id === 'javascript-concat-clean')!
     expect(js.fp).toBe(1)
     expect(s.all.precision).toBeLessThan(1)
     expect(s.all.recall).toBeLessThan(1)
