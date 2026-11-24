@@ -1,6 +1,6 @@
 ## 1.33.0
 
-The mobile scanner now covers the platform, resilience and privacy checks that the OmniBisic review
+The mobile scanner now covers the platform, resilience and privacy checks that the previous review
 found by hand, and it says what it cannot know without a running app.
 
 - **Android task hijacking**: an exported `singleTask` activity without `taskAffinity` is reported
@@ -23,7 +23,7 @@ found by hand, and it says what it cannot know without a running app.
   authority, Info.plist keys and permissions, and test-host/key detection in the Hermes bundle for
   both platforms.
 
-The OmniBisic reports are not in this repository; they stay on the machine, as asked.
+The assessment reports are not in this repository; they stay on the machine, as asked.
 
 641 tests (636 passed, 5 skipped).
 
@@ -45,7 +45,7 @@ The mobile scan now reads the things that were missing on iOS, and it stops repo
 - It does not run the app. Screenshot blocking, pinning enforcement, jailbreak detection and the actual base URL at runtime still need a device and a proxy.
 - It does not verify key restrictions with Google, and it does not contact test hosts.
 
-634 tests pass (629 passed, 5 skipped). The iOS checks were run against the supplied OmniBisic IPA via `OMNI_IPA_DIR`: ad hoc for 25 devices, team `Sathish Manju`, signed entitlements without a Keychain group, `GMSApiKey` present, test hosts and keys in the bundle.
+634 tests pass (629 passed, 5 skipped). The iOS checks were run against the supplied IPA via `OMNI_IPA_DIR`: ad hoc for 25 devices, an individual team, signed entitlements without a Keychain group, `GMSApiKey` present, test hosts and keys in the bundle.
 
 ---
 

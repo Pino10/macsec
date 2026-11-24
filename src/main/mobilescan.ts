@@ -337,7 +337,7 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
           ...webviewGap(text, kind === 'apk' ? 'android' : 'ios', kind === 'apk' ? 'AndroidManifest.xml' : 'main.jsbundle')
         )
         if (kind === 'apk') r.findings.push(...screenshotGap('android', text, false, 'classes.dex'), ...pinningGap(text, 'android', 'res/xml/network_security_config.xml'))
-        else r.findings.push(...keychainClasses(text, 'OmniBisic Bank'))
+        else r.findings.push(...keychainClasses(text, 'app'))
         note(`${bufs.length} compiled ${bufs.length === 1 ? 'file' : 'files'} read, ${r.hosts.length} servers named`)
         return [...out, ...r.findings]
       })
