@@ -106,7 +106,10 @@ export default function Plugins(): React.JSX.Element {
         </div>
 
         <div className="panel" style={{ padding: 16, display: 'grid', gap: 10 }}>
-          <strong>Run a plugin</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <strong className="grow">Run a plugin</strong>
+            {list.length > 0 && <button className="link" onClick={async () => { if (!window.confirm('Remove every plugin definition? Binaries and images are not deleted.')) return; const r = await act('plugin-clear', () => api.invoke('plugins:clear')); if (r) setList(r) }}>Remove all definitions</button>}
+          </div>
           <select className="input" value={session} onChange={(e) => setSession(e.target.value)} aria-label="Session">
             {finished.length === 0 && <option value="">No finished result</option>}
             {finished.map((s) => (<option key={s.id} value={s.id}>{s.title} · {s.target}</option>))}

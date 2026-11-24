@@ -452,6 +452,18 @@ export interface AgentInfo {
 
 // ---------------------------------------------------------------- App
 
+export interface ContainerStatus {
+  dockerPath: string
+  dockerHost: string
+  home: string
+  colimaPath: string
+  colima: boolean
+  running: boolean
+  version: string
+  managed: string
+  detail: string
+}
+
 export interface AppSettings {
   /** Laramac's www folder by default. */
   wwwPath: string
@@ -485,6 +497,8 @@ export interface AppSettings {
   packsAsk?: 'yes' | 'no'
   /** The newest skill pack version already announced, so each update is announced once. */
   packsNotified?: Record<string, string>
+  /** Optional container runtime used by the plugin runner. */
+  container?: { dockerPath?: string; dockerHost?: string; home?: string; colimaHome?: string; limaHome?: string; managedDir?: string }
 }
 
 export interface FreeLlmInfo {
@@ -662,7 +676,13 @@ export interface Channels {
   'loop:verify': { args: [string, Reviewer]; result: LoopState }
   'ad:pick': { args: []; result: string | null }
   'ad:start': { args: [string]; result: SessionInfo }
+  'container:status': { args: []; result: ContainerStatus }
+  'container:configure': { args: [{ dockerPath?: string; dockerHost?: string; home?: string; colimaHome?: string; limaHome?: string; managedDir?: string }]; result: ContainerStatus }
+  'container:start': { args: []; result: ContainerStatus }
+  'container:stop': { args: []; result: ContainerStatus }
+  'container:uninstall': { args: [boolean]; result: { removed: boolean; note: string } }
   'plugins:list': { args: []; result: PluginDef[] }
+  'plugins:clear': { args: []; result: PluginDef[] }
   'plugins:presets': { args: []; result: { name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: Severity; description: string; install: string; metering?: 'proxy' | 'none' }[] }
   'plugins:save': { args: [Record<string, unknown>]; result: PluginDef[] }
   'plugins:delete': { args: [string]; result: PluginDef[] }

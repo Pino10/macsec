@@ -5,6 +5,7 @@ import type { AgentInfo, LocalLlm, OptionalTool, ToolCategory, ToolInfo } from '
 import { useApp } from '../store'
 import { FreeLlmPanel, Integrations, ModelServersPanel, SkillPacks, PacksAsk } from '../components/Extras'
 import { PageHead, Seg } from '../ui'
+import ContainerRuntime from '../components/ContainerRuntime'
 
 const GROUPS: { id: ToolCategory; title: string; icon: React.ReactNode }[] = [
   { id: 'code', title: 'Code', icon: <Shield size={18} /> },
@@ -84,6 +85,7 @@ export default function Tools(): React.JSX.Element {
           <Download size={14} /> {missing.length === 0 ? 'All installed' : busy.has('all') ? 'Installing…' : `Install ${missing.length} missing`}
         </button>
       </PageHead>
+      <ContainerRuntime />
 
       {outdated.length > 0 && (
         <div className="notice info">
