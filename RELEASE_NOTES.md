@@ -1,3 +1,13 @@
+## 1.18.0
+
+- **Attack paths, and where to break them.** Findings that add up are now shown as a path: how the attack would go, what it needs, what it reaches, and the single cheapest fix that breaks it. Five new paths cover an upload that is served as a page, a key that opens a cloud service, a debug page with secrets behind it, a CORS gap over real user data, and a GraphQL API that trusts the account it is asked about. Each path is built only from findings that were really found, never from a guess. It appears in a new **Attack paths** tab on a result, in the PDF summary, in the fix plan, and on Assets.
+- **Four more skills, and the functions that use them.** `attack-chains` (how small findings become one attack, how to write it), `api-authorization` (cross-account reads, tenant leaks, mass assignment), `js-deep-analysis` (source maps, bundles, sinks, what changed) and `privilege-escalation` (climbing from a normal account). They are loaded by the web, API, server and code-review AI, not just listed.
+- **jsluice, through Katana.** The web scan now runs Katana with `-jsluice` in Standard and Thorough, so the endpoints and paths jsluice finds in the JavaScript join the pages MacSec tests next. No new download: it uses the Katana already installed.
+- **Assets page rebuilt.** It opens with what the score means (and the four bands), filters by kind, sorts worst first, and each asset shows its spark, its counts, what is proven, how long fixes took, the fix list with the score change, and the attack paths with the place to break them. Refreshing is explicit, and the empty and loading states say what is happening.
+- **Tests.** 5 new path tests, plus the skill and jsluice parsers; 581 passed, 4 skipped.
+
+Limits, on purpose: a path is a story built from findings, not a test that the chain works, and the app says so.
+
 ## 1.17.0
 
 - **WAF honeypots and deception, learned from the people who run them.** Shields waste a scanner's time: a port mimic accepts every connection so a scan shows every port open; dynamic path spoofing answers random paths with 200 and a nearly identical page, nudging the length so a size filter stops working; decoy .env and .sql files are served to catch scanners; tarpits hold the scanner open. MacSec now checks for all of it, compares structure instead of size, adds one note that says "this is deception", and turns the matching findings down to info instead of reporting them. The scan's AI is told to judge noise as noise and to point at the results that do not fit the pattern.

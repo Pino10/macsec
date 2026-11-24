@@ -17,11 +17,11 @@ import type { Op } from './engine'
 
 /** The review methods that fit each kind of check, so the report judges findings the way an expert in that area would. */
 export const METHOD: Record<'web' | 'api' | 'mobile' | 'cloud' | 'server', string[]> = {
-  web: ['client-side-review', 'infra-config-review', 'identity-surface-review', 'http-cache-review', 'standards-mapping-catalog', 'false-positive-check', 'evidence-gate-review', 'verify-with-proof', 'novelty-and-impact', 'hypotheses-from-invariants', 'bounty-report-writing', 'untrusted-content-guard'],
-  api: ['api-security-review', 'standards-mapping-catalog', 'graphql-review', 'auth-session-review', 'false-positive-check', 'evidence-gate-review', 'verify-with-proof', 'novelty-and-impact', 'hypotheses-from-invariants', 'bounty-report-writing', 'untrusted-content-guard'],
+  web: ['attack-chains', 'js-deep-analysis', 'client-side-review', 'infra-config-review', 'identity-surface-review', 'http-cache-review', 'standards-mapping-catalog', 'false-positive-check', 'evidence-gate-review', 'verify-with-proof', 'novelty-and-impact', 'hypotheses-from-invariants', 'bounty-report-writing', 'untrusted-content-guard'],
+  api: ['api-authorization', 'attack-chains', 'api-security-review', 'standards-mapping-catalog', 'graphql-review', 'auth-session-review', 'false-positive-check', 'evidence-gate-review', 'verify-with-proof', 'novelty-and-impact', 'hypotheses-from-invariants', 'bounty-report-writing', 'untrusted-content-guard'],
   mobile: ['mobile-app-review', 'android-app-review', 'ios-app-review', 'false-positive-check', 'evidence-gate-review', 'verify-with-proof', 'novelty-and-impact', 'bounty-report-writing', 'untrusted-content-guard'],
   cloud: ['cloud-iam-review', 'cloud-baas-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard'],
-  server: ['network-server-review', 'infra-config-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard']
+  server: ['network-server-review', 'attack-chains', 'infra-config-review', 'false-positive-check', 'evidence-gate-review', 'untrusted-content-guard']
 }
 
 const WHAT = { web: ['web', 'site'], api: ['API', 'API'], mobile: ['mobile app', 'app'], cloud: ['cloud account', 'cloud account'], server: ['server and open ports', 'server'] } as const

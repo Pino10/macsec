@@ -854,9 +854,13 @@ export interface Chain {
   id: string
   name: string
   story: string
-  members: { id: string; title: string; severity: Severity }[]
+  /** What the parts add up to, in one line. */
+  impact?: string
+  members: { id: string; title: string; severity: Severity; fix?: string }[]
   /** One level above the worst part, because together they are worse than any one alone. */
   severity: Severity
+  /** The cheapest single fix that breaks the whole path. */
+  breakAt?: { id: string; title: string; fix: string }
 }
 
 export interface Action {

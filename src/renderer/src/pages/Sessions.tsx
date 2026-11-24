@@ -103,7 +103,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [showFp, setShowFp] = useState(false)
   const [paused, setPaused] = useState(false)
   const [onlyProven, setOnlyProven] = useState(false)
-  const [tab, setTab] = useState<'findings' | 'owasp' | 'report' | 'run' | 'surface' | 'checklist'>('findings')
+  const [tab, setTab] = useState<'findings' | 'paths' | 'owasp' | 'report' | 'run' | 'surface' | 'checklist'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const [sureDelete, setSureDelete] = useState(false)
   const live = sessions.find((s) => s.id === id)
@@ -285,6 +285,9 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <button role="tab" aria-selected={tab === 'findings'} onClick={() => setTab('findings')}>
             Findings
           </button>
+          <button role="tab" aria-selected={tab === 'paths'} onClick={() => setTab('paths')}>
+            Attack paths
+          </button>
           <button role="tab" aria-selected={tab === 'owasp'} onClick={() => setTab('owasp')}>
             {live?.kind === 'mobile-scan' ? 'OWASP' : 'OWASP Top 10'}
           </button>
@@ -357,6 +360,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
         </div>
       )}
 
+      {tab === 'paths' && <AttackPaths detail={detail} onPick={(fid) => { setTab('findings'); setSel(fid) }} />}
       {tab === 'surface' && <Surface id={id} />}
       {tab === 'checklist' && <ChecklistView id={id} />}
       {tab === 'owasp' && (
@@ -621,6 +625,57 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
 }
 
 type SurfaceData = NonNullable<Awaited<ReturnType<typeof window.macsec.invoke<'recon:data'>>>>
+
+type ChainPlan = Awaited<ReturnType<typeof window.macsec.invoke<'sessions:fixplan'>>>
+
+/**
+ * How the findings add up to a real attack, and the one fix that breaks each path. A path is shown
+ * only when every part of it was found, so this is evidence from the session, not a guess.
+ */
+function AttackPaths({ detail, onPick }: { detail: SessionDetail; onPick: (findingId: string) => void }): React.JSX.Element {
+  const [plan, setPlan] = useState<ChainPlan | null>(null)
+  useEffect(() => {
+    if (detail.status === 'running') return
+    void window.macsec.invoke('sessions:fixplan', detail.id).then(setPlan).catch(() => setPlan(null))
+  }, [detail.id, detail.status, detail.findings])
+  if (detail.status === 'running') return <Empty title="The run is still going">Paths appear when it finishes.</Empty>
+  if (!plan) return <Empty title="Looking for paths…">Reading the findings that are still open.</Empty>
+  if (!plan.chains.length) {
+    return (
+      <Empty title="No attack path in this result">
+        A path needs two or more open findings that add up, for example an exposed file with a key in it, or a way to find accounts with no limit on guessing. Fixing the open findings one by one is still the right next step.
+      </Empty>
+    )
+  }
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      {plan.chains.map((c) => (
+        <section key={c.id} className="panel" style={{ padding: 16 }} aria-label={c.name}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Sev s={c.severity} />
+            <strong style={{ fontSize: 15 }}>{c.name}</strong>
+            <span className="hint">made of {c.members.length} findings</span>
+          </div>
+          <p style={{ margin: '8px 0 0', color: 'var(--ink-2)' }}>{c.story}</p>
+          {c.impact ? <p className="hint" style={{ marginTop: 4 }}>If someone used it: {c.impact}</p> : null}
+          {c.breakAt ? (
+            <div className="fix" style={{ marginTop: 10 }}>
+              <b>Break it here:</b> {c.breakAt.title}
+              <div className="hint" style={{ marginTop: 2 }}>{c.breakAt.fix}</div>
+            </div>
+          ) : null}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+            {c.members.map((m) => (
+              <button key={m.id} className="btn btn-sm" onClick={() => onPick(m.id)} data-tip="Open this finding">
+                <Sev s={m.severity} /> {m.title.length > 60 ? `${m.title.slice(0, 60)}…` : m.title}
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
 
 /** What is different from the last recon of the same domain. */
 function ReconChanges({ delta }: { delta: NonNullable<SurfaceData['delta']> }): React.JSX.Element {

@@ -5,6 +5,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { setRoot } from '../src/main/paths'
 import { parseGau } from '../src/main/reconscan'
+import { parseKatana } from '../src/main/scanners/web'
 import { parseSqlmap, setSqlmapRunner } from '../src/main/impact/actions'
 import { CATALOG, toolDef } from '../src/main/toolbox'
 import { engagementUsage, saveEngagement } from '../src/main/engagement'
@@ -147,5 +148,19 @@ describe('the new tools', () => {
     const run = await runCampaign({ plan: plan([step()]), engagement: e, approved: ['s1'], phrase: PHRASE, acceptLeftovers: false, delayMs: 0, guard: false })
     expect(run.steps[0].status).toBe('not-proven')
     expect(run.requests).toBe(0)
+  })
+})
+
+describe('jsluice through katana', () => {
+  it('reads the endpoints jsluice pulled out of the JavaScript, and keeps the site only', () => {
+    const jsonl = [
+      JSON.stringify({ request: { endpoint: 'https://shop.example.test/js/app.js' } }),
+      JSON.stringify({ tag: 'jsluice', data: '/api/v2/users', source: 'https://shop.example.test/js/app.js' }),
+      JSON.stringify({ tag: 'jsluice', data: 'https://other.test/x', source: 'https://shop.example.test/js/app.js' }),
+      JSON.stringify({ jsluice: [{ kind: 'endpoint', url: 'https://shop.example.test/graphql' }] })
+    ].join('\n')
+    const urls = parseKatana(jsonl, 'shop.example.test')
+    expect(urls).toEqual(expect.arrayContaining(['https://shop.example.test/js/app.js', 'https://shop.example.test/api/v2/users', 'https://shop.example.test/graphql']))
+    expect(urls.some((u) => u.includes('other.test'))).toBe(false)
   })
 })

@@ -37,6 +37,12 @@ export default function FixPlan({ detail }: { detail: SessionDetail }): React.JS
               <div key={c.id}>
                 <Sev s={c.severity} /> <strong>{c.name}</strong>
                 <div className="hint">{c.story}</div>
+                {c.impact ? <div className="hint">If it is used: {c.impact}</div> : null}
+                {c.breakAt ? (
+                  <div className="hint" style={{ color: 'var(--ink-2)' }}>
+                    <b>Break it here:</b> {c.breakAt.title}. {c.breakAt.fix}
+                  </div>
+                ) : null}
                 <div className="hint">Parts: {c.members.map((m) => m.title).join('; ')}</div>
               </div>
             ))}
