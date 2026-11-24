@@ -278,7 +278,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               value=""
               aria-label="Export findings"
               onChange={(e) => {
-                const f = e.target.value as 'sarif' | 'defectdojo' | 'cyclonedx' | 'csv' | 'json' | 'masvs-report'
+                const f = e.target.value as 'sarif' | 'defectdojo' | 'cyclonedx' | 'csv' | 'json' | 'masvs-report' | 'bounty'
                 if (f) void act('export', () => api.invoke('sessions:export', id, f)).then((p) => p && notify({ kind: 'info', text: 'Exported.' }))
               }}
             >
@@ -288,6 +288,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               <option value="defectdojo">DefectDojo</option>
               <option value="cyclonedx">SBOM (CycloneDX)</option>
               <option value="csv">CSV (a spreadsheet)</option>
+              <option value="bounty">Bounty submission draft (Markdown)</option>
               <option value="json">JSON</option>
             </select>
           )}

@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.36.0
+
+- `plugins.ts`: declared binary/args/parser, no shell, manual run, engagement for remote hosts, findings appended as possible; `plugins:*` IPC and the Plugins page.
+- `bountyReport` in `exports.ts` and the `bounty` export format.
+
 ### Added in 1.35.0
 
 - Engagement profiles (`EngagementProfile` in `shared/impact.ts`, normalised in `engagement.ts`, select in the Impact form).
