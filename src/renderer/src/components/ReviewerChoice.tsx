@@ -9,10 +9,23 @@ export default function ReviewerChoice({ value, onChange, what }: { value: Revie
   const [servers, setServers] = useState<ModelServer[]>([])
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [free, setFree] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   useEffect(() => {
-    void window.macsec.invoke('ai:agents').then(setAgents)
-    void window.macsec.invoke('freellm:get').then((f) => setFree(f.hasKey))
-    void window.macsec.invoke('ai:servers').then(setServers).catch(() => setServers([]))
+    let alive = true
+    void Promise.all([
+      window.macsec.invoke('ai:agents').catch(() => []),
+      window.macsec.invoke('freellm:get').catch(() => ({ hasKey: false })),
+      window.macsec.invoke('ai:servers').catch(() => [])
+    ]).then(([a, f, sv]) => {
+      if (!alive) return
+      setAgents(a)
+      setFree(f.hasKey)
+      setServers(sv)
+      setLoaded(true)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
   const has = (id: string): boolean => agents.find((a) => a.id === id)?.installed ?? false
   const model = settings?.llm.model
@@ -40,9 +53,10 @@ export default function ReviewerChoice({ value, onChange, what }: { value: Revie
   const ready = list.filter((r) => r.ok && (r.ds || !usingDs || (r.id !== 'claude-local' && r.id !== 'model')))
   const hidden = list.length - ready.length
   useEffect(() => {
-    if (agents.length && servers && !ready.some((r) => r.id === value)) onChange('none')
+    // Only decide once every list is in. Before that, "is it ready?" is unknown, not false.
+    if (loaded && !ready.some((r) => r.id === value)) onChange('none')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agents, free, model, servers])
+  }, [loaded, agents, free, model, servers, value, settings?.llm.baseUrl])
   const groups: [typeof list[number]['group'], string][] = [['mac', 'On this Mac: nothing leaves it'], ['cloud', 'Cloud AI: the findings are sent to the provider'], ['none', 'No AI']]
   const chosen = ready.find((r) => r.id === value && (r.ds ? usingDs && settings?.llm.baseUrl === r.ds.baseUrl : true))
   return (

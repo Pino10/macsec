@@ -1,3 +1,35 @@
+## 1.33.1
+
+The mobile scan was starting with **no AI** in two situations, and both are fixed.
+
+### Why the AI was missing
+
+- The Mobile page initialised its reviewer to the saved setting **once**, with `'none'` as the
+  fallback. If settings loaded after the page mounted (normal on a cold start), the page kept
+  `'none'`, so the scan never created the AI step. The Web scan had the same pattern.
+- The reviewer picker also reset a choice to `'none'` while its AI lists were still loading: the
+  effect ran when `agents` had loaded but `servers` had not, so a DeepSeek or model selection looked
+  unavailable for a moment and was replaced with `'none'`.
+
+### What changed
+
+- The Mobile and Web forms now follow the saved reviewer when settings arrive, unless the person
+  has already picked one in that form.
+- The reviewer picker waits for agents, Free LLM API and model servers to load before deciding a
+  choice is unavailable. A DeepSeek selection is no longer reset to "Scanners only" during load.
+- If the reviewer really is none, the form still shows "Scanners only" and the session says "No AI".
+
+### Mobile coverage
+
+The coverage map now lists the live techniques mobile testers use (TLS interception, pinning bypass,
+root/jailbreak bypass, Keychain/adb extraction, exported components, task hijacking, tapjacking,
+screenshots, WebView, deep links, Play Integrity) and says which ones MacSec automates and which
+need a device.
+
+636 tests pass (this is a UI state fix; the suite and build are clean).
+
+---
+
 ## 1.33.0
 
 The mobile scanner now covers the platform, resilience and privacy checks that the previous review
