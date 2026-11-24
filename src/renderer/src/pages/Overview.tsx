@@ -14,14 +14,8 @@ const LAUNCH: { page: Page; icon: React.ReactNode; g: string; title: string; tex
   { page: 'api', icon: <Plug size={20} />, g: '#ff3d7f', title: 'Check an API', text: 'Load a Postman or OpenAPI file and see what it gives away.' }
 ]
 /** One go: a project's code and its live site, joined in one report. */
-const testFully = (setPage: (p: Page) => void): void => {
-  try {
-    sessionStorage.setItem('macsec.reviewMode', 'full')
-  } catch {
-    // Not available: the page opens on the whole-project review.
-  }
-  setPage('review')
-}
+// The full audit (code plus live site) lives with the other special audits now.
+const testFully = (setPage: (p: Page) => void): void => setPage('audit')
 
 export default function Overview(): React.JSX.Element {
   const { sessions, tools, setPage, showSession, act, setTools, busy, notify, settings, updateSettings } = useApp()

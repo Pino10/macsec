@@ -199,7 +199,7 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
     log('info', `Reviewing ${info.title}: ${stats.files} files, ${stats.languages.join(', ') || 'no known languages'}`, id)
 
     // 2. Scanners.
-    const runs = planScanners(root, stats, req.depth, raw).filter((s) => !req.skip?.includes(s.id))
+    const runs = planScanners(root, stats, req.depth, raw, { skipHistory: req.skipHistory }).filter((s) => !req.skip?.includes(s.id))
     const steps = runs.map((s) => step({ id: s.id, label: s.label, status: 'waiting' }))
     for (const [i, run] of runs.entries()) {
       if (r.cancelled) break

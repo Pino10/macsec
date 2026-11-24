@@ -17,6 +17,19 @@ export function Switch({ on, onChange, disabled, label }: { on: boolean; onChang
   return <button type="button" role="switch" aria-checked={on} aria-label={label} className="switch no-drag" disabled={disabled} onClick={onChange} />
 }
 
+/** A switch with its own text as a label, so clicking the words works too. */
+export function SwitchLine({ on, onChange, disabled, label, help }: { on: boolean; onChange: () => void; disabled?: boolean; label: string; help?: string }): React.JSX.Element {
+  return (
+    <label className={disabled ? 'switch-line is-disabled' : 'switch-line'}>
+      <Switch on={on} onChange={onChange} disabled={disabled} label={label} />
+      <span className="switch-copy">
+        <strong>{label}</strong>
+        {help && <span className="hint">{help}</span>}
+      </span>
+    </label>
+  )
+}
+
 export function Seg<T extends string>({ value, options, onChange, label }: { value: T; options: [T, React.ReactNode][]; onChange: (v: T) => void; label: string }): React.JSX.Element {
   return (
     <div className="seg" role="radiogroup" aria-label={label}>

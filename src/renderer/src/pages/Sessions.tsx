@@ -338,9 +338,11 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           <button role="tab" aria-selected={tab === 'paths'} onClick={() => setTab('paths')}>
             Attack paths
           </button>
-          <button role="tab" aria-selected={tab === 'owasp'} onClick={() => setTab('owasp')}>
-            {live?.kind === 'mobile-scan' ? 'OWASP' : 'OWASP Top 10'}
-          </button>
+          {(live?.kind === 'web-scan' || live?.kind === 'api-scan' || live?.kind === 'mobile-scan') && (
+            <button role="tab" aria-selected={tab === 'owasp'} onClick={() => setTab('owasp')}>
+              {live?.kind === 'mobile-scan' ? 'OWASP' : 'OWASP Top 10'}
+            </button>
+          )}
           <button role="tab" aria-selected={tab === 'report'} onClick={() => setTab('report')}>
             Report
           </button>

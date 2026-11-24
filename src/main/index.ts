@@ -285,6 +285,7 @@ function validReview(req: unknown): ReviewRequest {
     focus: pick(r.focus, ['security', 'bugs', 'all'] as const, 'security'),
     keepCode: r.keepCode === true,
     skip: Array.isArray(r.skip) ? r.skip.filter((x): x is string => typeof x === 'string') : [],
+    skipHistory: r.skipHistory === true,
     skills: Array.isArray(r.skills) ? r.skills.filter((x): x is string => typeof x === 'string' && /^(own|mine|pack):[\w.:-]{1,120}$/.test(x)).slice(0, 80) : []
   }
 }

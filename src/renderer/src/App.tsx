@@ -6,6 +6,8 @@ import { NotificationLayer } from './components/Notifications'
 import ErrorBoundary from './components/ErrorBoundary'
 import Rail, { PAGE_ORDER } from './components/Rail'
 import ThisMac from './pages/ThisMac'
+import NewTest from './pages/NewTest'
+import CommandPalette from './components/CommandPalette'
 import JobsBar from './components/JobsBar'
 import { overall } from './components/LiveRun'
 import Overview from './pages/Overview'
@@ -57,7 +59,7 @@ function EngineBar(): React.JSX.Element {
         )}
       </button>
       <span style={{ flex: 1 }} />
-      <button className="btn btn-primary" onClick={() => setPage('review')}>
+      <button className="btn btn-primary" onClick={() => setPage('new')}>
         <Plus size={15} /> New test
       </button>
     </header>
@@ -130,6 +132,7 @@ function Shell(): React.JSX.Element {
           <div className="scroll">
             <div className="page" key={page}>
               <UpdateBar />
+              {page === 'new' && <NewTest />}
               {page === 'overview' && <Overview />}
               {page === 'updates' && <Updates />}
               {page === 'projects' && <Projects />}
@@ -152,6 +155,7 @@ function Shell(): React.JSX.Element {
       </div>
       <JobsBar />
       <NotificationLayer />
+      <CommandPalette />
     </>
   )
 }

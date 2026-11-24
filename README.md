@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.22.0 | Web scan and code review rearranged around the decision, pace control, request and cost estimates, Start a test, Cmd+K | [1.22.0](RELEASE_NOTES.md#1220) |
 | 1.21.0 | The full release history, a SQLite session index, interface cleanup | [1.21.0](RELEASE_NOTES.md#1210) |
 | 1.20.0 | A command line with baselines, search across sessions, storage cleanup, an accuracy gate in CI, accessibility | [1.20.0](RELEASE_NOTES.md#1200) |
 | 1.19.0 | The five trust fixes: no credentials to tools, pinned DNS, masked evidence, signed releases, reviewer scope. Proofs reach findings | [1.19.0](RELEASE_NOTES.md#1190) |
