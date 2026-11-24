@@ -1,4 +1,7 @@
 import { spawnSync } from 'child_process'
+import { existsSync } from 'fs'
+// The system git shim fails while Xcode is selected but its licence is not accepted.
+const GIT = existsSync('/Library/Developer/CommandLineTools/usr/bin/git') ? '/Library/Developer/CommandLineTools/usr/bin/git' : 'git'
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -206,7 +209,7 @@ describe('what will run, in plain words', () => {
 
 describe('skill updates', () => {
   const sh = (cwd: string, ...args: string[]): string => {
-    const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8' })
+    const r = spawnSync(GIT, ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8' })
     if (r.status !== 0) throw new Error(r.stderr)
     return r.stdout.trim()
   }

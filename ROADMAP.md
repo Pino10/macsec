@@ -38,10 +38,10 @@ Status after 1.26.1, verified against the release itself.
          a slow rate, for hosts the person owns.
    - [x] Report only an answer that proves a vhost, and nothing on a wildcard.
 5. **Patch generation, last and isolated.**
-   - [ ] Generate into a scratch copy, never the project.
-   - [ ] Run the project's own tests with a time cap, then the scanners again on the patched copy.
-   - [ ] Show the diff, require a typed confirmation, keep a one-click rollback, and refuse when
-         there is no test command.
+   - [x] Generate into a scratch copy, never the project.
+   - [x] Run the project's own tests with a time cap, show the diff, require a typed confirmation,
+         keep a one-click rollback, and refuse when there is no test command.
+   - [ ] Run the scanners again on the patched copy (next).
 
 ## Later
 

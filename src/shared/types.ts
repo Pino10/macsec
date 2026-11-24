@@ -656,6 +656,11 @@ export interface Channels {
   'ignored:remove': { args: [string]; result: { key: string; scope: 'site' | 'everywhere'; title: string; place?: string; at: string }[] }
   'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null, ('site' | 'everywhere')?]; result: SessionDetail }
   /** Mark several findings at once, with an optional owner and due date. */
+  'patches:propose': { args: [string, string]; result: PatchRecord }
+  'patches:list': { args: [string]; result: PatchRecord[] }
+  'patches:apply': { args: [string, string]; result: PatchRecord }
+  'patches:rollback': { args: [string]; result: PatchRecord }
+  'patches:discard': { args: [string]; result: void }
   'findings:second-opinion': { args: [string, string]; result: SessionDetail }
   'findings:triage-bulk': { args: [string, string[], 'fixed' | 'accepted' | 'not-a-problem' | null, { owner?: string; due?: string }?]; result: SessionDetail }
   'profiles:list': { args: []; result: SavedProfile[] }
@@ -742,6 +747,23 @@ export interface Channels {
   'impact:runs': { args: []; result: ImpactRun[] }
   /** Fill in the fields a plan step cannot know (the expected string, a read-back address, an undo note). */
   'impact:update-step': { args: [{ planId: string; stepId: string; patch: Partial<PlannedStep> }]; result: ImpactPlan }
+}
+
+export interface PatchRecord {
+  id: string
+  sessionId: string
+  findingId: string
+  title: string
+  createdAt: string
+  dir: string
+  scratch: string
+  diff: string
+  files: string[]
+  tests: { ran: boolean; passed: boolean; command: string; output: string }
+  applied: boolean
+  appliedAt?: string
+  rolledBack: boolean
+  error?: string
 }
 
 export interface VhostHit {

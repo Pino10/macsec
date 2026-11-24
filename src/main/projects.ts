@@ -3,6 +3,7 @@
  * Azure DevOps organization. Tokens come from the Keychain and are only ever sent to the service
  * they belong to.
  */
+import { gitBin } from './git'
 import { execFile } from 'child_process'
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, statSync } from 'fs'
 import { basename, join } from 'path'
@@ -174,7 +175,7 @@ export function cloneInto(url: string, target: string, fullHistory: boolean, onC
   const clean = url.replace(/^https:\/\/[^@/]+@/, 'https://')
   const args = [...(token ? authHeader(clean, token) : []), 'clone', '--quiet', ...(fullHistory ? [] : ['--depth', '1']), clean, target]
   return new Promise((resolve, reject) => {
-    const child = execFile('git', args, { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 30 * 60_000, maxBuffer: 1024 * 1024 }, (err, _o, stderr) => {
+    const child = execFile(gitBin(), args, { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 30 * 60_000, maxBuffer: 1024 * 1024 }, (err, _o, stderr) => {
       if (!err) return resolve()
       const msg = String(stderr || err.message)
       reject(new Error(/Authentication|403|401|could not read Username|not found/i.test(msg) ? 'The repository could not be read. Check that the account you connected can see it.' : `Cloning failed: ${msg.trim().split('\n').pop()}`))

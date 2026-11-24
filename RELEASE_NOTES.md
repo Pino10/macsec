@@ -1,3 +1,46 @@
+## 1.31.0
+
+Patch generation, in a scratch copy, with tests, a diff, a typed confirmation and a rollback. It is
+the last backlog item, and it ships with the safety rails that make it worth having.
+
+### How a patch is made
+
+- **A scratch copy, never the project.** The project is copied to `~/MacSec/patches/<id>/work`,
+  without `node_modules`, `vendor`, `.git` or build folders; dependencies are symlinked back so the
+  project's tests can run. A git baseline is committed in the copy, so a diff is exact.
+- **Only the copy is edited.** Claude Code runs with `acceptEdits` and only Read, Edit and Write, in
+  the scratch folder, with a settings file that denies Keychain and cloud credentials. The prompt
+  names one finding, forbids touching tests, manifests, CI or dependencies, and asks for the
+  smallest change.
+- **The project's own tests must pass.** npm `scripts.test`, Composer `test`, or pytest. No test
+  command means the patch is shown but cannot be applied, and the interface says why.
+- **The diff is shown**, with the test output behind a disclosure.
+- **Apply requires the exact phrase** `APPLY <patch id>`, and only after the tests passed. The
+  original files are backed up first, then the diff is applied with `git apply` (or `patch -p1`
+  for a project without git).
+- **One-click rollback** restores the backed-up files. Discard deletes the scratch copy and record.
+- Everything is in the finding's panel: prepare, read the diff, read the tests, type the phrase,
+  apply, roll back.
+
+### A git fix while Xcode is unlicensed
+
+Selecting Xcode without accepting its licence makes `/usr/bin/git` fail through the xcodebuild shim.
+The app now prefers the Command Line Tools git when it exists, and the skill-update tests do the
+same, so a licence prompt cannot break cloning, skill updates or patch diffs.
+
+### Limits, stated
+
+- **No automatic scanner rescan yet.** The patch must pass the project's tests and be read by a
+  person; re-running the security checks on the patched copy is the next step, not a claim here.
+- An AI patch can be functionally correct and still be the wrong fix. The diff and the rollback are
+  the control for that, not a promise.
+- Applying needs a test command and a passing test run. That is deliberate.
+
+627 tests pass (623 passed, 4 skipped), including a scratch-copy test that applies only with the
+phrase and rolls back to the original bytes.
+
+---
+
 ## 1.30.0
 
 Two decisions, both made from actual runs rather than another deferral.

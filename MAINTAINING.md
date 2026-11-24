@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.31.0
+
+- `patch.ts`: scratch copy, AI edit of the copy only, test detection and run, diff, typed apply, backup and rollback; `patches:*` IPC and the finding panel.
+- `git.ts`: prefer the Command Line Tools git when the Xcode licence is unaccepted.
+
 ### Added in 1.30.0
 
 - The Amass decision: 5.1.3 against subfinder 2.17.0 on `owasp.org`; Amass timed out at seven minutes with no result, subfinder returned 158. Do not add it.
