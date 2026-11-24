@@ -56,8 +56,8 @@ export function addEvidence(root: string, findings: Finding[], around = 4): Find
     if (!at || at > lines.length) return f
     const start = Math.max(1, at - around)
     const end = Math.min(lines.length, at + around)
-    const mask = f.category === 'secret' || /secret|key|token|password|credential/i.test(f.title)
+    // Always masked: a key can sit in the lines around any finding, not only a "secret" one.
     const slice = lines.slice(start - 1, end).map((l) => (l.length > 400 ? `${l.slice(0, 400)} …` : l))
-    return { ...f, line: f.line ?? at, context: { start, at, lines: mask ? slice.map(maskSecrets) : slice } }
+    return { ...f, line: f.line ?? at, context: { start, at, lines: slice.map(maskSecrets) } }
   })
 }

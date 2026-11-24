@@ -54,6 +54,7 @@ function Chain_({ c }: { c: Chain }): React.JSX.Element {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Sev s={c.severity} />
         <strong>{c.name}</strong>
+        <span className="tag">{c.confidence}</span>
       </div>
       <div className="hint" style={{ marginTop: 2 }}>
         {c.story}
@@ -82,8 +83,10 @@ export default function Assets(): React.JSX.Element {
   }
   useEffect(() => {
     load()
+    // Deliberately not on every session update: this page parses every session, so it loads when
+    // opened and when Refresh is pressed, not twice a second during a scan.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, sessions])
+  }, [api])
 
   const shown = useMemo(() => {
     const l = (list ?? []).filter((a) => kind === 'all' || a.kind === kind)

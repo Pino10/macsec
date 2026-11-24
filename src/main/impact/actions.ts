@@ -555,6 +555,7 @@ async function msfRun(c: ActionContext): Promise<ActionResult> {
   client.reserve(Math.min(12, client.left().requests), `Metasploit run ${step.module}`)
   const marker = `macsec-${rand()}`
   const ip = lanIp()
+  // Bind only the address the target will call back to, never every interface.
   let resolveHit: (v: Callback | null) => void = () => undefined
   const hit = new Promise<Callback | null>((r) => (resolveHit = r))
   const server: Server = createServer((req, res) => {
@@ -568,7 +569,10 @@ async function msfRun(c: ActionContext): Promise<ActionResult> {
     res.writeHead(404)
     res.end()
   })
-  await new Promise<void>((r) => server.listen(0, '0.0.0.0', () => r()))
+  await new Promise<void>((r, reject) => {
+    server.once('error', reject)
+    server.listen(0, ip, () => r())
+  })
   const listenPort = (() => {
     const a = server.address()
     return a && typeof a === 'object' ? a.port : 0

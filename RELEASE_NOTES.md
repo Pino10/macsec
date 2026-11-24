@@ -1,3 +1,20 @@
+## 1.19.0
+
+This release is mostly the five things the last review said were still open. It also connects a controlled proof back to the finding that started it.
+
+- **Session credentials no longer go to tools.** httpx, Katana, Nuclei and WPScan run signed out. The signed-in crawl is MacSec's own, capped at 120 requests on the target's host, and the header check follows a redirect only when it stays on the same host. A pasted cookie can no longer ride a redirect to someone else.
+- **DNS is really pinned now.** A guarded request resolves once, refuses metadata and mixed answers, and then connects to the approved address (`netclient.ts`), with the name kept in the Host header and TLS SNI. The rebinding window is closed for every confirmation request.
+- **Evidence is masked everywhere.** The lines around a finding are redacted whatever the finding is about, so a key next to a SQL injection no longer lands in a report or an export.
+- **Releases are signed.** `SHA256SUMS.txt` carries an Ed25519 signature from a key only the release workflow holds, and the app refuses to install a release whose list is unsigned or signed by another key. The public half is in `build/release-signing.pub`. The release workflow fails if the key secret is missing.
+- **The reviewer can no longer read your credentials.** Each review gets its own Claude Code settings file that denies `.ssh`, `.aws`, `.gnupg`, Keychains, `.netrc`, `.npmrc`, `.docker`, `.kube` and the like, and the prompt says plainly that code is data, not instructions.
+- **A proof now reaches its finding.** When a controlled run proves a step that was planned from a finding, that finding becomes confirmed, wears the proof, and names the engagement and run. It shows on the finding, in the PDF, and the run says how many findings it proved.
+- **Attack paths say how sure they are.** A path is `likely` when every part is confirmed or proven, `possible` otherwise, and overlapping rules no longer show the same pair twice.
+- **Smaller fixes.** The Metasploit callback listener binds only the address the target will call back to. The API "answers without signing in" check ignores login pages. Quick web scans skip the deception sampling again. Assets loads when opened instead of on every session update. An uncaught error in the main process is logged and shown instead of disappearing. `SECURITY.md` and `THREAT_MODEL.md` exist.
+
+Tests: 581 passed, 4 skipped.
+
+Still open, honestly: the headless CLI with a baseline, a SQLite session index with search and retention, notarised builds, and a benchmark loop against a known vulnerable app. Those are 1.20.
+
 ## 1.18.0
 
 - **Attack paths, and where to break them.** Findings that add up are now shown as a path: how the attack would go, what it needs, what it reaches, and the single cheapest fix that breaks it. Five new paths cover an upload that is served as a page, a key that opens a cloud service, a debug page with secrets behind it, a CORS gap over real user data, and a GraphQL API that trusts the account it is asked about. Each path is built only from findings that were really found, never from a guess. It appears in a new **Attack paths** tab on a result, in the PDF summary, in the fix plan, and on Assets.

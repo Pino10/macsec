@@ -13,6 +13,7 @@ import type { ReleaseNote, UpdateInfo, UpdateStatus } from '../shared/types'
 import { downloadFile, sha256File, USER_AGENT } from './download'
 import { dirs } from './paths'
 import { hashFor, newer } from './toolbox'
+import { verifyChecksums } from './releasesign'
 
 const REPO = 'Pino10/macsec'
 
@@ -29,7 +30,7 @@ export interface Release {
 export const dmgArch = (): string => (process.arch === 'arm64' ? 'arm64' : 'x64')
 
 /** The newest release (tags like v1.2.3) newer than `current`, with a DMG for this Mac and checksums. */
-export function pickUpdate(releases: Release[], current: string, arch = dmgArch()): { info: UpdateInfo; dmg: string; sums: string } | null {
+export function pickUpdate(releases: Release[], current: string, arch = dmgArch()): { info: UpdateInfo; dmg: string; sums: string; sig: string } | null {
   let best: Release | null = null
   for (const r of releases) {
     // MacSec's releases up to 0.8.1 were published as pre-releases: they count too.
@@ -41,16 +42,17 @@ export function pickUpdate(releases: Release[], current: string, arch = dmgArch(
   const version = best.tag_name.slice(1)
   const dmg = best.assets.find((a) => a.name === `MacSec-${version}-${arch}.dmg`)
   const sums = best.assets.find((a) => a.name === 'SHA256SUMS.txt')
-  // Without a checksum list the download cannot be verified, so it is not offered.
-  if (!dmg || !sums) return null
-  return { info: { version, current, notes: ownNotes(best.body), publishedAt: best.published_at, url: best.html_url }, dmg: dmg.browser_download_url, sums: sums.browser_download_url }
+  const sig = best.assets.find((a) => a.name === 'SHA256SUMS.txt.sig')
+  // Without a checksum list and its signature the download cannot be verified, so it is not offered.
+  if (!dmg || !sums || !sig) return null
+  return { info: { version, current, notes: ownNotes(best.body), publishedAt: best.published_at, url: best.html_url }, dmg: dmg.browser_download_url, sums: sums.browser_download_url, sig: sig.browser_download_url }
 }
 
 function run(cmd: string, args: string[]): Promise<string> {
   return new Promise((res, rej) => execFile(cmd, args, { maxBuffer: 8 * 1024 * 1024 }, (err, out, errOut) => (err ? rej(new Error(String(errOut).trim() || err.message)) : res(String(out)))))
 }
 
-let pending: { info: UpdateInfo; dmg: string; sums: string } | null = null
+let pending: { info: UpdateInfo; dmg: string; sums: string; sig: string } | null = null
 
 let lastReleases: Release[] = []
 let checkedAt: number | null = null
@@ -82,7 +84,7 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
     problem = (e as Error).message
     try {
       const tag = (await latestTagFromWeb(REPO)).replace(/^v/, '')
-      const files = [`MacSec-${tag}-arm64.dmg`, `MacSec-${tag}-x64.dmg`, 'SHA256SUMS.txt']
+      const files = [`MacSec-${tag}-arm64.dmg`, `MacSec-${tag}-x64.dmg`, 'SHA256SUMS.txt', 'SHA256SUMS.txt.sig']
       lastReleases = [
         {
           tag_name: `v${tag}`,
@@ -112,15 +114,25 @@ const currentBundle = (): string => resolve(dirname(app.getPath('exe')), '..', '
 export async function installUpdate(update: (pct: number | null, label?: string) => void): Promise<void> {
   if (!pending) await checkForUpdate()
   if (!pending) throw new Error('MacSec is up to date.')
-  const { info, dmg, sums } = pending
+  const { info, dmg, sums, sig } = pending
   const bundle = currentBundle()
   if (!bundle.endsWith('.app') || bundle.includes('/AppTranslocation/') || bundle.startsWith('/Volumes/')) throw new Error('Move MacSec to your Applications folder first, then update.')
 
   const name = `MacSec-${info.version}-${dmgArch()}.dmg`
   const file = join(dirs.downloads(), name)
   await downloadFile(dmg, file, (p) => update(p, `Downloading MacSec ${info.version}`))
-  update(null, 'Checking the download')
+  update(null, 'Checking the signature')
   const list = await (await fetch(sums, { headers: { 'User-Agent': USER_AGENT } })).text()
+  const sigRes = await fetch(sig, { headers: { 'User-Agent': USER_AGENT } })
+  if (!sigRes.ok) {
+    rmSync(file, { force: true })
+    throw new Error('This release is not signed by MacSec, so it was not installed. Download it from the release page and install it by hand if you trust it.')
+  }
+  if (!verifyChecksums(list, Buffer.from(await sigRes.arrayBuffer()))) {
+    rmSync(file, { force: true })
+    throw new Error('The release signature does not match. The download was deleted and nothing was installed.')
+  }
+  update(null, 'Checking the download')
   const expected = hashFor(list, name)
   if (!expected || (await sha256File(file)) !== expected) {
     rmSync(file, { force: true })

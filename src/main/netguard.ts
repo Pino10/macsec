@@ -53,10 +53,18 @@ const defaultResolver: Resolver = async (host) => (await lookup(host, { all: tru
 export class NetGuard {
   private pinned = new Map<string, Set<string>>()
   private checked = new Map<string, number>()
+  /** The address this host was approved on, for a request that must not resolve again. */
+  private approved = new Map<string, string>()
 
   constructor(private resolver: Resolver = defaultResolver, private every = 10_000, private now: () => number = Date.now) {}
 
   /** Throws with a plain reason when the request should not go. A name that does not resolve is left to the request itself. */
+  /** The approved address for a host, or null when nothing was pinned (a name that does not resolve). */
+  addressFor(host: string): string | null {
+    const h = host.replace(/^\[|\]$/g, '').toLowerCase()
+    return this.approved.get(h) ?? null
+  }
+
   async check(host: string): Promise<void> {
     const h = host.replace(/^\[|\]$/g, '').toLowerCase()
     const last = this.checked.get(h)
@@ -76,6 +84,7 @@ export class NetGuard {
     const pin = this.pinned.get(h)
     if (!pin) {
       this.pinned.set(h, new Set(ips))
+      this.approved.set(h, ips[0])
       return
     }
     const moved = ips.filter((ip) => !pin.has(ip))

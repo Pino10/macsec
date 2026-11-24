@@ -175,6 +175,7 @@ const open = (f: Finding): boolean => f.verdict !== 'false-positive' && !f.triag
 export function chainsOf(findings: Finding[]): Chain[] {
   const list = findings.filter(open)
   const out: Chain[] = []
+  const seen = new Set<string>()
   for (const r of RULES) {
     const parts = r.needs.map((re) => list.filter((f) => re.test(f.title)))
     if (parts.some((p) => !p.length)) continue
@@ -192,6 +193,11 @@ export function chainsOf(findings: Finding[]): Chain[] {
       members.push(pick)
     }
     if (!ok) continue
+    // Overlapping rules can describe the same pair of findings: show it once.
+    const signature = members.map((m) => m.id).sort().join('|')
+    if (seen.has(signature)) continue
+    seen.add(signature)
+    const confidence: Chain['confidence'] = members.every((m) => m.confidence === 'confirmed' || !!m.proof) ? 'likely' : 'possible'
     const worst = Math.max(...members.map((m) => ORDER.indexOf(m.severity)))
     const breaker = members.find((m) => r.breakWith.test(m.title)) ?? members[0]
     out.push({
@@ -201,6 +207,7 @@ export function chainsOf(findings: Finding[]): Chain[] {
       impact: r.impact,
       members: members.map((m) => ({ id: m.id, title: m.title, severity: m.severity, fix: m.fix })),
       severity: ORDER[Math.min(ORDER.length - 1, worst + 1)],
+      confidence,
       breakAt: { id: breaker.id, title: breaker.title, fix: r.breakHint }
     })
   }

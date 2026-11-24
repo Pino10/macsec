@@ -58,12 +58,27 @@ jobs:
       - name: Checksums
         run: cd dist && shasum -a 256 *.dmg > SHA256SUMS.txt && cat SHA256SUMS.txt
 
+      # The list is signed with a key that only this workflow holds, so the app can tell a real
+      # release from an edited one. No secret, no release.
+      - name: Sign the checksums
+        env:
+          MACSEC_SIGNING_KEY: ${{ secrets.MACSEC_SIGNING_KEY }}
+        run: |
+          if [ -z "$MACSEC_SIGNING_KEY" ]; then
+            echo "::error::MACSEC_SIGNING_KEY is not set. A release must be signed by MacSec's key."
+            exit 1
+          fi
+          node -e "const {readFileSync,writeFileSync}=require('fs');const {sign,createPrivateKey}=require('crypto');const key=createPrivateKey(process.env.MACSEC_SIGNING_KEY);writeFileSync('dist/SHA256SUMS.txt.sig', sign(null, readFileSync('dist/SHA256SUMS.txt'), key))"
+          node -e "const {readFileSync}=require('fs');const {verify,createPublicKey}=require('crypto');const ok=verify(null, readFileSync('dist/SHA256SUMS.txt'), createPublicKey(readFileSync('build/release-signing.pub','utf8')), readFileSync('dist/SHA256SUMS.txt.sig'));if(!ok){console.error('The signature does not check out');process.exit(1)}"
+          ls -l dist/SHA256SUMS.txt.sig
+
       - uses: actions/upload-artifact@v4
         with:
           name: macsec-dmg
           path: |
             dist/*.dmg
             dist/SHA256SUMS.txt
+            dist/SHA256SUMS.txt.sig
 
       # A release created in the GitHub UI (tag push): just attach the files.
       - name: Attach DMGs to the release
@@ -73,6 +88,7 @@ jobs:
           files: |
             dist/*.dmg
             dist/SHA256SUMS.txt
+            dist/SHA256SUMS.txt.sig
 
       # Started from the Actions tab with a tag: publish the release.
       - name: Publish the release
@@ -86,7 +102,7 @@ jobs:
           awk '/^## /{n++} n==1' RELEASE_NOTES.md > notes.md
           target=""
           [ "$REPO" = "$GITHUB_REPOSITORY" ] && target="--target $GITHUB_SHA"
-          gh release create "$TAG" dist/*.dmg dist/SHA256SUMS.txt --repo "$REPO" $target \
+          gh release create "$TAG" dist/*.dmg dist/SHA256SUMS.txt dist/SHA256SUMS.txt.sig --repo "$REPO" $target \
             --title "MacSec $TAG" --notes-file notes.md --latest
           echo "Published $TAG to $REPO"
 
@@ -97,5 +113,5 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           awk '/^## /{n++} n==1' RELEASE_NOTES.md > notes.md
-          gh release create "$TAG" dist/*.dmg dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+          gh release create "$TAG" dist/*.dmg dist/SHA256SUMS.txt dist/SHA256SUMS.txt.sig --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "MacSec $TAG" --notes-file notes.md --latest

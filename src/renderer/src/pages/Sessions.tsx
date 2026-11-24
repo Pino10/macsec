@@ -503,6 +503,7 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
         {f.verdict === 'confirmed' && <span className="tag tag-ok">Confirmed by AI</span>}
         {f.verdict === 'false-positive' && <span className="tag tag-warn">Ruled out by AI</span>}
         <ConfidenceTag f={f} />
+        {f.controlled && <span className="tag tag-ok" data-tip={`Run ${f.controlled.runId} under engagement ${f.controlled.engagementRef}`}>Proven by a controlled proof</span>}
         <ExploitTag f={f} />
         <span className="tag" data-tip={VERIFICATION_TEXT[verificationOf(f)]}>{VERIFICATION_TEXT[verificationOf(f)].split(":")[0]}</span>
         {asvsOf(f.cwe) && <span className="tag" data-tip="The OWASP ASVS chapter this kind of problem belongs to.">{asvsOf(f.cwe)}</span>}
@@ -534,6 +535,16 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
           <h5>The code</h5>
           <pre>{f.snippet}</pre>
         </>
+      ) : null}
+      {f.controlled ? (
+        <div className="fix" style={{ marginTop: 4 }}>
+          <b>Proven by a controlled proof.</b> Engagement {f.controlled.engagementRef}, run {f.controlled.runId}, on {new Date(f.controlled.at).toLocaleString('en-GB')}.
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+            {f.controlled.shows.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+        </div>
       ) : null}
       <ProofBlock f={f} />
       {(f.why || f.aiNote) && (
@@ -654,6 +665,7 @@ function AttackPaths({ detail, onPick }: { detail: SessionDetail; onPick: (findi
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <Sev s={c.severity} />
             <strong style={{ fontSize: 15 }}>{c.name}</strong>
+            <span className="tag">{c.confidence}</span>
             <span className="hint">made of {c.members.length} findings</span>
           </div>
           <p style={{ margin: '8px 0 0', color: 'var(--ink-2)' }}>{c.story}</p>

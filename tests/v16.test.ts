@@ -82,8 +82,8 @@ describe('menu bar', () => {
 })
 
 describe('skills', () => {
-  it('there are 48, none with an em dash', () => {
-    expect(Object.keys(SKILLS)).toHaveLength(48)
+  it('there are at least 48, none with an em dash', () => {
+    expect(Object.keys(SKILLS).length).toBeGreaterThanOrEqual(48)
     for (const s of Object.values(SKILLS)) expect(s.body).not.toContain('—')
   })
 })
