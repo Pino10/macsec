@@ -77,7 +77,9 @@ export function normaliseDraft(input: unknown, now = Date.now()): EngagementDraf
   const hosts = [...new Set(hostList.filter((h) => typeof h === 'string' && h.trim()).map((h) => validScopeHost(h)))].slice(0, 40)
   if (!hosts.length) throw new ValidationError('Name at least one host the authority covers, such as shop.example.com or *.example.com.')
   const window = validWindow(d.startsAt, d.endsAt, now)
+  const profile = ['pentest', 'bounty', 'red-team', 'internal', 'lab'].includes(String(d.profile)) ? (String(d.profile) as EngagementDraft['profile']) : 'pentest'
   return {
+    profile,
     client: validShortText(d.client, 'the client or project', 120),
     authorityRef: validShortText(d.authorityRef, 'the authority reference', 160),
     authorizedBy: validShortText(d.authorizedBy, 'who gave the authority', 120),

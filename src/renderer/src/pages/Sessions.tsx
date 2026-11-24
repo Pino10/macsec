@@ -374,11 +374,9 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               Checklist
             </button>
           )}
-          {s.kind === 'mobile-scan' && (
-            <button role="tab" aria-selected={tab === 'desk'} onClick={() => setTab('desk')}>
-              Review desk
-            </button>
-          )}
+          <button role="tab" aria-selected={tab === 'desk'} onClick={() => setTab('desk')}>
+            Review desk
+          </button>
           {(s.kind === 'recon' || s.kind === 'web-scan') && (
             <button role="tab" aria-selected={tab === 'surface'} onClick={() => setTab('surface')}>
               {s.kind === 'recon' ? 'Pages and hosts' : 'JavaScript map'}
@@ -439,7 +437,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
 
       {tab === 'paths' && <AttackPaths detail={detail} onPick={(fid) => { setTab('findings'); setSel(fid) }} />}
       {tab === 'surface' && <Surface id={id} detail={detail} onPick={setSel} />}
-      {tab === 'desk' && <ReviewDesk id={id} reviewer={(s.reviewer ?? 'none') as Reviewer} toolCount={detail.findings.length} />}
+      {tab === 'desk' && <ReviewDesk id={id} initialReviewer={(s.reviewer ?? 'none') as Reviewer} toolCount={detail.findings.length} />}
       {tab === 'checklist' && <ChecklistView id={id} />}
       {tab === 'owasp' && (
         <>

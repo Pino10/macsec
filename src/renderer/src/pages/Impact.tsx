@@ -14,6 +14,7 @@ const cls = (c: ImpactClass): string => (c === 'confidentiality' ? 'C' : c === '
 const clsName = (c: ImpactClass): string => c[0].toUpperCase() + c.slice(1)
 
 const DRAFT_DEFAULTS = {
+  profile: 'pentest',
   client: '',
   authorityRef: '',
   authorizedBy: '',
@@ -49,6 +50,16 @@ function EngagementForm({ onSaved }: { onSaved: (e: Engagement) => void }): Reac
             A controlled proof changes things or reads real data, so it needs the same thing a person would have in hand on site: who allowed it, for which hosts, until when, and how many requests. Everything here is stored on this Mac and printed with every run.
           </p>
           <div className="choices" style={{ display: 'grid', gap: 10 }}>
+            <label className="hint" style={{ display: 'grid', gap: 4 }}>
+              Engagement type
+              <select className="input" value={f.profile} onChange={(e) => set({ profile: e.target.value })}>
+                <option value="pentest">Pentest or assessment</option>
+                <option value="bounty">Bug bounty programme</option>
+                <option value="red-team">Red team or adversary simulation</option>
+                <option value="internal">Internal audit</option>
+                <option value="lab">Lab or training</option>
+              </select>
+            </label>
             <input className="input" placeholder="Client or project" value={f.client} onChange={(e) => set({ client: e.target.value })} aria-label="Client or project" />
             <input className="input" placeholder="Authority reference (contract, ticket, email subject, programme id)" value={f.authorityRef} onChange={(e) => set({ authorityRef: e.target.value })} aria-label="Authority reference" />
             <input className="input" placeholder="Who gave the authority (a person, or the programme)" value={f.authorizedBy} onChange={(e) => set({ authorizedBy: e.target.value })} aria-label="Who gave the authority" />
@@ -95,6 +106,7 @@ function EngagementForm({ onSaved }: { onSaved: (e: Engagement) => void }): Reac
               onClick={async () => {
                 const e = await act('impact-engagement', () =>
                   api.invoke('impact:save-engagement', {
+                    profile: f.profile as 'pentest' | 'bounty' | 'red-team' | 'internal' | 'lab',
                     client: f.client,
                     authorityRef: f.authorityRef,
                     authorizedBy: f.authorizedBy,

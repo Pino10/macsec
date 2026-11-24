@@ -11,6 +11,7 @@ import { askAi } from './aisummary'
 import { beginOp, endOp } from './engine'
 import { maskSecrets } from './evidence'
 import { readSession, sessionDetail, sessionDir } from './sessions'
+import { dirs } from './paths'
 
 const SEVS: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
 const MAX_EVIDENCE = 90_000
@@ -53,39 +54,69 @@ const readText = (file: string): string => {
 /** Save the app's own evidence (no tool findings) for the blind review. */
 export async function writeEvidence(sessionId: string, unpacked?: string): Promise<string> {
   const s = readSession(sessionId)
-  const base = unpacked ?? join(sessionDir(sessionId), 'unpacked')
   const parts: string[] = [`App: ${s.title}`, `Target: ${s.target.replace(/^.*\//, '')}`, `Kind: ${s.kind}`, '']
   const raw: string[] = [...parts]
-  if (existsSync(base)) {
-    for (const f of walk(base)) {
-      const rel = f.slice(base.length + 1)
-      if (/AndroidManifest\.xml|Info\.plist|entitlements|embedded\.mobileprovision|main\.jsbundle|index\.android\.bundle|\.plist$|\.entitlements$/.test(rel)) {
-        const text = readText(f)
-        if (text.trim()) {
-          parts.push(`## ${rel}`, maskSecrets(text.slice(0, 35_000)), '')
-          raw.push(`## ${rel}`, text.slice(0, 35_000), '')
+  const add = (label: string, file: string, max = 20_000): void => {
+    if (!existsSync(file)) return
+    const text = readText(file).slice(0, max)
+    if (!text.trim()) return
+    parts.push(`## ${label}`, maskSecrets(text), '')
+    raw.push(`## ${label}`, text, '')
+  }
+  if (s.kind === 'mobile-scan') {
+    const base = unpacked ?? join(sessionDir(sessionId), 'unpacked')
+    if (existsSync(base)) {
+      for (const f of walk(base)) {
+        const rel = f.slice(base.length + 1)
+        if (/AndroidManifest\.xml|Info\.plist|entitlements|embedded\.mobileprovision|main\.jsbundle|index\.android\.bundle|\.plist$|\.entitlements$/.test(rel)) add(rel, f, 35_000)
+        if (parts.join('\n').length > MAX_EVIDENCE) break
+      }
+      const app = walk(base).find((p) => /Payload\/[^/]+\.app\/Info\.plist$/.test(p))
+      if (app) {
+        const dir = join(app, '..')
+        const ent = await new Promise<string>((resolve) => execFile('/usr/bin/codesign', ['-d', '--entitlements', ':-', dir], { maxBuffer: 4 * 1024 * 1024 }, (_e, out) => resolve(out?.toString() ?? '')))
+        if (ent.trim()) add('signed entitlements (codesign)', join(app, '..', 'entitlements.tmp'), 20_000)
+        if (ent.trim()) {
+          parts.push('## signed entitlements (codesign)', maskSecrets(ent), '')
+          raw.push('## signed entitlements (codesign)', ent, '')
         }
       }
-      if (parts.join('\n').length > MAX_EVIDENCE) break
     }
-    // iOS signed entitlements are not a file in the app; read them from codesign.
-    const app = walk(base).find((p) => /Payload\/[^/]+\.app\/Info\.plist$/.test(p))
-    if (app) {
-      const dir = join(app, '..')
-      const ent = await new Promise<string>((resolve) => execFile('/usr/bin/codesign', ['-d', '--entitlements', ':-', dir], { maxBuffer: 4 * 1024 * 1024 }, (_e, out) => resolve(out?.toString() ?? '')))
-      if (ent.trim()) {
-        parts.push('## signed entitlements (codesign)', maskSecrets(ent), '')
-        raw.push('## signed entitlements (codesign)', ent, '')
+  } else if (s.kind === 'code-review' || s.kind === 'audit') {
+    const root = s.codePath ?? join(sessionDir(sessionId), 'code')
+    if (existsSync(root)) {
+      for (const f of walk(root)) {
+        if (!/\.(php|py|js|jsx|ts|tsx|java|kt|go|rb|cs|swift|c|h|cpp|json|yml|yaml|xml|gradle|plist|entitlements)$/i.test(f)) continue
+        const rel = f.slice(root.length + 1)
+        if (/node_modules|\/vendor\/|\.git\//.test(rel)) continue
+        add(rel, f, 4_000)
+        if (parts.join('\n').length > MAX_EVIDENCE) break
+      }
+    }
+  } else {
+    const rawDir = join(sessionDir(sessionId), 'raw')
+    add('request.json', join(sessionDir(sessionId), 'request.json'), 8_000)
+    if (s.kind === 'web-scan') {
+      add('urls.txt', join(rawDir, 'urls.txt'), 12_000)
+      add('js-map.json', join(rawDir, 'js-map.json'), 20_000)
+      add('code-map.json', join(rawDir, 'code-map.json'), 20_000)
+    } else if (s.kind === 'recon') {
+      add('recon.json', join(rawDir, 'recon.json'), 30_000)
+      add('urls.txt', join(rawDir, 'urls.txt'), 12_000)
+      add('js-map.json', join(rawDir, 'js-map.json'), 20_000)
+    } else if (s.kind === 'api-scan') {
+      // The file the person loaded is kept under config/api-specs; the request names it.
+      try {
+        const req = JSON.parse(readFileSync(join(sessionDir(sessionId), 'request.json'), 'utf8')) as { spec?: string }
+        if (typeof req.spec === 'string' && /^[a-f0-9]+$/.test(req.spec)) add('api-spec', join(dirs.config(), 'api-specs', `${req.spec}.txt`), 30_000)
+      } catch {
+        // No request: the target is still in the header.
       }
     }
   }
-  if (parts.length <= 4) {
-    // No unpacked app: use the findings' places as thin evidence so the stage can explain why.
-    parts.push('No unpacked app bundle was found. Run the mobile scan again so the evidence pack is kept.')
-  }
+  if (parts.length <= 4) parts.push('No evidence file was available for this kind. Run the scan again, or keep the code for a remote review.')
   const text = parts.join('\n').slice(0, MAX_EVIDENCE)
   writeFileSync(evidenceFile(sessionId), text)
-  // The unmasked copy stays on this Mac for the reviewer; it is never sent to the AI or the report.
   writeFileSync(rawEvidenceFile(sessionId), raw.join('\n').slice(0, MAX_EVIDENCE * 2), { mode: 0o600 })
   return text
 }

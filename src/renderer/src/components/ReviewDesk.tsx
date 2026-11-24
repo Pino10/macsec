@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Bot, Combine, FileCheck2, FolderOpen, Play, ShieldCheck } from 'lucide-react'
 import type { LoopState, Reviewer } from '@shared/types'
+import ReviewerChoice from './ReviewerChoice'
 import { useApp } from '../store'
 
 /**
  * The review loop for a mobile result: tools, then a blind AI review, then the merge, then a
  * verifier. The AI findings are possible, never confirmed; the person decides at the end.
  */
-export default function ReviewDesk({ id, reviewer, toolCount }: { id: string; reviewer: Reviewer; toolCount: number }): React.JSX.Element {
+export default function ReviewDesk({ id, initialReviewer, toolCount }: { id: string; initialReviewer: Reviewer; toolCount: number }): React.JSX.Element {
   const { act, notify } = useApp()
+  const [reviewer, setReviewer] = useState<Reviewer>(initialReviewer)
+  useEffect(() => {
+    if (initialReviewer !== 'none') setReviewer(initialReviewer)
+  }, [initialReviewer])
   const api = window.macsec
   const [state, setState] = useState<LoopState | null>(null)
   const [busy, setBusy] = useState('')
@@ -40,6 +45,11 @@ export default function ReviewDesk({ id, reviewer, toolCount }: { id: string; re
         <button className="btn btn-sm" onClick={() => void api.invoke('sessions:open', id, 'folder')}>
           <FolderOpen size={13} /> Session folder
         </button>
+      </div>
+
+      <div className="loop-ai">
+        <span className="hint">Who reviews this app:</span>
+        <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
       </div>
 
       <div className="loop-stages">
