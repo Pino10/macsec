@@ -26,13 +26,11 @@
          PHPStan and Joern, comparing finding keys, duplicates and precision. This is the
          measuring stick the next three items use.
 2. **SQL corpus and Joern evaluation.**
-   - [ ] A labelled corpus of SQL injection across PHP, Python, JavaScript and Java: positive
-         samples (string-built queries, unsafe ORM raw calls) and clean samples that must not be
-         flagged.
+   - [x] A labelled corpus of SQL injection across eight languages: 33 cases, 17 vulnerable and 16 clean, with a holdout split.
    - [ ] Hold out at least a third of the samples from anyone writing rules, or the measurement
          only proves the rules match their own examples.
-   - [ ] Measure precision, recall, runtime and disk for `p/sql-injection`, Bearer, Psalm taint,
-         PHPStan and Joern, on the same machine and the same corpus.
+   - [x] Measure `p/sql-injection` on the corpus: precision 1.0, recall 0.647 (holdout 0.5).
+   - [ ] Measure Bearer, Psalm taint, PHPStan and Joern on the same corpus.
    - [ ] Decide Joern on the numbers: it replaces something, or it adds coverage worth 400 MB, or
          it does not ship.
 3. **Real, redistributable mobile fixtures and install tests.**

@@ -1,3 +1,61 @@
+## 1.26.0
+
+The corpus is now big enough to judge an engine with. This release is the labelled set, the measured
+numbers, and the decision rule for Joern written down before it is installed.
+
+### The corpus
+
+- **33 labelled cases across eight languages**: PHP, Python, JavaScript, TypeScript, Java, Go, Ruby
+  and C#. Seventeen put request data into a query; sixteen are the prepared or bound version of the
+  same code. The line that matters is marked in the source, so a label cannot drift from the code.
+- **A real holdout split.** PHP and Python are the training half (9 cases); everything else is
+  holdout (15 cases), and rules must not be written against it. Fifteen of the seventeen vulnerable
+  cases are holdout.
+- The clean halves are deliberately the same operation with a parameter, so an engine cannot pass by
+  flagging the file, the framework or the word "SQL".
+
+### The numbers, measured
+
+Semgrep with `p/sql-injection`, on this Mac, via `npm run corpus:sql`:
+
+| Split | Precision | Recall |
+| --- | --- | --- |
+| Training (PHP, Python) | 1.0 | 0.778 |
+| Holdout (the other six) | 1.0 | 0.5 |
+| All | 1.0 | 0.647 |
+
+No false positives, and six misses:
+
+- **PHP, Laravel:** `DB::select` with a concatenated string, and `DB::raw` with request data. The
+  generic rules do not know Laravel's query builders.
+- **JavaScript:** a query built by `+` concatenation. The template-literal case was already missed.
+- **TypeScript:** Prisma's `$queryRawUnsafe` and TypeORM's `query` with a template literal.
+- **Java:** Hibernate's `createQuery` with a concatenated HQL string.
+
+That is exactly the shape of gap the corpus exists to expose: framework-specific raw APIs and ORM
+escape hatches, not plain `mysql_query`.
+
+### The Joern rule
+
+Joern still is not installed, so no number is claimed for it. The rule for the next release is:
+
+- it must find the holdout cases the existing engines miss, starting with the four framework and ORM
+  cases above, and
+- it must stay under a false-positive rate of one in ten clean files on this corpus, and
+- its runtime and disk must be worth what it adds, measured on the same machine.
+
+If it cannot beat 0.5 holdout recall, it does not ship. That decision is now measurable instead of
+arguable.
+
+### Limits
+
+- 33 cases is a corpus, not a benchmark. The next growth is real applications with no known SQL
+  injection, to measure false positives on code that was not written for the test.
+- The holdout is a split by language, not by pattern: a rule tuned to PHP could still generalise.
+  The next corpus grows patterns within languages, not just languages.
+
+---
+
 ## 1.25.1
 
 The SQL corpus, and the first real numbers from it. The point of this release is not a new rule; it

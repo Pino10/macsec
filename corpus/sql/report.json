@@ -1,49 +1,88 @@
 {
-  "at": "2026-11-24T08:46:04.217Z",
+  "at": "2026-11-24T08:54:56.525Z",
   "engine": "semgrep",
   "config": "p/sql-injection",
   "bin": "/Users/badpino/MacSec/tools/bin/semgrep",
-  "corpus": 8,
-  "findings": 4,
+  "corpus": 33,
+  "findings": 12,
   "raw": [
     {
-      "file": "java/Vulnerable.java",
-      "line": 8,
-      "checkId": "java.lang.security.audit.sqli.tainted-sql-from-http-request.tainted-sql-from-http-request",
-      "tool": "Semgrep"
-    },
-    {
-      "file": "java/Vulnerable.java",
+      "file": "cs/Command.cs",
       "line": 9,
-      "checkId": "java.lang.security.audit.formatted-sql-string.formatted-sql-string",
+      "checkId": "csharp.lang.security.sqli.csharp-sqli.csharp-sqli",
       "tool": "Semgrep"
     },
     {
-      "file": "php/vulnerable.php",
+      "file": "go/sprintf.go",
+      "line": 12,
+      "checkId": "go.lang.security.injection.tainted-sql-string.tainted-sql-string",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "javascript/knex-raw.js",
+      "line": 6,
+      "checkId": "javascript.lang.security.audit.sqli.node-knex-sqli.node-knex-sqli",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "javascript/knex-raw.js",
+      "line": 6,
+      "checkId": "javascript.lang.security.audit.sqli.node-knex-sqli.node-knex-sqli",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "php/insert.php",
       "line": 5,
       "checkId": "php.lang.security.injection.tainted-sql-string.tainted-sql-string",
       "tool": "Semgrep"
     },
     {
-      "file": "python/vulnerable.py",
+      "file": "php/raw.php",
+      "line": 5,
+      "checkId": "php.lang.security.injection.tainted-sql-string.tainted-sql-string",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "python/format.py",
       "line": 9,
       "checkId": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "python/fstring.py",
+      "line": 9,
+      "checkId": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "python/percent.py",
+      "line": 9,
+      "checkId": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "python/sqlalchemy-text.py",
+      "line": 10,
+      "checkId": "python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "python/update.py",
+      "line": 9,
+      "checkId": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "ruby/where-interp.rb",
+      "line": 6,
+      "checkId": "ruby.rails.security.injection.tainted-sql-string.tainted-sql-string",
       "tool": "Semgrep"
     }
   ],
   "score": {
     "cases": [
       {
-        "id": "php-request-to-query",
-        "split": "train",
-        "tp": 1,
-        "fp": 0,
-        "fn": 0,
-        "missed": [],
-        "extra": []
-      },
-      {
-        "id": "php-prepared",
+        "id": "php-insert-clean",
         "split": "train",
         "tp": 0,
         "fp": 0,
@@ -52,7 +91,7 @@
         "extra": []
       },
       {
-        "id": "python-format-to-execute",
+        "id": "php-insert",
         "split": "train",
         "tp": 1,
         "fp": 0,
@@ -61,7 +100,7 @@
         "extra": []
       },
       {
-        "id": "python-parameterised",
+        "id": "php-laravel-binding",
         "split": "train",
         "tp": 0,
         "fp": 0,
@@ -70,18 +109,166 @@
         "extra": []
       },
       {
-        "id": "javascript-template-to-query",
+        "id": "php-laravel-dbraw",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 1,
+        "missed": [
+          "sqli at php/laravel-dbraw.php:4"
+        ],
+        "extra": []
+      },
+      {
+        "id": "php-laravel-raw",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 1,
+        "missed": [
+          "sqli at php/laravel-raw.php:4"
+        ],
+        "extra": []
+      },
+      {
+        "id": "php-query-builder",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "php-raw-clean",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "php-raw",
+        "split": "train",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-format-clean",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-format",
+        "split": "train",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-fstring-clean",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-fstring",
+        "split": "train",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-percent-clean",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-percent",
+        "split": "train",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-sqlalchemy-text-clean",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-sqlalchemy-text",
+        "split": "train",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-update-clean",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-update",
+        "split": "train",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "javascript-concat-clean",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "javascript-concat",
         "split": "holdout",
         "tp": 0,
         "fp": 0,
         "fn": 1,
         "missed": [
-          "sqli at javascript/vulnerable.js:8"
+          "sqli at javascript/concat.js:7"
         ],
         "extra": []
       },
       {
-        "id": "javascript-parameterised",
+        "id": "javascript-knex-clean",
         "split": "holdout",
         "tp": 0,
         "fp": 0,
@@ -90,7 +277,7 @@
         "extra": []
       },
       {
-        "id": "java-concat-to-execute",
+        "id": "javascript-knex-raw",
         "split": "holdout",
         "tp": 1,
         "fp": 0,
@@ -99,7 +286,103 @@
         "extra": []
       },
       {
-        "id": "java-prepared",
+        "id": "typescript-prisma-safe",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "typescript-prisma-unsafe",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 1,
+        "missed": [
+          "sqli at typescript/prisma-unsafe.ts:8"
+        ],
+        "extra": []
+      },
+      {
+        "id": "typescript-typeorm",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 1,
+        "missed": [
+          "sqli at typescript/typeorm.ts:8"
+        ],
+        "extra": []
+      },
+      {
+        "id": "java-hibernate",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 1,
+        "missed": [
+          "sqli at java/Hibernate.java:9"
+        ],
+        "extra": []
+      },
+      {
+        "id": "java-hibernateclean",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "go-query",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "go-sprintf",
+        "split": "holdout",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "ruby-where-clean",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "ruby-where-interp",
+        "split": "holdout",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "cs-command",
+        "split": "holdout",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "cs-commandclean",
         "split": "holdout",
         "tp": 0,
         "fp": 0,
@@ -109,25 +392,25 @@
       }
     ],
     "train": {
-      "tp": 2,
+      "tp": 7,
       "fp": 0,
-      "fn": 0,
+      "fn": 2,
       "precision": 1,
-      "recall": 1
+      "recall": 0.778
     },
     "holdout": {
-      "tp": 1,
+      "tp": 4,
       "fp": 0,
-      "fn": 1,
+      "fn": 4,
       "precision": 1,
       "recall": 0.5
     },
     "all": {
-      "tp": 3,
+      "tp": 11,
       "fp": 0,
-      "fn": 1,
+      "fn": 6,
       "precision": 1,
-      "recall": 0.75
+      "recall": 0.647
     }
   }
 }

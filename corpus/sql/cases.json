@@ -1,15 +1,323 @@
 {
-  "version": 1,
-  "description": "Labelled SQL injection samples for measuring engines. Each expected line is where the query is executed or built with request data. The holdout split must not be used to write or tune rules.",
+  "version": 2,
+  "description": "Labelled SQL injection samples for measuring engines. The line marked with MACSEC-SQLI is where the query is built or run with request data. The holdout split (every language except PHP and Python) must not be used to write or tune rules.",
   "toleranceLines": 2,
   "cases": [
-    { "id": "php-request-to-query", "language": "PHP", "file": "php/vulnerable.php", "split": "train", "expect": [{ "line": 6, "kind": "sqli" }] },
-    { "id": "php-prepared", "language": "PHP", "file": "php/clean.php", "split": "train", "expect": [] },
-    { "id": "python-format-to-execute", "language": "Python", "file": "python/vulnerable.py", "split": "train", "expect": [{ "line": 11, "kind": "sqli" }] },
-    { "id": "python-parameterised", "language": "Python", "file": "python/clean.py", "split": "train", "expect": [] },
-    { "id": "javascript-template-to-query", "language": "JavaScript", "file": "javascript/vulnerable.js", "split": "holdout", "expect": [{ "line": 8, "kind": "sqli" }] },
-    { "id": "javascript-parameterised", "language": "JavaScript", "file": "javascript/clean.js", "split": "holdout", "expect": [] },
-    { "id": "java-concat-to-execute", "language": "Java", "file": "java/Vulnerable.java", "split": "holdout", "expect": [{ "line": 9, "kind": "sqli" }] },
-    { "id": "java-prepared", "language": "Java", "file": "java/Clean.java", "split": "holdout", "expect": [] }
+    {
+      "id": "php-insert-clean",
+      "language": "PHP",
+      "file": "php/insert-clean.php",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "php-insert",
+      "language": "PHP",
+      "file": "php/insert.php",
+      "split": "train",
+      "expect": [
+        {
+          "line": 5,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "php-laravel-binding",
+      "language": "PHP",
+      "file": "php/laravel-binding.php",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "php-laravel-dbraw",
+      "language": "PHP",
+      "file": "php/laravel-dbraw.php",
+      "split": "train",
+      "expect": [
+        {
+          "line": 4,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "php-laravel-raw",
+      "language": "PHP",
+      "file": "php/laravel-raw.php",
+      "split": "train",
+      "expect": [
+        {
+          "line": 4,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "php-query-builder",
+      "language": "PHP",
+      "file": "php/query-builder.php",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "php-raw-clean",
+      "language": "PHP",
+      "file": "php/raw-clean.php",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "php-raw",
+      "language": "PHP",
+      "file": "php/raw.php",
+      "split": "train",
+      "expect": [
+        {
+          "line": 5,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "python-format-clean",
+      "language": "Python",
+      "file": "python/format-clean.py",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "python-format",
+      "language": "Python",
+      "file": "python/format.py",
+      "split": "train",
+      "expect": [
+        {
+          "line": 10,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "python-fstring-clean",
+      "language": "Python",
+      "file": "python/fstring-clean.py",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "python-fstring",
+      "language": "Python",
+      "file": "python/fstring.py",
+      "split": "train",
+      "expect": [
+        {
+          "line": 10,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "python-percent-clean",
+      "language": "Python",
+      "file": "python/percent-clean.py",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "python-percent",
+      "language": "Python",
+      "file": "python/percent.py",
+      "split": "train",
+      "expect": [
+        {
+          "line": 11,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "python-sqlalchemy-text-clean",
+      "language": "Python",
+      "file": "python/sqlalchemy-text-clean.py",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "python-sqlalchemy-text",
+      "language": "Python",
+      "file": "python/sqlalchemy-text.py",
+      "split": "train",
+      "expect": [
+        {
+          "line": 10,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "python-update-clean",
+      "language": "Python",
+      "file": "python/update-clean.py",
+      "split": "train",
+      "expect": []
+    },
+    {
+      "id": "python-update",
+      "language": "Python",
+      "file": "python/update.py",
+      "split": "train",
+      "expect": [
+        {
+          "line": 10,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "javascript-concat-clean",
+      "language": "JavaScript",
+      "file": "javascript/concat-clean.js",
+      "split": "holdout",
+      "expect": []
+    },
+    {
+      "id": "javascript-concat",
+      "language": "JavaScript",
+      "file": "javascript/concat.js",
+      "split": "holdout",
+      "expect": [
+        {
+          "line": 7,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "javascript-knex-clean",
+      "language": "JavaScript",
+      "file": "javascript/knex-clean.js",
+      "split": "holdout",
+      "expect": []
+    },
+    {
+      "id": "javascript-knex-raw",
+      "language": "JavaScript",
+      "file": "javascript/knex-raw.js",
+      "split": "holdout",
+      "expect": [
+        {
+          "line": 6,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "typescript-prisma-safe",
+      "language": "TypeScript",
+      "file": "typescript/prisma-safe.ts",
+      "split": "holdout",
+      "expect": []
+    },
+    {
+      "id": "typescript-prisma-unsafe",
+      "language": "TypeScript",
+      "file": "typescript/prisma-unsafe.ts",
+      "split": "holdout",
+      "expect": [
+        {
+          "line": 8,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "typescript-typeorm",
+      "language": "TypeScript",
+      "file": "typescript/typeorm.ts",
+      "split": "holdout",
+      "expect": [
+        {
+          "line": 8,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "java-hibernate",
+      "language": "Java",
+      "file": "java/Hibernate.java",
+      "split": "holdout",
+      "expect": [
+        {
+          "line": 9,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "java-hibernateclean",
+      "language": "Java",
+      "file": "java/HibernateClean.java",
+      "split": "holdout",
+      "expect": []
+    },
+    {
+      "id": "go-query",
+      "language": "Go",
+      "file": "go/query.go",
+      "split": "holdout",
+      "expect": []
+    },
+    {
+      "id": "go-sprintf",
+      "language": "Go",
+      "file": "go/sprintf.go",
+      "split": "holdout",
+      "expect": [
+        {
+          "line": 12,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "ruby-where-clean",
+      "language": "Ruby",
+      "file": "ruby/where-clean.rb",
+      "split": "holdout",
+      "expect": []
+    },
+    {
+      "id": "ruby-where-interp",
+      "language": "Ruby",
+      "file": "ruby/where-interp.rb",
+      "split": "holdout",
+      "expect": [
+        {
+          "line": 6,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "cs-command",
+      "language": "C#",
+      "file": "cs/Command.cs",
+      "split": "holdout",
+      "expect": [
+        {
+          "line": 9,
+          "kind": "sqli"
+        }
+      ]
+    },
+    {
+      "id": "cs-commandclean",
+      "language": "C#",
+      "file": "cs/CommandClean.cs",
+      "split": "holdout",
+      "expect": []
+    }
   ]
 }
