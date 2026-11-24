@@ -1,3 +1,34 @@
+## 1.25.0
+
+The measuring stick, before any new engine. Two harnesses that run without a scanner installed, and
+one of them also checks the real world every week.
+
+### What is new
+
+- **The install harness.** Every tool in the catalogue is checked against the rules that keep an
+  install honest: a real `owner/name` repository for a downloaded tool, a plain Python package for a
+  uv tool, absolute paths and a plain formula for a Homebrew tool, an https homepage, a purpose, a
+  unique slug. A live half asks GitHub for the latest release of every downloaded tool, so a renamed
+  repository, a deleted release or an empty asset list fails the harness instead of a user's first
+  review. It runs in 10.6 seconds here.
+- **A weekly workflow.** `harness.yml` runs the static rules and the live check every Monday and on
+  demand. Normal CI still runs the static half on every change.
+- **The cross-engine runner.** The same labelled case is put through Semgrep, Psalm and PHPStan
+  output formats, through the real parsers, and scored for precision and recall. Duplicate reports
+  at one place count once. It uses recorded tool output, so CI needs no scanners and no network, and
+  a parser change or an engine upgrade cannot silently change what is reported.
+- **Two commands.** `npm run harness:offline` for the static half, `npm run harness` for the live
+  half too.
+
+### Limits
+
+- The live half only checks GitHub releases; the uv and Homebrew tools are covered by the static
+  rules, because asking PyPI and Homebrew for a version on every run would be a different harness.
+- It does not actually install each tool. That is a slower, disposable-machine test, and it is the
+  next step after the SQL corpus, not something to fake in CI.
+
+---
+
 ## 1.24.1
 
 A consistency patch. No check changed.

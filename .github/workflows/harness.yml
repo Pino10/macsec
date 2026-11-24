@@ -1,0 +1,25 @@
+name: Harness
+
+# The checks that protect the checks: every install address is still real, and every engine's
+# output still parses to the same labelled finding. Weekly, and on demand.
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+jobs:
+  harness:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Static install rules and cross-engine fixtures
+        run: npm run harness:offline
+      - name: Every tool's latest release still exists
+        run: npm run harness
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.25.0 | The install and cross-engine harnesses, and a weekly check that every install address still works | [1.25.0](RELEASE_NOTES.md#1250) |
 | 1.24.1 | Every release page now carries its notes; the tag workflow sets them | [1.24.1](RELEASE_NOTES.md#1241) |
 | 1.24.0 | PHP taint analysis, the independent AI verifier, the attack-surface graph, Burp import | [1.24.0](RELEASE_NOTES.md#1240) |
 | 1.23.0 | Saved profiles, bulk triage with an owner and a due date, CSV export, the cost estimate on the result | [1.23.0](RELEASE_NOTES.md#1230) |

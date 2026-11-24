@@ -63,6 +63,13 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.25.0
+
+- `qa/installcheck.ts`: the static catalogue rules and the live GitHub release check; `qa/crossengine.ts`: recorded output through the real parsers with precision and recall.
+- `tests/v45-harness.test.ts` and `tests/fixtures/crossengine/`: the fixtures and the gate.
+- `.github/workflows/harness.yml`: weekly and on demand; `npm run harness` / `harness:offline`.
+- `scripts/` and the SQL corpus follow in 1.25.1.
+
 ### Added in 1.24.1
 
 - `.github/workflows/release.yml`: the tag path now sets the release body from the top section of `RELEASE_NOTES.md`, after attaching the files.

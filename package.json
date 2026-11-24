@@ -1,7 +1,7 @@
 {
   "name": "macsec",
   "productName": "MacSec",
-  "version": "1.24.1",
+  "version": "1.25.0",
   "description": "A free security workbench for macOS: deep code review, web and API scanning for your own projects, with AI.",
   "main": "./out/main/index.js",
   "author": "MacSec contributors",
@@ -14,7 +14,9 @@
     "dist": "electron-vite build && electron-builder --mac --publish never",
     "dist:dir": "electron-vite build && electron-builder --mac --dir --publish never",
     "test": "vitest run",
-    "benchmark": "vitest run tests/v40-cli.test.ts -t \"accuracy gate\""
+    "benchmark": "vitest run tests/v40-cli.test.ts -t \"accuracy gate\"",
+    "harness": "MACSEC_LIVE=1 vitest run tests/v45-harness.test.ts",
+    "harness:offline": "vitest run tests/v45-harness.test.ts"
   },
   "optionalDependencies": {
     "electron-liquid-glass": "^1.1.1"

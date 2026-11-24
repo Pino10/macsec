@@ -1,0 +1,1 @@
+{"results":[{"check_id":"php.lang.security.sql-injection","path":"app/Search.php","start":{"line":6},"extra":{"message":"SQL built from user input.","severity":"ERROR","lines":"$q = \"SELECT * FROM users WHERE name = '\" . $_GET['q'] . \"'\";","metadata":{"cwe":["CWE-89"]}}}]}
