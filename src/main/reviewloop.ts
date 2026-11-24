@@ -17,6 +17,7 @@ const MAX_EVIDENCE = 90_000
 const blindFile = (id: string): string => join(sessionDir(id), 'blind-findings.json')
 const combinedFile = (id: string): string => join(sessionDir(id), 'combined-findings.json')
 const evidenceFile = (id: string): string => join(sessionDir(id), 'evidence.txt')
+const rawEvidenceFile = (id: string): string => join(sessionDir(id), 'evidence.raw.txt')
 const reportFile = (id: string): string => join(sessionDir(id), 'review-loop.md')
 
 const walk = (dir: string, out: string[] = [], depth = 0): string[] => {
@@ -54,12 +55,16 @@ export async function writeEvidence(sessionId: string, unpacked?: string): Promi
   const s = readSession(sessionId)
   const base = unpacked ?? join(sessionDir(sessionId), 'unpacked')
   const parts: string[] = [`App: ${s.title}`, `Target: ${s.target.replace(/^.*\//, '')}`, `Kind: ${s.kind}`, '']
+  const raw: string[] = [...parts]
   if (existsSync(base)) {
     for (const f of walk(base)) {
       const rel = f.slice(base.length + 1)
       if (/AndroidManifest\.xml|Info\.plist|entitlements|embedded\.mobileprovision|main\.jsbundle|index\.android\.bundle|\.plist$|\.entitlements$/.test(rel)) {
         const text = readText(f)
-        if (text.trim()) parts.push(`## ${rel}`, maskSecrets(text.slice(0, 35_000)), '')
+        if (text.trim()) {
+          parts.push(`## ${rel}`, maskSecrets(text.slice(0, 35_000)), '')
+          raw.push(`## ${rel}`, text.slice(0, 35_000), '')
+        }
       }
       if (parts.join('\n').length > MAX_EVIDENCE) break
     }
@@ -68,7 +73,10 @@ export async function writeEvidence(sessionId: string, unpacked?: string): Promi
     if (app) {
       const dir = join(app, '..')
       const ent = await new Promise<string>((resolve) => execFile('/usr/bin/codesign', ['-d', '--entitlements', ':-', dir], { maxBuffer: 4 * 1024 * 1024 }, (_e, out) => resolve(out?.toString() ?? '')))
-      if (ent.trim()) parts.push('## signed entitlements (codesign)', maskSecrets(ent), '')
+      if (ent.trim()) {
+        parts.push('## signed entitlements (codesign)', maskSecrets(ent), '')
+        raw.push('## signed entitlements (codesign)', ent, '')
+      }
     }
   }
   if (parts.length <= 4) {
@@ -77,6 +85,8 @@ export async function writeEvidence(sessionId: string, unpacked?: string): Promi
   }
   const text = parts.join('\n').slice(0, MAX_EVIDENCE)
   writeFileSync(evidenceFile(sessionId), text)
+  // The unmasked copy stays on this Mac for the reviewer; it is never sent to the AI or the report.
+  writeFileSync(rawEvidenceFile(sessionId), raw.join('\n').slice(0, MAX_EVIDENCE * 2), { mode: 0o600 })
   return text
 }
 
@@ -121,13 +131,13 @@ export function parseBlind(text: string): BlindFinding[] {
     const f = raw as Record<string, unknown>
     const title = typeof f.title === 'string' ? f.title.trim().slice(0, 220) : ''
     const location = typeof f.location === 'string' ? f.location.trim().slice(0, 300) : ''
-    if (!title || !location) continue
+    if (!title) continue
     const sev = SEVS.includes(f.severity as Severity) ? (f.severity as Severity) : 'medium'
     out.push({
       id: `blind-${out.length + 1}`,
       title,
       severity: sev,
-      location,
+      location: location || 'not stated',
       evidence: typeof f.evidence === 'string' ? maskSecrets(f.evidence).slice(0, 1200) : '',
       why: typeof f.why === 'string' ? String(f.why).slice(0, 1500) : '',
       fix: typeof f.fix === 'string' ? String(f.fix).slice(0, 1500) : '',
@@ -224,7 +234,7 @@ export function combineFindings(tool: { id: string; title: string; severity: Sev
 export function loopState(sessionId: string): LoopState {
   const blind = existsSync(blindFile(sessionId)) ? (JSON.parse(readFileSync(blindFile(sessionId), 'utf8')) as BlindFinding[]) : []
   const combined = existsSync(combinedFile(sessionId)) ? (JSON.parse(readFileSync(combinedFile(sessionId), 'utf8')) as CombinedFinding[]) : []
-  return { evidence: existsSync(evidenceFile(sessionId)), blind, combined, report: existsSync(reportFile(sessionId)) }
+  return { evidence: existsSync(evidenceFile(sessionId)), rawEvidence: existsSync(rawEvidenceFile(sessionId)), blind, combined, report: existsSync(reportFile(sessionId)) }
 }
 
 export async function blindReview(sessionId: string, reviewer: Reviewer): Promise<LoopState> {
@@ -247,7 +257,7 @@ export function combineReview(sessionId: string): LoopState {
   const d = sessionDetail(sessionId)
   const blind = existsSync(blindFile(sessionId)) ? (JSON.parse(readFileSync(blindFile(sessionId), 'utf8')) as BlindFinding[]) : []
   const tool = d.findings
-    .filter((f) => f.severity !== 'info' && f.verdict !== 'false-positive' && !f.triage)
+    .filter((f) => f.verdict !== 'false-positive' && !f.triage)
     .map((f) => ({ id: f.id, title: f.title, severity: f.severity, location: f.file ?? f.url ?? 'app', evidence: (f.description ?? f.snippet ?? '').slice(0, 800) }))
   const combined = combineFindings(tool, blind)
   writeFileSync(combinedFile(sessionId), JSON.stringify(combined, null, 2))
