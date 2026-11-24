@@ -7,8 +7,9 @@ const tool = { id: 't1', title: 'Missing screenshot protection', severity: 'medi
 describe('the blind review', () => {
   it('keeps only findings with a location, and defaults the severity', () => {
     const f = parseBlind('{"findings":[{"title":"Exported activity","location":"AndroidManifest.xml","evidence":"exported=true"},{"title":"No place","severity":"high"}]}')
-    expect(f).toHaveLength(1)
+    expect(f).toHaveLength(2) // a finding without a location is shown as "not stated", not hidden
     expect(f[0]).toMatchObject({ title: 'Exported activity', severity: 'medium', confidence: 'possible' })
+    expect(f[1].location).toBe('not stated')
   })
   it('does not put the tool findings into the blind prompt', () => {
     const p = blindPrompt('App', 'evidence only')

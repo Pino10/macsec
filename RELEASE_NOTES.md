@@ -1,3 +1,27 @@
+## 1.34.2
+
+Evidence is now kept in full locally, and nothing that was seen is silently dropped from the list.
+
+- **No-hiding in the findings view.** `info` findings are shown by default; the old filter started
+  with them hidden. The severities remain toggleable.
+- **AI findings without a location are kept**, with the location shown as `not stated`. They are
+  marked possible and cannot merge with a tool finding, but they are no longer thrown away.
+- **Raw evidence stays local.** The session now keeps `evidence.txt` (masked, sent to the AI) and
+  `evidence.raw.txt` (unmasked, mode 0600, for the reviewer, never sent to the AI or the report).
+  The desk says where it is.
+- **The report masks only the secret value**, not the finding. The location, the host, the plist key,
+  the manifest attribute and the evidence excerpt remain; a key value is shortened, with its length
+  or fingerprint available where the finding records it. Dumping a live key or cookie into a report
+  that gets emailed to a bank or an assessor is not robustness, it is a second incident.
+- The combined list now includes `info` notes from the tools, not only problems.
+
+The rule is: the report must show that the thing exists, where it is, and what proves it, without
+becoming a secret store. The full value lives in the local session for the person who owns it.
+
+648 tests (643 passed, 5 skipped).
+
+---
+
 ## 1.34.1
 
 The review loop can now be used in a **single-source** mode, and it says so.

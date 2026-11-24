@@ -780,6 +780,7 @@ export interface CombinedFinding {
 
 export interface LoopState {
   evidence: boolean
+  rawEvidence: boolean
   blind: BlindFinding[]
   combined: CombinedFinding[]
   report: boolean

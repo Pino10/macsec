@@ -47,7 +47,7 @@ export default function ReviewDesk({ id, reviewer, toolCount }: { id: string; re
           <FileCheck2 size={15} />
           <div>
             <strong>1. Tools</strong>
-            <span className="hint">{toolCount} finding{toolCount === 1 ? '' : 's'} from the scan. {s?.evidence ? 'Evidence pack saved.' : 'Run the scan again to keep the evidence pack.'}</span>
+            <span className="hint">{toolCount} finding{toolCount === 1 ? '' : 's'} from the scan. {s?.evidence ? `Evidence pack saved${s.rawEvidence ? '; the unmasked copy is evidence.raw.txt in the session folder, local only' : ''}.` : 'Run the scan again to keep the evidence pack.'}</span>
           </div>
         </div>
         <div className="loop-stage" data-done={(s?.blind.length ?? 0) > 0}>
