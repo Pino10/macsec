@@ -1,5 +1,5 @@
 import Logo from './Logo'
-import { ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar, Boxes } from 'lucide-react'
+import { ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar, Boxes, Crosshair } from 'lucide-react'
 import { Bell_ } from './Notifications'
 import { useApp, type Page } from '../store'
 
@@ -16,6 +16,7 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
       { id: 'recon', label: 'Recon', icon: <Radar size={I} /> },
       { id: 'mobile', label: 'Mobile apps', icon: <Smartphone size={I} /> },
       { id: 'audit', label: 'Cloud and servers', icon: <Cloud size={I} /> },
+      { id: 'impact', label: 'Controlled proofs', icon: <Crosshair size={I} /> },
       { id: 'mac', label: 'This Mac', icon: <Laptop size={I} /> }
     ]
   },

@@ -105,6 +105,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [onlyProven, setOnlyProven] = useState(false)
   const [tab, setTab] = useState<'findings' | 'owasp' | 'report' | 'run' | 'surface' | 'checklist'>('findings')
   const [sel, setSel] = useState<string | null>(null)
+  const [sureDelete, setSureDelete] = useState(false)
   const live = sessions.find((s) => s.id === id)
   const now = useNow(live?.status === 'running')
 
@@ -221,10 +222,15 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           </button>
           {!running && (
             <button
-              className="icon-btn danger-text"
-              data-tip="Delete this session"
-              aria-label="Delete this session"
+              className={sureDelete ? 'btn btn-danger btn-sm' : 'icon-btn danger-text'}
+              data-tip={sureDelete ? 'This deletes the session folder and its raw output for good' : 'Delete this session'}
+              aria-label={sureDelete ? 'Confirm deleting this session' : 'Delete this session'}
               onClick={async () => {
+                if (!sureDelete) {
+                  setSureDelete(true)
+                  window.setTimeout(() => setSureDelete(false), 6000)
+                  return
+                }
                 const r = await act('del', () => api.invoke('sessions:delete', id))
                 if (r) {
                   setSessions(r)
@@ -232,7 +238,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
                 }
               }}
             >
-              <Trash2 />
+              {sureDelete ? 'Delete for good' : <Trash2 />}
             </button>
           )}
         </div>

@@ -1,13 +1,15 @@
 import { addRule, readRules, removeRule } from './ignored'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, safeStorage, session, shell, type IpcMainInvokeEvent, nativeTheme } from 'electron'
 import { installedEditors, isAppBundle, isEditorChoice, openInEditorOf, pickEditor } from './seckit/editors'
+import { randomBytes } from 'crypto'
 import { execFile } from 'child_process'
 import type { Server } from 'http'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { basename, join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
-import type { FreeLlmInfo, IntegrationsInfo, SkillPackInfo, ApiScanRequest, Channels, Events, ReviewRequest, ScanMode, WebScanRequest, ReconRequest, SessionInfo } from '../shared/types'
+import type { ApiScanRequest, Channels, Events, Finding, FreeLlmInfo, IntegrationsInfo, ReconRequest, ReviewRequest, Reviewer, ScanMode, SessionInfo, SkillPackInfo, WebScanRequest } from '../shared/types'
+import type { ImpactPlan, ImpactPlanRequest, ImpactRunRequest } from '../shared/impact'
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { getSecret, setSecret, setSecretsCrypto } from './secrets'
@@ -48,7 +50,15 @@ import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
 import { expandTargets } from './targets'
 import { optionalTools } from './optional'
 import { startAudit } from './audit'
-import { cancelOp, finishEvents, isPaused, pauseOp } from './engine'
+import { beginOp, cancelOp, endOp, finishEvents, isPaused, pauseOp } from './engine'
+import { askAi } from './aisummary'
+import { currentEngagement, engagementById, engagementProblem, hostKey, listEngagements, revokeEngagement, saveEngagement } from './engagement'
+import { IMPACT_ACTIONS } from './impact/catalog'
+import { aiPlanCost, aiPlannerPrompt, parseAiPlan, planFromRules } from './impact/planner'
+import { listRuns, loadPlan, runCampaign, runProblem, savePlan } from './impact/campaign'
+import { requestStop } from './impact/client'
+import { ValidationError, hostCovers, pick, validCaps, validHost, validImpacts, validUrl } from './validate'
+export { validHost } from './validate'
 import { retestFinding } from './retest'
 import { createGithubIssue, ticketJira, ticketMarkdown, validRepo } from './tickets'
 import { buildAssets, remediationPlan } from './assets'
@@ -70,7 +80,6 @@ const RENDERER_FILE = join(__dirname, '../renderer/index.html')
 let mainWindow: BrowserWindow | null = null
 let material: 'liquid-glass' | 'vibrancy' | 'none' = 'none'
 
-class ValidationError extends Error {}
 
 const macMajor = (): number => (isMac ? parseInt(release().split('.')[0], 10) - 9 : 0)
 
@@ -204,7 +213,6 @@ function allowedProject(path: unknown): string {
   return p
 }
 
-const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d)
 const MODES = ['quick', 'standard', 'thorough'] as const
 const REVIEWERS = ['none', 'claude', 'claude-local', 'claude-free', 'codex', 'gemini', 'model'] as const
 
@@ -233,12 +241,6 @@ function validConfirm(v: unknown): WebScanRequest['confirm'] {
   return out.fuzz || out.auth || out.authz || out.waf || out.logic || out.inject || out.proto ? out : undefined
 }
 
-/** A host name or IP address only: never something a tool could read as an option. */
-export function validHost(v: unknown): string {
-  const h = typeof v === 'string' ? v.trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/[/:].*$/, '') : ''
-  if (!h || h.length > 253 || h.startsWith('-') || !/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(h)) throw new ValidationError('Enter a server name or IP address, such as example.com or 203.0.113.10.')
-  return h
-}
 
 function validApi(req: unknown): ApiScanRequest {
   const r = (req ?? {}) as Partial<ApiScanRequest>
@@ -1146,6 +1148,109 @@ function registerIpc(): void {
   handle('ai:servers', () => listServers())
   handle('ai:save-server', (input) => saveServer(input))
   handle('ai:delete-server', (id) => deleteServer(String(id)))
+
+  // ---- Controlled proofs: impact under a written engagement
+  const findingsForTarget = (target: string): Finding[] => {
+    const host = hostKey(target)
+    const out: Finding[] = []
+    for (const s of listSessions().filter((x) => x.status !== 'running').slice(0, 8)) {
+      try {
+        const t = hostKey(s.target)
+        if (!(t === host || t.endsWith(`.${host}`) || host.endsWith(`.${t}`))) continue
+        out.push(...sessionDetail(s.id).findings)
+      } catch {
+        // A session that cannot be read is skipped, not fatal.
+      }
+      if (out.length > 400) break
+    }
+    return out
+  }
+  handle('impact:engagements', () => listEngagements())
+  handle('impact:current', () => currentEngagement())
+  handle('impact:save-engagement', (draft) => saveEngagement(draft))
+  handle('impact:revoke', (id) => revokeEngagement(String(id)))
+  handle('impact:catalog', () => IMPACT_ACTIONS)
+  handle('impact:runs', () => listRuns())
+  handle('impact:stop', () => {
+    requestStop()
+    return true
+  })
+  handle('impact:plan', async (req) => {
+    const r = (req ?? {}) as Partial<ImpactPlanRequest>
+    const engagement = engagementById(String(r.engagementId ?? ''))
+    if (!engagement) throw new ValidationError('Write an engagement first: it is the authority a controlled proof stands on.')
+    const target = validUrl(r.target)
+    const goal = validImpacts(r.goal)
+    const bad = engagementProblem(engagement, hostKey(target), goal)
+    if (bad) throw new ValidationError(bad)
+    const findings = findingsForTarget(target)
+    const base = { target: new URL(target).href, goal, findings, caps: engagement.caps }
+    const ruled = planFromRules(base)
+    let steps = ruled.steps
+    let notes = ruled.notes
+    let source: 'rules' | 'ai' = 'rules'
+    let cost: { chars: number; tokens: number; calls: number } | null = null
+    if (r.useAi === true) {
+      const reviewer = pick(r.reviewer, REVIEWERS, 'claude')
+      if (reviewer === 'none') throw new ValidationError('Choose an AI reviewer to plan with, or plan from the findings alone.')
+      const prompt = aiPlannerPrompt(base)
+      cost = aiPlanCost(prompt)
+      const op = beginOp('impact-plan')
+      mkdirSync(join(dirs.config(), 'impact-plan'), { recursive: true, mode: 0o700 })
+      try {
+        const text = await askAi(reviewer, prompt, op, join(dirs.config(), 'impact-plan'))
+        const parsed = parseAiPlan(text, base)
+        if (parsed.steps.length) {
+          steps = parsed.steps
+          source = 'ai'
+        }
+        notes = [...notes, ...parsed.notes]
+      } catch (e) {
+        notes = [...notes, `The AI planner could not be used (${(e as Error).message}), so the plan from the findings stands.`]
+      } finally {
+        endOp('impact-plan')
+      }
+    }
+    const plan: ImpactPlan = {
+      id: `pl-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`,
+      engagementId: engagement.id,
+      target: new URL(target).href,
+      goal,
+      steps,
+      source,
+      caps: engagement.caps,
+      notes,
+      at: new Date().toISOString()
+    }
+    savePlan(plan)
+    log('info', `Controlled proof plan for ${hostKey(target)}: ${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'} (${source})`)
+    return { plan, cost }
+  })
+  handle('impact:run', async (req) => {
+    const r = (req ?? {}) as Partial<ImpactRunRequest>
+    const plan = loadPlan(String(r.planId ?? ''))
+    const engagement = engagementById(plan.engagementId)
+    if (!engagement) throw new ValidationError('The engagement for this plan is gone. Make a new plan.')
+    const input = {
+      plan,
+      engagement,
+      approved: Array.isArray(r.approved) ? (r.approved as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 20) : [],
+      phrase: typeof r.phrase === 'string' ? r.phrase.slice(0, 200) : '',
+      acceptLeftovers: r.acceptLeftovers === true
+    }
+    const bad = runProblem(input)
+    if (bad) throw new ValidationError(bad)
+    const runId = `run-${Date.now().toString(36)}`
+    return jobs.run('Controlled proof', async () => {
+      const run = await runCampaign({
+        ...input,
+        onStep: (step) => send('impact:progress', { runId, step: step.step, line: `${step.status}: ${step.title}` }),
+        onLine: (line) => send('impact:progress', { runId, step: '', line })
+      })
+      log('info', `Controlled proof on ${run.target}: ${run.stopped} ${run.requests} requests, ${run.proven.join(', ') || 'nothing proven'}`)
+      return run
+    })
+  })
 
   // Logs
   handle('logs:list', () => listLogs())

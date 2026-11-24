@@ -33,19 +33,20 @@ export interface MsfModule {
   label: string
 }
 
-/** Modules with a check that does not exploit and does not read other people's files or memory. */
+/**
+ * Modules with a check that does not exploit and does not read other people's files or memory.
+ *
+ * These are all auxiliary scanner modules. An exploit module is deliberately never on this list:
+ * several popular ones implement `check` by executing a command on the target (Shellshock and Struts2
+ * do), so "check only" would be a promise the module itself breaks. A real exploit belongs to a
+ * controlled proof (src/main/impact), where it needs an engagement, a typed phrase and a cleanup.
+ */
 export const MODULES: MsfModule[] = [
   { cve: 'CVE-2017-0144', module: 'auxiliary/scanner/smb/smb_ms17_010', port: 445, label: 'EternalBlue (MS17-010) in SMB' },
   { cve: 'CVE-2019-0708', module: 'auxiliary/scanner/rdp/cve_2019_0708_bluekeep', port: 3389, label: 'BlueKeep in Remote Desktop' },
   { cve: 'CVE-2021-41773', module: 'auxiliary/scanner/http/apache_normalize_path', port: 80, label: 'Apache 2.4.49 path traversal' },
   { cve: 'CVE-2021-42013', module: 'auxiliary/scanner/http/apache_normalize_path', port: 80, label: 'Apache 2.4.50 path traversal' },
-  { cve: 'CVE-2022-22965', module: 'exploit/multi/http/spring_framework_rce_spring4shell', port: 8080, label: 'Spring4Shell' },
-  { cve: 'CVE-2017-5638', module: 'exploit/multi/http/struts2_content_type_ognl', port: 8080, label: 'Apache Struts 2 (S2-045)' },
-  { cve: 'CVE-2018-7600', module: 'exploit/unix/webapp/drupal_drupalgeddon2', port: 80, label: 'Drupalgeddon 2' },
-  { cve: 'CVE-2014-6271', module: 'exploit/multi/http/apache_mod_cgi_bash_env_exec', port: 80, label: 'Shellshock in CGI' },
-  { cve: 'CVE-2022-26134', module: 'exploit/multi/http/atlassian_confluence_rce_cve_2022_26134', port: 8090, label: 'Confluence OGNL injection' },
-  { cve: 'CVE-2021-26855', module: 'auxiliary/scanner/http/exchange_proxylogon', port: 443, label: 'Exchange ProxyLogon' },
-  { cve: 'CVE-2021-22205', module: 'exploit/multi/http/gitlab_exif_rce', port: 80, label: 'GitLab ExifTool' }
+  { cve: 'CVE-2021-26855', module: 'auxiliary/scanner/http/exchange_proxylogon', port: 443, label: 'Exchange ProxyLogon' }
 ]
 
 export const moduleFor = (cve: string): MsfModule | null => MODULES.find((m) => m.cve === cve.toUpperCase()) ?? null
@@ -106,7 +107,7 @@ export function catalog(): CatalogEntry[] {
   for (const m of MODULES) {
     if (seen.has(m.module)) continue
     seen.add(m.module)
-    checks.push({ module: m.module, kind: 'check', title: m.label, what: `Metasploit's own check for ${MODULES.filter((x) => x.module === m.module).map((x) => x.cve).join(', ')}. It sends a harmless probe and the module says "vulnerable" or "safe". It does not attack, does not read files, and opens no session. Runs only when MacSec matched a version it saw to that flaw.`, risk: 'Low. A check sends a probe that real attackers also send. Very old or fragile servers have occasionally reacted badly to such probes, so run it in a quiet period on servers you own.' })
+    checks.push({ module: m.module, kind: 'check', title: m.label, what: `Metasploit's own check for ${MODULES.filter((x) => x.module === m.module).map((x) => x.cve).join(', ')}. This is a scanner module: it sends one or two probes and answers "vulnerable", "safe" or "cannot tell". It does not exploit, does not read files and opens no session. Exploit modules are never on this list, because some of them run code during their check. Runs only when MacSec matched a version it saw to that flaw.`, risk: 'Low. A check sends a probe that real attackers also send. Very old or fragile servers have occasionally reacted badly to such probes, so run it in a quiet period on servers you own.' })
   }
   const looks: CatalogEntry[] = LOOK.map((l) => ({ module: l.module, kind: 'look', title: l.title, what: l.what, risk: 'Very low. One ordinary connection to a port that is already open, the same as a browser or a mail program would make.' }))
   return [...looks, ...checks]
