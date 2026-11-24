@@ -34,9 +34,9 @@ Status after 1.26.1, verified against the release itself.
          the dependency footprint.
    - [ ] Add Amass only if it finds something subfinder does not, often enough.
 4. **Bounded virtual-host discovery.**
-   - [ ] A fixed Host-header list against one address, compared with a name that cannot exist, at
+   - [x] A fixed Host-header list against one address, compared with a name that cannot exist, at
          a slow rate, for hosts the person owns.
-   - [ ] Report only an answer that proves a vhost, and nothing on a wildcard.
+   - [x] Report only an answer that proves a vhost, and nothing on a wildcard.
 5. **Patch generation, last and isolated.**
    - [ ] Generate into a scratch copy, never the project.
    - [ ] Run the project's own tests with a time cap, then the scanners again on the patched copy.

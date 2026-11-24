@@ -7,7 +7,7 @@ import { issueText } from '@shared/insights'
 import { tokensText } from '@shared/estimate'
 import { verificationOf, VERIFICATION_TEXT, asvsOf } from '@shared/verification'
 import { ArrowLeft, Bot, Check, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText, Globe } from 'lucide-react'
-import { SEVERITIES, type Finding, type FindingCategory, type SearchHit, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
+import { SEVERITIES, type Finding, type FindingCategory, type SearchHit, type SessionDetail, type SessionInfo, type Severity, type SessionCompare, type VhostHit } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
 import { SessionMasvs, SessionOwasp } from '../components/OwaspList'
@@ -844,15 +844,57 @@ function ReconChanges({ delta }: { delta: NonNullable<SurfaceData['delta']> }): 
 
 /** A recon's hosts, scripts, endpoints and parameters. */
 function Surface({ id, detail, onPick }: { id: string; detail: SessionDetail; onPick: (fid: string) => void }): React.JSX.Element {
+  const { notify } = useApp()
   const [d, setD] = useState<SurfaceData | null>(null)
+  const [vhosts, setVhosts] = useState<VhostHit[] | null>(null)
+  const [probing, setProbing] = useState(false)
   useEffect(() => {
     void window.macsec.invoke('recon:data', id).then(setD)
   }, [id])
   const graph = <SurfaceGraph findings={detail.findings} target={detail.target} onPick={onPick} />
+  const vhostCard = (
+    <div className="panel" style={{ padding: 16 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="grow">
+          <strong>Virtual hosts</strong>
+          <div className="hint">Ten common names against this address, each compared with a name that cannot exist. Read-only, one at a time, for a host you own.</div>
+        </div>
+        <button
+          className="btn btn-sm"
+          disabled={probing}
+          onClick={async () => {
+            setProbing(true)
+            try {
+              const r = await window.macsec.invoke('recon:vhosts', id)
+              setVhosts(r)
+            } catch (e) {
+              notify({ kind: 'error', text: (e as Error).message })
+            } finally {
+              setProbing(false)
+            }
+          }}
+        >
+          {probing ? 'Probing…' : 'Probe virtual hosts'}
+        </button>
+      </div>
+      {vhosts && (
+        <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+          {vhosts.length === 0 && <span className="hint">No virtual host answered differently from the made-up name.</span>}
+          {vhosts.map((v) => (
+            <div key={v.name} className="since-line">
+              <span className="tag tag-warn">{v.status}</span> <strong>{v.name}</strong> {v.title ? `"${v.title}"` : ''}
+              <span className="hint"> {v.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
   if (!d) {
     return (
       <div style={{ display: 'grid', gap: 14 }}>
         {graph}
+        {vhostCard}
         <div className="panel" style={{ padding: 20 }}>
           <span className="hint">The recon map appears when the recon has collected it.</span>
         </div>
@@ -862,6 +904,7 @@ function Surface({ id, detail, onPick }: { id: string; detail: SessionDetail; on
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       {graph}
+      {vhostCard}
       {d.delta && <ReconChanges delta={d.delta} />}
       {d.jsmap && <JsMap id={id} m={d.jsmap} />}
       {d.pages && <ReconPages pages={d.pages} />}

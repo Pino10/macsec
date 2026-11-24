@@ -28,6 +28,7 @@ import { dockerPath, localSites, startWebScan } from './webscan'
 import { ciWorkflow, compareFindings, preCommitHook, previousSession, sessionCsv, toDefectDojo, toSarif } from './exports'
 import { topFindings } from '../shared/insights'
 import { searchFindings } from './search'
+import { COMMON_VHOSTS, probeVhosts, resolveForVhosts } from './vhosts'
 import { secondOpinion } from './secondopinion'
 import { pruneSessions, storageInfo } from './storage'
 import { label } from './risk'
@@ -121,7 +122,8 @@ function createWindow(): void {
     show: false,
     title: 'MacSec',
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
-    trafficLightPosition: { x: 20, y: 20 },
+    trafficLightPosition: { x: 18, y: 17 },
+    roundedCorners: true,
     transparent: material === 'liquid-glass',
     vibrancy: material === 'vibrancy' ? 'sidebar' : undefined,
     visualEffectState: 'active',
@@ -1060,6 +1062,20 @@ function registerIpc(): void {
     saveRequest(info.id, 'web:start', stripSecrets(req))
     log('info', `Recon ${s.id} handed to a web scan of ${origin} with ${seeds.length} pages`)
     return info
+  })
+  handle('recon:vhosts', async (id) => {
+    const s = readSession(String(id))
+    const raw = s.target.match(/^https?:\/\//) ? s.target : `https://${s.target}`
+    let u: URL
+    try {
+      u = new URL(raw)
+    } catch {
+      throw new ValidationError('This result has no web address to probe.')
+    }
+    if (!u.hostname.includes('.') && u.hostname !== 'localhost') throw new ValidationError('Choose a domain or a local site first.')
+    const address = await resolveForVhosts(u.hostname)
+    const names = COMMON_VHOSTS.map((n) => `${n}.${u.hostname}`)
+    return probeVhosts(u.origin, address, names)
   })
   handle('recon:data', (id) => reconData(String(id)) as never)
   handle('ai:claude-skills', (on) => {

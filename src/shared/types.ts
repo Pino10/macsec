@@ -668,6 +668,7 @@ export interface Channels {
   'recon:start': { args: [ReconRequest]; result: SessionInfo }
   /** Takes a finished recon straight into a web scan of its first live host. */
   'recon:handoff': { args: [string]; result: SessionInfo }
+  'recon:vhosts': { args: [string]; result: VhostHit[] }
   'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number; pages?: ReconPage[]; delta?: ReconDeltaInfo; jsmap?: JsMapInfo } | null }
   'sessions:open-sources': { args: [string]; result: boolean }
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }
@@ -741,6 +742,15 @@ export interface Channels {
   'impact:runs': { args: []; result: ImpactRun[] }
   /** Fill in the fields a plan step cannot know (the expected string, a read-back address, an undo note). */
   'impact:update-step': { args: [{ planId: string; stepId: string; patch: Partial<PlannedStep> }]; result: ImpactPlan }
+}
+
+export interface VhostHit {
+  name: string
+  url: string
+  status: number
+  title: string
+  length: number
+  reason: string
 }
 
 export interface SavedProfile {
