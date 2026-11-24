@@ -156,6 +156,42 @@ export function triageFinding(id: string, findingId: string, triage: Finding['tr
   return sessionDetail(id)
 }
 
+/**
+ * Mark several findings at once. An owner and a due date are optional, and only kept while the
+ * finding is triaged; clearing the triage clears them too.
+ */
+export function triageBulk(id: string, findingIds: string[], triage: Finding['triage'] | null, patch: { owner?: string; due?: string } = {}): SessionDetail {
+  const info = readSession(id)
+  const f = join(sessionDir(id), 'findings.json')
+  const list = existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as Finding[]) : []
+  const ids = new Set((Array.isArray(findingIds) ? findingIds : []).filter((x): x is string => typeof x === 'string').slice(0, 500))
+  if (!ids.size) throw new Error('Choose at least one finding.')
+  const owner = typeof patch.owner === 'string' ? patch.owner.trim().slice(0, 80) : undefined
+  const due = typeof patch.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(patch.due) ? patch.due : undefined
+  let changed = 0
+  for (const item of list) {
+    if (!ids.has(item.id)) continue
+    changed++
+    if (triage) {
+      item.triage = triage
+      item.triagedAt = new Date().toISOString()
+      if (owner) item.owner = owner
+      if (due) item.due = due
+    } else {
+      delete item.triage
+      delete item.triagedAt
+      delete item.owner
+      delete item.due
+      delete item.remembered
+    }
+  }
+  if (!changed) throw new Error('Those findings are not in this session.')
+  writeFileSync(f, JSON.stringify(list, null, 2))
+  info.counts = countBySeverity(list.filter((x) => x.verdict !== 'false-positive'))
+  saveSession(info)
+  return sessionDetail(id)
+}
+
 /** A request without cookies, sign-in headers or API keys: those are never written to disk. */
 export function stripSecrets(req: unknown): unknown {
   if (!req || typeof req !== 'object') return req

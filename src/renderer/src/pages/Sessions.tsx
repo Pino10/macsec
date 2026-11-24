@@ -4,8 +4,9 @@ import FixPlan from '../components/FixPlan'
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { issueText } from '@shared/insights'
+import { tokensText } from '@shared/estimate'
 import { verificationOf, VERIFICATION_TEXT, asvsOf } from '@shared/verification'
-import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText, Globe } from 'lucide-react'
+import { ArrowLeft, Bot, Check, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText, Globe } from 'lucide-react'
 import { SEVERITIES, type Finding, type FindingCategory, type SearchHit, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
@@ -135,6 +136,21 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [tab, setTab] = useState<'findings' | 'paths' | 'owasp' | 'report' | 'run' | 'surface' | 'checklist'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const [sureDelete, setSureDelete] = useState(false)
+  const [selecting, setSelecting] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [owner, setOwner] = useState('')
+  const [due, setDue] = useState('')
+  const togglePick = (fid: string): void => setPicked((p) => { const n = new Set(p); if (n.has(fid)) n.delete(fid); else n.add(fid); return n })
+  const applyBulk = async (t: 'fixed' | 'accepted' | 'not-a-problem' | null): Promise<void> => {
+    const d = await act('bulk', () => api.invoke('findings:triage-bulk', id, [...picked], t, { ...(owner.trim() ? { owner: owner.trim() } : {}), ...(due ? { due } : {}) }))
+    if (d) {
+      setDetail(d)
+      setPicked(new Set())
+      setSelecting(false)
+      setOwner('')
+      setDue('')
+    }
+  }
   const listRef = useRef<HTMLDivElement | null>(null)
   const onListKeys = (e: React.KeyboardEvent<HTMLDivElement>): void => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
@@ -201,6 +217,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               {', '}
               {new Date(s.createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}
               {s.mode || s.depth ? `, ${s.mode ?? s.depth}` : ''}, {reviewerName(s)}
+              {s.estimate && s.estimate.tokens > 0 ? `, AI estimate ${tokensText(s.estimate.tokens)} tokens${s.estimate.costUsd === null ? ' (included in your plan)' : s.estimate.costUsd === 0 ? ' (no cost)' : ` (about $${s.estimate.costUsd})`}` : ''}
             </div>
           </div>
         </div>
@@ -259,7 +276,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               value=""
               aria-label="Export findings"
               onChange={(e) => {
-                const f = e.target.value as 'sarif' | 'defectdojo' | 'cyclonedx' | 'json' | 'masvs-report'
+                const f = e.target.value as 'sarif' | 'defectdojo' | 'cyclonedx' | 'csv' | 'json' | 'masvs-report'
                 if (f) void act('export', () => api.invoke('sessions:export', id, f)).then((p) => p && notify({ kind: 'info', text: 'Exported.' }))
               }}
             >
@@ -268,6 +285,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               <option value="sarif">SARIF (GitHub, editors)</option>
               <option value="defectdojo">DefectDojo</option>
               <option value="cyclonedx">SBOM (CycloneDX)</option>
+              <option value="csv">CSV (a spreadsheet)</option>
               <option value="json">JSON</option>
             </select>
           )}
@@ -473,6 +491,24 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
         </>
       )}
 
+          {tab === 'findings' && (
+            <div className="bulk-bar">
+              {!selecting ? (
+                <button className="btn btn-sm" onClick={() => { setSelecting(true); setPicked(new Set()) }}>Select findings</button>
+              ) : (
+                <>
+                  <span className="hint">{picked.size} selected</span>
+                  <input className="input" style={{ width: 170, height: 30 }} placeholder="Owner (optional)" value={owner} onChange={(e) => setOwner(e.target.value)} aria-label="Owner" />
+                  <input className="input" style={{ width: 150, height: 30 }} type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Due date" />
+                  <button className="btn btn-sm" disabled={!picked.size} onClick={() => void applyBulk('fixed')}>Fixed</button>
+                  <button className="btn btn-sm" disabled={!picked.size} onClick={() => void applyBulk('accepted')}>Accepted</button>
+                  <button className="btn btn-sm" disabled={!picked.size} onClick={() => void applyBulk('not-a-problem')}>Not a problem</button>
+                  <button className="btn btn-sm" disabled={!picked.size} onClick={() => void applyBulk(null)}>Clear</button>
+                  <button className="link" onClick={() => { setSelecting(false); setPicked(new Set()) }}>Done</button>
+                </>
+              )}
+            </div>
+          )}
       {tab === 'findings' &&
         (findings.length === 0 ? (
           !running && <Empty title={detail.findings.length ? 'Nothing matches these filters' : 'Nothing found'}>{detail.findings.length ? 'Try turning more severities on.' : 'None of the checks found a problem.'}</Empty>
@@ -488,7 +524,17 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
                 </div>
               )}
               {findings.map((f) => (
-                <button key={f.id} className="f-row" role="option" data-sev={f.severity} data-fp={f.verdict === 'false-positive' || !!f.triage} aria-selected={f.id === sel} onClick={() => setSel(f.id)}>
+                <button
+                  key={f.id}
+                  className="f-row"
+                  role="option"
+                  data-sev={f.severity}
+                  data-fp={f.verdict === 'false-positive' || !!f.triage}
+                  data-picked={selecting ? picked.has(f.id) : undefined}
+                  aria-selected={selecting ? picked.has(f.id) : f.id === sel}
+                  onClick={() => (selecting ? togglePick(f.id) : setSel(f.id))}
+                >
+                  {selecting && <span className="pick">{picked.has(f.id) ? <Check size={13} /> : null}</span>}
                   <Sev s={f.severity} />
                   <span className="t">{f.title}</span>
                   {f.exploit ? <ExploitTag f={f} compact /> : f.confidence === 'possible' && <span className="tag tag-warn" style={{ flex: 'none' }}>Possible</span>}
@@ -546,6 +592,13 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
             </>
           )}
         </div>
+      )}
+      {(f.owner || f.due) && (
+        <p className="hint" style={{ margin: '0 0 8px' }}>
+          {f.owner ? `Owner: ${f.owner}` : ''}
+          {f.owner && f.due ? ' · ' : ''}
+          {f.due ? `due ${f.due}` : ''}
+        </p>
       )}
       <details className="tech" open={!simple}>
       {simple && <summary>Technical details</summary>}

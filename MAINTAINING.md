@@ -63,6 +63,13 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.23
+
+- `profiles.ts` + `ProfileBar`: saved choices for web scans and code reviews, with the secret-key refusal and a 50 profile cap.
+- `findings:triage-bulk` + the bulk bar in a result: one write for several findings, with an owner and a due date.
+- `sessionCsv` in `exports.ts`, the CSV export entry, and `SessionInfo.estimate` filled by `startReview`.
+- `ROADMAP.md` for the agreed 1.24 set.
+
 ### Added in 1.22
 
 - `shared/estimate.ts`: the scan and review estimators, used by the Web scan and Code review pages and tested in `tests/v42`.

@@ -25,6 +25,7 @@ import { addEvidence } from './evidence'
 import { beginOp, cancelOp, endOp, type Op, friendly, percentOf } from './engine'
 import { getSettings } from './settings'
 import { chosenPluginArgs } from './skills'
+import { estimateReview } from '../shared/estimate'
 
 
 type Running = Op
@@ -143,6 +144,8 @@ export async function startReview(req: ReviewRequest): Promise<SessionInfo> {
   const info = createSession('code-review', title, target)
   info.reviewer = req.reviewer
   info.depth = req.depth
+  const e = estimateReview({ depth: req.depth, reviewer: req.reviewer })
+  info.estimate = { tokens: e.tokens, costUsd: e.costUsd, minutes: e.minutes }
   saveSession(info)
   void runReview(info.id, req).catch((err) => log('error', `Review failed: ${(err as Error).message}`, info.id))
   return info

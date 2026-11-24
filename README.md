@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.23.0 | Saved profiles, bulk triage with an owner and a due date, CSV export, the cost estimate on the result | [1.23.0](RELEASE_NOTES.md#1230) |
 | 1.22.0 | Web scan and code review rearranged around the decision, pace control, request and cost estimates, Start a test, Cmd+K | [1.22.0](RELEASE_NOTES.md#1220) |
 | 1.21.0 | The full release history, a SQLite session index, interface cleanup | [1.21.0](RELEASE_NOTES.md#1210) |
 | 1.20.0 | A command line with baselines, search across sessions, storage cleanup, an accuracy gate in CI, accessibility | [1.20.0](RELEASE_NOTES.md#1200) |
@@ -111,7 +112,7 @@ build and explain an attack path, so the history is worth reading in order.
 | 1.15.0 | ffuf as a discovery engine, the read to write ladder, editable plan steps | [1.15.0](RELEASE_NOTES.md#1150) |
 | 1.14.0 | Controlled proofs under a written engagement, CIA by design, chaining, the Metasploit check list fixed | [1.14.0](RELEASE_NOTES.md#1140) |
 
-Earlier versions, back to 0.1, are in the same file.
+Earlier versions, back to 0.1, are in the same file. The work planned for 1.24 is in [ROADMAP.md](ROADMAP.md).
 
 ## From the command line
 

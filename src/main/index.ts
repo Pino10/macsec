@@ -25,7 +25,7 @@ import { jobs } from './jobs'
 import { log, logEvents, listLogs, clearLogs } from './logs'
 import { checkUpdates, checkUpdatesDaily, installApp, installTool, listTools, removeTool, toolDef, toolEnv, toolPath, updateToolData } from './toolbox'
 import { dockerPath, localSites, startWebScan } from './webscan'
-import { ciWorkflow, compareFindings, preCommitHook, previousSession, toDefectDojo, toSarif } from './exports'
+import { ciWorkflow, compareFindings, preCommitHook, previousSession, sessionCsv, toDefectDojo, toSarif } from './exports'
 import { topFindings } from '../shared/insights'
 import { searchFindings } from './search'
 import { pruneSessions, storageInfo } from './storage'
@@ -41,11 +41,12 @@ import { checkHookUrl, hookBody, raycastScripts, sendHook, type HookKind } from 
 import { MCP_PORT, mcpToken, mcpUrl, startMcpServer } from './mcp'
 import { macsecCli, macsecTools } from './mcptools'
 import { loadSpec, loadSpecText, startApiScan } from './apiscan'
+import { deleteProfile, listProfiles, saveProfile } from './profiles'
 import { startMobileScan } from './mobilescan'
 import { captureStatus, sessionFromHar, startCapture, stopCapture, stopCaptureQuietly } from './trafficcapture'
 import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from './mobilelive'
 import { reconData, startRecon } from './reconscan'
-import { markChecklistItem, readChecklist, readRequest, saveFindings, saveRequest, stripSecrets, triageFinding } from './sessions'
+import { markChecklistItem, readChecklist, readRequest, saveFindings, saveRequest, stripSecrets, triageBulk, triageFinding } from './sessions'
 import { checkForUpdate, installUpdate, releaseNotes, updateStatus } from './updater'
 import { catalog as msfCatalog, RUN_MODULES } from './msf'
 import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
@@ -490,6 +491,10 @@ function registerIpc(): void {
     }
     return out.filter(Boolean)
   })
+  handle('findings:triage-bulk', (id, ids, triage, patch) => triageBulk(String(id), Array.isArray(ids) ? ids : [], triage === null ? null : triage, (patch ?? {}) as { owner?: string; due?: string }))
+  handle('profiles:list', () => listProfiles())
+  handle('profiles:save', (input) => saveProfile(input))
+  handle('profiles:delete', (id) => deleteProfile(String(id)))
   handle('findings:triage', (sid, fidv, t, remember) => {
     const triage = t === 'fixed' || t === 'accepted' || t === 'not-a-problem' ? t : null
     const detail = triageFinding(String(sid), String(fidv), triage)
@@ -513,7 +518,7 @@ function registerIpc(): void {
   handle('sessions:export', async (id, format) => {
     const d = sessionDetail(String(id))
     if (!mainWindow) return null
-    const ext = format === 'sarif' ? 'sarif' : format === 'cyclonedx' ? 'cdx.json' : format === 'masvs-report' ? 'html' : 'json'
+    const ext = format === 'sarif' ? 'sarif' : format === 'cyclonedx' ? 'cdx.json' : format === 'masvs-report' ? 'html' : format === 'csv' ? 'csv' : 'json'
     let text: string
     if (format === 'sarif') text = JSON.stringify(toSarif(d.findings, app.getVersion()), null, 2)
     else if (format === 'defectdojo') text = JSON.stringify(toDefectDojo(d.findings, d), null, 2)
@@ -525,7 +530,7 @@ function registerIpc(): void {
     else if (format === 'masvs-report') {
       if (d.kind !== 'mobile-scan') throw new ValidationError('The MASVS report is for mobile checks.')
       text = masvsReportHtml(d, app.getVersion())
-    } else throw new ValidationError('Choose SARIF, DefectDojo, CycloneDX, JSON or the MASVS report.')
+    } else throw new ValidationError('Choose SARIF, DefectDojo, CycloneDX, CSV, JSON or the MASVS report.')
     const r = await dialog.showSaveDialog(mainWindow, { title: 'Export findings', defaultPath: join(app.getPath('downloads'), `macsec-${d.id}.${ext}`) })
     if (r.canceled || !r.filePath) return null
     writeFileSync(r.filePath, text)
