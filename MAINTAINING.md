@@ -63,6 +63,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.29.0
+
+- `corpus/sql/joern.md`: the Joern 4.0.691 commands and the Java-pair result.
+
 ### Added in 1.28.0
 
 - `tests/fixtures/mobile/red-screen.apk` (8,649 bytes, MIT, F-Droid) with its provenance, and `tests/v48-mobile-fixture.test.ts` covering the zip central directory, the AXML header and the dex magic.
