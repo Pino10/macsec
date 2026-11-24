@@ -1,96 +1,70 @@
 # Roadmap
 
-Status after 1.24.0: PHPStan and Psalm, the independent verifier, the surface graph and Burp import shipped. The ledger in RELEASE_NOTES.md says which of the rest need a download, an SDK or an Apple account.
+## Done in 1.24.0
 
-This is the agreed 1.24 work, in the order it was set. Each item says how it fits MacSec's rules: free
-tools only, everything on this Mac, read-only unless a person turns on a controlled proof, and no
-external account unless the person connects one themselves.
+- PHPStan and Psalm, from the project's own `vendor/bin` and config, with Psalm's taint analysis
+  and PHPStan's security messages only.
+- The independent AI verifier, on demand, with a masked excerpt and a fixed two-line answer.
+- The attack-surface graph in the Surface tab.
+- Burp XML import, with no stored credentials.
+- The full ledger in RELEASE_NOTES.md, so what is not done is named with its blocker.
 
-## Code scanning
+## 1.24.1: consistency
 
-- **Joern evaluation.** Free and open source, but a JVM tool of about 400 MB with its own server. The
-  evaluation is: does its cross-function data flow find things Semgrep and Bearer miss on the same
-  labelled samples, and what does it cost in time and disk? If it earns its place, it becomes an
-  optional tool with a checksummed download and its own cache under `~/MacSec/tools`.
-- **PHPStan and Psalm.** The two PHP static analysers. Both ship as a single phar, which suits
-  MacSec: download with a checksum, run with the project's own `php` (or a managed one), and add the
-  security rule sets. They are PHP only, so the Tools page should hide them when no PHP project is
-  around.
-- **Dedicated SQL security rules.** Semgrep rules for SQL built by string joining, unsafe ORM raw
-  calls, and a second rule set per framework (Laravel, Django, Rails, Spring). This is rules, not a
-  new engine, and it fits the existing pipeline.
-- **More advanced cross-function data flow.** Semgrep's free data flow plus Bearer's; the next step
-  is taint tracking across files and a small call graph. Joern is the likely engine; otherwise the
-  AI reviewer is asked to trace a specific flow with the code around it, which is slower but free.
-- **Broader framework-specific security coverage.** Rule packs and checks for the frameworks the
-  scanner already recognises, plus framework-aware live checks (Laravel debug pages, Django debug,
-  Spring actuator, Rails routes).
+- Every release page from 1.0 to 1.24 now carries its notes (they were empty: the tag path attached
+  the files but never set the body).
+- The release workflow now sets the body from RELEASE_NOTES.md on every tag, so this cannot drift
+  again.
+- This roadmap is the agreed next order, not a wish list.
 
-## AI
+## 1.25 priorities
 
-- **Independent AI verification agent.** A second, separate read of every high finding whose only
-  job is to try to disprove it. It sees the finding, the proof and the code around it, never the
-  first reviewer's reasoning, so it cannot simply agree. Disagreements are shown, never hidden.
-- **Comprehensive AI accuracy benchmarks.** Grow `benchmarks.ts` from four checks to a labelled set
-  across findings, paths and AI triage, with the same 0.8 precision and recall gate in CI.
-- **Automated patch generation and validation.** Generate a small patch, apply it to a throwaway
-  copy, run the tests that exist, and only then offer it. Never write into the person's project
-  without a click. This needs a sandbox and a time limit.
-- **Deeper repository-wide vulnerability tracing.** Follow a source from where it enters (a route,
-  a form, a message queue) to a sink across files, and show the path. Calls for the call graph the
-  Joern evaluation would provide.
-- **More advanced IDOR and business-logic verification.** More two-account comparisons and
-  read-only logic probes under the controlled-proof rules: no writes, no state changes, repeat
-  every hit once, and stop at the first proof.
+1. **QA harness before any new dependency.**
+   - [ ] Scanner install and update tests: every tool's pinned address, checksum and version,
+         checked in CI on a schedule, so a rotted URL fails the harness and not a user's review.
+   - [ ] Cross-engine fixture runner: the same labelled file through Semgrep, Bearer, Psalm,
+         PHPStan and Joern, comparing finding keys, duplicates and precision. This is the
+         measuring stick the next three items use.
+2. **SQL corpus and Joern evaluation.**
+   - [ ] A labelled corpus of SQL injection across PHP, Python, JavaScript and Java: positive
+         samples (string-built queries, unsafe ORM raw calls) and clean samples that must not be
+         flagged.
+   - [ ] Hold out at least a third of the samples from anyone writing rules, or the measurement
+         only proves the rules match their own examples.
+   - [ ] Measure precision, recall, runtime and disk for `p/sql-injection`, Bearer, Psalm taint,
+         PHPStan and Joern, on the same machine and the same corpus.
+   - [ ] Decide Joern on the numbers: it replaces something, or it adds coverage worth 400 MB, or
+         it does not ship.
+3. **Real, redistributable mobile fixtures and install tests.**
+   - [ ] A small open-source APK with a pinned checksum (an F-Droid build is the obvious source),
+         used for the manifest and decompiler tests.
+   - [ ] An IPA is different: an unsigned build from an open-source project can test static
+         parsing, but dynamic testing needs a signing identity and a device. The fixture says so.
+   - [ ] The install tests from 1 are extended to the mobile tools once they exist.
+4. **Amass against subfinder, passive only.**
+   - [ ] Run both on a fixed domain list, compare unique subdomains, false positives, runtime and
+         the dependency footprint (Amass is a Go tool with its own config and database).
+   - [ ] Add Amass only if it finds something subfinder does not, often enough to justify it.
+5. **Bounded virtual-host discovery.**
+   - [ ] A fixed candidate list of Host headers against one address, each compared with a name
+         that cannot exist, at a slow rate, for hosts the person owns.
+   - [ ] Report a discovered vhost with the answer that proves it, and nothing on a wildcard.
+6. **Patch generation, last and isolated.**
+   - [ ] Generate a patch into a scratch copy, never into the project.
+   - [ ] Run the project's own test command, capped in time, then the scanners again on the patched
+         copy, so a "fix" that adds a vulnerability fails.
+   - [ ] Show the diff, require a typed confirmation, and keep a one-click rollback.
+   - [ ] Refuse when there is no test command, and say why.
 
-## Recon
+## Later
 
-- **Amass evaluation.** OWASP Amass, passive mode only at first (`-passive`), so it never touches
-  the target. Assessed on speed and false positives against the current subfinder pass.
-- **Virtual-host discovery.** A bounded Host-header probe list against one address, compared with a
-  name that cannot exist. Only on hosts the person owns, and only in the confirmation rules.
-- **Visual attack-surface graph.** A local, offline graph of hosts, pages, parameters and findings,
-  built from what a session already holds. No telemetry, no cloud rendering.
-- **Continuous asset-change monitoring.** The watch already re-runs; this adds a real diff: new
-  subdomains, new ports, new pages, new certificates, and one note that says what changed.
-- **Better API authentication and route mapping.** Read the specification and the traffic, map
-  which routes need which scheme, and say where a route is missing from the spec or answers
-  differently signed in and out. Read-only.
+- Notarisation: needs an Apple Developer account. The app stays ad-hoc signed and the Ed25519
+  release signature is what protects updates; notarising is a workflow change once an account exists.
+- Windows and Linux: MacSec is a macOS workbench.
 
-## Mobile
+## How each item stays inside the rules
 
-- **JADX and Apktool.** Free, Java, and they fit the existing static analysis: decompile to a
-  session folder, parse manifests and sources, keep secrets as kind, file and line. Checksummed
-  downloads under `~/MacSec/tools`.
-- **Ghidra and LIEF.** Ghidra is large (about 400 MB) and needs a JDK, so its evaluation is disk and
-  time first. LIEF is a Python library and suits the existing uv-managed Python tools. Both are
-  read-only analyses.
-- **iOS dynamic testing.** Needs a Mac with Xcode, a developer-signed app and a physical device.
-  MacSec can drive Frida over USB the way it does for Android, but it cannot sign an IPA for you, and
-  it will say so. No jailbreak automation.
-- **Android emulator orchestration.** Start an AVD, wait for boot, install a chosen APK, run it and
-  observe. Heavy, and it needs the Android SDK. Only for an APK the person chose, and it removes
-  what it installed.
-- **Frida and Objection.** Frida is already used; Objection is a Python wrapper. Both observe only:
-  every hook calls the original. Never a bypass script.
-- **AI-assisted decompiled-code analysis.** Send selected decompiled files to the chosen AI, not the
-  whole archive, with secrets masked. Same rules as the code reviewer.
-- **Burp integration.** Burp has no free headless API for MacSec to drive; the honest integration is
-  importing a Burp export (HAR or XML) the way the HAR import already works, and exporting findings
-  as a Burp-friendly XML. No paid API and no extension to install.
-
-## Quality assurance
-
-- **Full automated integration tests.** A small decoy app (already in the test helpers) run through
-  the real flows on CI, with the network parts stubbed at the client boundary.
-- **Real APK and IPA test fixtures.** Small, open-source, redistributable binaries. An IPA needs a
-  signing identity for the dynamic parts, so the static tests use one and the dynamic test skips
-  when no identity is present.
-- **Cross-engine regression testing.** The same labelled fixture through every engine and reviewer,
-  comparing counts and precision, so an engine upgrade cannot quietly change what is reported.
-- **Validate all scanner installation and update workflows.** A CI matrix that installs each tool
-  the way MacSec does, checks its version, and fails when a pinned URL or checksum rots.
-
-The order above is the order of work. The first release in this set will be the parts that need no
-new account or large download: SQL rules, framework coverage, the independent verification agent,
-accuracy benchmarks, vhost discovery, route mapping, JADX and Apktool, and the QA scaffolding.
+Free tools only, everything on this Mac, read-only unless a person turns on a controlled proof, and
+no external account unless they connect it themselves. A new engine is added only after it is
+measured against the existing ones on the same labelled data, and a new fixture only when it can be
+redistributed legally.

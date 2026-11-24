@@ -97,6 +97,16 @@ jobs:
             dist/SHA256SUMS.txt
             dist/SHA256SUMS.txt.sig
 
+      # A tag pushed from the command line already made a release, but its body is empty.
+      - name: Set the release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN || github.token }}
+        run: |
+          awk '/^## /{n++} n==1' RELEASE_NOTES.md > notes.md
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          echo "Notes set on $GITHUB_REF_NAME"
+
       # Started from the Actions tab with a tag: publish the release.
       - name: Publish the release
         if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
