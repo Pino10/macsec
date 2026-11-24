@@ -2,11 +2,11 @@ import ProofBlock, { ConfidenceTag, ExploitTag } from '../components/ProofBlock'
 import ChecklistView from '../components/ChecklistView'
 import FixPlan from '../components/FixPlan'
 import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { issueText } from '@shared/insights'
 import { verificationOf, VERIFICATION_TEXT, asvsOf } from '@shared/verification'
 import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText, Globe } from 'lucide-react'
-import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
+import { SEVERITIES, type Finding, type FindingCategory, type SearchHit, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
 import { SessionMasvs, SessionOwasp } from '../components/OwaspList'
@@ -20,9 +20,19 @@ const reviewerName = (s: SessionInfo): string => ({ claude: 'Claude Code', 'clau
 export default function Sessions(): React.JSX.Element {
   const { sessions, openSession, showSession } = useApp()
   const [q, setQ] = useState('')
+  const [hits, setHits] = useState<SearchHit[]>([])
   const [kind, setKind] = useState<SessionInfo['kind'] | 'all'>('all')
   if (openSession) return <SessionView id={openSession} onBack={() => showSession(null)} />
   const list = sessions.filter((s) => (kind === 'all' || s.kind === kind) && (!q.trim() || `${s.title} ${s.target}`.toLowerCase().includes(q.toLowerCase())))
+  // The same box searches inside every finding, not only the session titles.
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setHits([])
+      return
+    }
+    const t = window.setTimeout(() => void window.macsec.invoke('sessions:search', q).then(setHits).catch(() => setHits([])), 300)
+    return () => window.clearTimeout(t)
+  }, [q])
   return (
     <>
       <PageHead title="Results" desc="Every test you ran, kept with its findings, the AI’s report and each tool’s raw output.">
@@ -72,6 +82,25 @@ export default function Sessions(): React.JSX.Element {
               </button>
             ))}
           </div>
+          {q.trim().length >= 2 && (
+            <div className="panel" style={{ marginTop: 14 }}>
+              <div className="row" style={{ cursor: 'default' }}>
+                <span className="grow">
+                  <span className="row-title">{hits.length ? `${hits.length} finding${hits.length === 1 ? '' : 's'} match "${q}" in every session` : `No finding matches "${q}"`}</span>
+                  <span className="row-sub">Searching titles, tools, files and addresses in every finished session.</span>
+                </span>
+              </div>
+              {hits.slice(0, 30).map((h) => (
+                <button key={`${h.sessionId}-${h.findingId}`} className="row" onClick={() => showSession(h.sessionId)}>
+                  <Sev s={h.severity as never} />
+                  <span className="grow">
+                    <span className="row-title" style={{ display: 'block' }}>{h.title}</span>
+                    <span className="row-sub">{kindName(h.kind)}: {h.sessionTitle}{h.where ? ` · ${h.where}` : ''}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
     </>
@@ -106,6 +135,26 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [tab, setTab] = useState<'findings' | 'paths' | 'owasp' | 'report' | 'run' | 'surface' | 'checklist'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const [sureDelete, setSureDelete] = useState(false)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const onListKeys = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+    const items = [...(listRef.current?.querySelectorAll<HTMLButtonElement>('button.f-row') ?? [])]
+    if (!items.length) return
+    e.preventDefault()
+    const at = items.indexOf(document.activeElement as HTMLButtonElement)
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : e.key === 'ArrowDown' ? Math.min(items.length - 1, at + 1) : Math.max(0, at - 1)
+    items[next]?.focus()
+  }
+  const onTabKeys = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+    const tabs = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role=tab]')]
+    const at = tabs.indexOf(document.activeElement as HTMLButtonElement)
+    if (at < 0) return
+    e.preventDefault()
+    const n = e.key === 'ArrowRight' ? (at + 1) % tabs.length : (at - 1 + tabs.length) % tabs.length
+    tabs[n].focus()
+    tabs[n].click()
+  }
   const live = sessions.find((s) => s.id === id)
   const now = useNow(live?.status === 'running')
 
@@ -281,7 +330,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
       {running && <LiveRun s={s} />}
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
-        <div className="tabs" role="tablist">
+        <div className="tabs" role="tablist" onKeyDown={onTabKeys}>
           <button role="tab" aria-selected={tab === 'findings'} onClick={() => setTab('findings')}>
             Findings
           </button>
@@ -426,7 +475,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
           !running && <Empty title={detail.findings.length ? 'Nothing matches these filters' : 'Nothing found'}>{detail.findings.length ? 'Try turning more severities on.' : 'None of the checks found a problem.'}</Empty>
         ) : (
           <div className="split">
-            <div className="panel f-list" role="listbox" aria-label="Findings">
+            <div className="panel f-list" role="listbox" aria-label="Findings" ref={listRef} onKeyDown={onListKeys}>
               {hiddenInfo > 0 && (
                 <div className="f-note">
                   {hiddenInfo} info {hiddenInfo === 1 ? 'note is' : 'notes are'} hidden.{' '}

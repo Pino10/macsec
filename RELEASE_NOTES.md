@@ -1,3 +1,14 @@
+## 1.20.0
+
+- **MacSec from the command line, with a baseline.** `MacSec --headless scan --path <folder>` runs a review with no window and exits 0 when it is clean, 1 when a new finding reaches `--fail-on` (default high), 2 on an error and 3 when the scanners are not installed. `--json` prints the result, `--install-missing` installs the three scanners a review needs, and `--baseline <file>` points at a committed baseline. `MacSec --headless baseline --path <folder>` writes `<folder>/.macsec-baseline.json`, so a team fails only on what is new. `MacSec --headless help` lists it all.
+- **Find a finding anywhere.** The box on Results now searches inside every finished session, not only the session titles: titles, tools, files and addresses, newest first, with the session it came from.
+- **Storage you can see and let go of.** Settings shows how much the MacSec folder holds and how many sessions and findings it keeps, and removes finished sessions older than the number of days you choose, with a clear second click and the count it removed.
+- **An accuracy gate in CI.** `npm run benchmark` scores the checks that carry the most weight against known-bad and known-good samples (exposed files, key placeholders, WAF deception, attack paths) and fails below 0.8 precision or recall. It is a step of its own in CI, so accuracy is measured on every change.
+- **Accessibility.** Faint text is now readable (the small-text colour went from about 3.5:1 to about 4.6:1), tooltips show on keyboard focus and on hover, the findings list answers to arrow keys and Home/End, and the result tabs answer to the left and right arrows.
+- **Still deferred, honestly:** a SQLite index. Search reads the newest 300 sessions, which is quick at this size; an index is worth doing when Macs hold thousands.
+
+Tests: 588 passed, 4 skipped.
+
 ## 1.19.0
 
 This release is mostly the five things the last review said were still open. It also connects a controlled proof back to the finding that started it.

@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
-import type { Reviewer } from '@shared/types'
+import type { Reviewer, StorageInfo } from '@shared/types'
 import { useApp } from '../store'
 import { PageHead, Seg, Switch } from '../ui'
 
 export default function Settings(): React.JSX.Element {
-  const { settings, updateSettings, setSettings, act, appInfo, setPage } = useApp()
+  const { settings, updateSettings, setSettings, act, appInfo, setPage, notify } = useApp()
   const [check, setCheck] = useState<string | null>(null)
   const [eds, setEds] = useState<{ found: { id: string; name: string }[]; current: string | null } | null>(null)
   const [have, setHave] = useState<string[] | null>(null)
   const [ignored, setIgnored] = useState<Awaited<ReturnType<typeof window.macsec.invoke<'ignored:list'>>>>([])
+  const [storage, setStorage] = useState<StorageInfo | null>(null)
+  const [days, setDays] = useState(90)
+  const [pruneSure, setPruneSure] = useState(false)
+  const size = (b: number): string => (b >= 1_000_000_000 ? `${(b / 1_000_000_000).toFixed(1)} GB` : b >= 1_000_000 ? `${Math.round(b / 1_000_000)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
   useEffect(() => {
     void window.macsec.invoke('editors:list').then(setEds)
     void window.macsec.invoke('ignored:list').then(setIgnored)
     void window.macsec.invoke('ai:agents').then((a) => setHave(a.filter((x) => x.installed).map((x) => x.id)))
+    void window.macsec.invoke('app:storage').then(setStorage).catch(() => undefined)
   }, [])
   const api = window.macsec
   if (!settings) return <></>
@@ -192,6 +197,51 @@ export default function Settings(): React.JSX.Element {
           <button className="btn btn-sm" onClick={() => void api.invoke('app:open-folder', 'extensions')}>
             <FolderOpen size={13} /> Open
           </button>
+        </div>
+        <div className="ms-row">
+          <div className="grow">
+            <div className="row-title">What MacSec keeps</div>
+            <div className="row-sub">
+              {storage ? `${size(storage.bytes)} in the MacSec folder, ${storage.sessions} sessions, about ${storage.findings} findings. Sessions are the only part that grows without a limit.` : 'Measuring the MacSec folder…'}
+            </div>
+          </div>
+          <button className="btn btn-sm" onClick={() => void api.invoke('app:storage').then(setStorage).catch(() => undefined)}>
+            Measure
+          </button>
+        </div>
+        <div className="ms-row">
+          <div className="grow">
+            <div className="row-title">Delete old sessions</div>
+            <div className="row-sub">Removes finished sessions older than the number of days you choose, with their raw scanner output. Findings and reports go with them. This cannot be undone.</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+              <input className="input" type="number" min={7} max={3650} value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ width: 96 }} aria-label="Days" />
+              <span className="hint">days</span>
+            </div>
+          </div>
+          {pruneSure ? (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={async () => {
+                  const r = await act('prune', () => api.invoke('sessions:prune', days))
+                  if (r) {
+                    setStorage(r.info)
+                    setPruneSure(false)
+                    notify({ kind: 'info', text: `Removed ${r.removed} session${r.removed === 1 ? '' : 's'} older than ${days} days.` })
+                  }
+                }}
+              >
+                Delete for good
+              </button>
+              <button className="btn btn-sm" onClick={() => setPruneSure(false)}>
+                Keep them
+              </button>
+            </div>
+          ) : (
+            <button className="btn btn-sm" onClick={() => setPruneSure(true)}>
+              Delete older than {days} days
+            </button>
+          )}
         </div>
         <div className="ms-row">
           <div className="grow">
