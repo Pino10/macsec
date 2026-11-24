@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.33.0
+
+- `mobilegaps.ts`: task hijacking, backup rules, pinning evidence, resilience, WebView, screenshot indicator and iOS Keychain classes; wired into `mobilescan.ts` manifest and deep steps.
+- `MOBILE_COVERAGE.md`: the MASVS-mapped coverage and the live-test gaps.
+
 ### Added in 1.32.0
 
 - `ioschecks.ts`: signed-entitlement checks, provisioning/adhoc/team/expiry, Info.plist keys and permissions, bundle test-host/key/pinning checks; wired into `mobilescan.ts` with `security cms` and `codesign`.

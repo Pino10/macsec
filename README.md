@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.33.0 | Mobile coverage: task hijacking, pinning, resilience, WebView, Keychain classes, MASVS map | [1.33.0](RELEASE_NOTES.md#1330) |
 | 1.32.0 | iOS signed entitlements, ad hoc signing, bundle hosts and keys; Android bundle pass | [1.32.0](RELEASE_NOTES.md#1320) |
 | 1.31.0 | Patch generation in a scratch copy, with tests, typed apply and rollback | [1.31.0](RELEASE_NOTES.md#1310) |
 | 1.30.0 | Amass evaluated and refused, Xcode selected (licence needs accepting) | [1.30.0](RELEASE_NOTES.md#1300) |
