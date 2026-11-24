@@ -501,8 +501,10 @@ export function parsePhpstan(text: string, root: string): Finding[] {
 /** Psalm's taint analysis: every issue here is about untrusted data reaching a dangerous sink. */
 export function parsePsalm(text: string, root: string): Finding[] {
   type I = { type: string; severity?: string; file_name: string; line_from?: number; message: string }
-  const d = json<{ issues?: I[] }>(text)
-  return (d?.issues ?? []).map((i) =>
+  // Psalm 6 and older wrap the list in {issues}; Psalm 7 writes the list on its own.
+  const d = json<{ issues?: I[] } | I[]>(text)
+  const issues = Array.isArray(d) ? d : (d?.issues ?? [])
+  return issues.map((i) =>
     mk('Psalm', 'code', {
       severity: /sql|rce|shell|command|exec|include|deserial|ssrf|xxe|ldap/i.test(i.type) ? 'high' : 'medium',
       title: `${i.type.replace(/([a-z])([A-Z])/g, '$1 $2')}: ${i.message.split('.')[0]}`.slice(0, 160),
