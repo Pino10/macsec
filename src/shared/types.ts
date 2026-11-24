@@ -802,6 +802,8 @@ export interface PluginDef {
   description?: string
   /** proxy: count HTTP(S) through MacSec's local proxy; none: raw tools are unmetered and say so. */
   metering?: 'proxy' | 'none'
+  /** Run the tool inside this image on an internal Docker network; the proxy is the only route. */
+  containerImage?: string
 }
 
 export interface PluginRun {
@@ -812,6 +814,7 @@ export interface PluginRun {
   metered: boolean
   requests: number
   exceeded: boolean
+  container?: boolean
 }
 
 export interface PatchRecord {

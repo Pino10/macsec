@@ -13,7 +13,7 @@ export interface MeteredProxy {
   close: () => Promise<void>
 }
 
-export async function startMeteredProxy(cap: number, onExceeded?: () => void): Promise<MeteredProxy> {
+export async function startMeteredProxy(cap: number, onExceeded?: () => void, bind = '127.0.0.1'): Promise<MeteredProxy> {
   let n = 0
   let over = false
   const sockets = new Set<Socket>()
@@ -80,7 +80,7 @@ export async function startMeteredProxy(cap: number, onExceeded?: () => void): P
     client.on('error', () => up.destroy())
     client.on('close', () => up.destroy())
   })
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+  await new Promise<void>((resolve) => server.listen(0, bind, () => resolve()))
   const addr = server.address()
   const port = typeof addr === 'object' && addr ? addr.port : 0
   return {

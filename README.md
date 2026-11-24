@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.39.0 | Container plugin runner: internal Docker network, proxy-only route, budget kill | [1.39.0](RELEASE_NOTES.md#1390) |
 | 1.38.0 | Metered proxy for plugins: count HTTP/HTTPS, refuse past the engagement budget | [1.38.0](RELEASE_NOTES.md#1380) |
 | 1.37.0 | Programme rules, bounty platform fields, plugin presets for network/AD tools and JSONL | [1.37.0](RELEASE_NOTES.md#1370) |
 | 1.36.0 | Plugin runner for bring-your-own tools; bounty submission draft export | [1.36.0](RELEASE_NOTES.md#1360) |

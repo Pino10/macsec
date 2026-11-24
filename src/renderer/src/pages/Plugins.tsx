@@ -15,7 +15,7 @@ export default function Plugins(): React.JSX.Element {
   const [plugin, setPlugin] = useState('')
   const [ok, setOk] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ name: '', bin: '', args: '["--target","{target}"]', parser: 'json' as PluginDef['parser'], severity: 'medium', pattern: '', description: '', metering: 'none' as 'proxy' | 'none' })
+  const [form, setForm] = useState({ name: '', bin: '', args: '["--target","{target}"]', parser: 'json' as PluginDef['parser'], severity: 'medium', pattern: '', description: '', metering: 'none' as 'proxy' | 'none', containerImage: '' })
   useEffect(() => {
     void api.invoke('plugins:list').then(setList).catch(() => setList([]))
     void api.invoke('plugins:presets').then(setPresets).catch(() => setPresets([]))
@@ -34,7 +34,7 @@ export default function Plugins(): React.JSX.Element {
       notify({ kind: 'error', text: `Arguments: ${(e as Error).message}` })
       return
     }
-    const r = await act('plugin-save', () => api.invoke('plugins:save', { name: form.name, bin: form.bin, args, parser: form.parser, pattern: form.pattern || undefined, severity: form.severity, description: form.description, metering: form.metering }))
+    const r = await act('plugin-save', () => api.invoke('plugins:save', { name: form.name, bin: form.bin, args, parser: form.parser, pattern: form.pattern || undefined, severity: form.severity, description: form.description, metering: form.metering, containerImage: form.containerImage || undefined }))
     if (r) {
       setList(r)
       setForm({ ...form, name: '', bin: '', description: '' })
@@ -46,7 +46,7 @@ export default function Plugins(): React.JSX.Element {
     try {
       const r = await act('plugin-run', () => api.invoke('plugins:run', session, plugin, ok))
       if (r) {
-        notify({ kind: r.exceeded ? 'error' : 'info', text: `${r.added} finding${r.added === 1 ? '' : 's'} added. ${r.metered ? `${r.requests} request${r.requests === 1 ? '' : 's'} counted${r.exceeded ? '; budget exhausted' : ''}.` : 'Unmetered: raw tool traffic is not counted.'}` })
+        notify({ kind: r.exceeded ? 'error' : 'info', text: `${r.added} finding${r.added === 1 ? '' : 's'} added. ${r.metered ? `${r.requests} request${r.requests === 1 ? '' : 's'} counted${r.exceeded ? '; budget exhausted' : ''}.` : 'Unmetered: raw tool traffic is not counted.'}${r.container ? ' It ran in a container on an internal network.' : ''}` })
         showSession(session)
       }
     } finally {
@@ -70,7 +70,7 @@ export default function Plugins(): React.JSX.Element {
               onClick={() => {
                 const x = presets.find((v) => v.name === preset)
                 if (!x) return
-                setForm({ name: x.name, bin: x.bin, args: JSON.stringify(x.args), parser: x.parser, severity: x.severity, pattern: x.pattern ?? '', description: `${x.description} Install: ${x.install}`, metering: x.metering ?? 'none' })
+                setForm({ name: x.name, bin: x.bin, args: JSON.stringify(x.args), parser: x.parser, severity: x.severity, pattern: x.pattern ?? '', description: `${x.description} Install: ${x.install}`, metering: x.metering ?? 'none', containerImage: '' })
               }}
             >
               Use preset
@@ -79,7 +79,9 @@ export default function Plugins(): React.JSX.Element {
           <p className="hint">Presets are templates, not installed tools. Install the tool first; MacSec never installs a plugin binary.</p>
           <p className="hint">The binary must be an absolute path. Placeholders: <span className="mono">{'{target}'}</span>, <span className="mono">{'{host}'}</span>, <span className="mono">{'{url}'}</span>, <span className="mono">{'{session}'}</span>. Arguments are a JSON array; there is no shell.</p>
           <input className="input" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} aria-label="Plugin name" />
-          <input className="input mono" placeholder="/usr/local/bin/tool" value={form.bin} onChange={(e) => setForm({ ...form, bin: e.target.value })} aria-label="Binary" />
+          <input className="input mono" placeholder="/usr/local/bin/tool (or leave empty for a container)" value={form.bin} onChange={(e) => setForm({ ...form, bin: e.target.value })} aria-label="Binary" />
+          <input className="input mono" placeholder="Container image, for example projectdiscovery/nuclei:latest" value={form.containerImage} onChange={(e) => setForm({ ...form, containerImage: e.target.value })} aria-label="Container image" />
+          <p className="hint">A container image runs on an internal Docker network; the metering proxy is the only route. This needs Colima or Docker Desktop running. The tool must already be in the image.</p>
           <textarea className="input mono" rows={2} value={form.args} onChange={(e) => setForm({ ...form, args: e.target.value })} aria-label="Arguments JSON" />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select className="input" value={form.parser} onChange={(e) => setForm({ ...form, parser: e.target.value as PluginDef['parser'] })} aria-label="Parser">
@@ -98,7 +100,7 @@ export default function Plugins(): React.JSX.Element {
             </select>
           </div>
           <input className="input" placeholder="What it does (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} aria-label="Description" />
-          <button className="btn btn-primary" disabled={!form.name.trim() || !form.bin.trim()} onClick={() => void save()}>
+          <button className="btn btn-primary" disabled={!form.name.trim() || (!form.bin.trim() && !form.containerImage.trim())} onClick={() => void save()}>
             <Plus size={14} /> Save plugin
           </button>
         </div>
@@ -131,7 +133,7 @@ export default function Plugins(): React.JSX.Element {
               <Wrench size={15} />
               <span className="grow">
                 <span className="row-title">{p.name}</span>
-                <span className="row-sub mono">{p.bin} {p.args.join(' ')}</span>
+                <span className="row-sub mono">{p.containerImage ? `container: ${p.containerImage}` : p.bin} {p.args.join(' ')}</span>
               </span>
               <button className="icon-btn danger-text" aria-label={`Delete ${p.name}`} onClick={async () => { const r = await act('plugin-del', () => api.invoke('plugins:delete', p.id)); if (r) setList(r) }}>
                 <Trash2 size={14} />
