@@ -235,13 +235,15 @@ export function sessionCsv(d: SessionDetail): string {
 }
 
 /** A submission draft for one programme, from the findings that are actually open. */
-export function bountyReport(d: SessionDetail, program: { client: string; authorityRef: string } | null): string {
+export function bountyReport(d: SessionDetail, program: { client: string; authorityRef: string; programme?: { platform?: string; url?: string; rateLimit?: string; exclusions?: string[] } } | null): string {
   const open = d.findings.filter((f) => f.verdict !== 'false-positive' && !f.triage && f.severity !== 'info')
   const lines = [
     `# Bug bounty submission: ${program?.client || d.title}`,
     '',
     `- Target: ${d.target}`,
     `- Programme/authority: ${program?.client || 'not recorded'}${program?.authorityRef ? ` (${program.authorityRef})` : ''}`,
+    `- Platform: ${program?.programme?.platform || 'generic'}${program?.programme?.url ? ` (${program.programme.url})` : ''}`,
+    `- Programme rate limit: ${program?.programme?.rateLimit || 'not recorded'}${program?.programme?.exclusions?.length ? `; exclusions: ${program.programme.exclusions.join(', ')}` : ''}`,
     `- Build/run: ${d.id}`,
     `- Prepared: ${new Date().toISOString().slice(0, 10)}`,
     `- Findings: ${open.length}`,

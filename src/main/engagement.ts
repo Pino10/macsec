@@ -78,8 +78,17 @@ export function normaliseDraft(input: unknown, now = Date.now()): EngagementDraf
   if (!hosts.length) throw new ValidationError('Name at least one host the authority covers, such as shop.example.com or *.example.com.')
   const window = validWindow(d.startsAt, d.endsAt, now)
   const profile = ['pentest', 'bounty', 'red-team', 'internal', 'lab'].includes(String(d.profile)) ? (String(d.profile) as EngagementDraft['profile']) : 'pentest'
+  const pr = (d.programme ?? {}) as Record<string, unknown>
+  const platform = ['hackerone', 'bugcrowd', 'intigriti', 'generic'].includes(String(pr.platform)) ? (String(pr.platform) as 'hackerone' | 'bugcrowd' | 'intigriti' | 'generic') : 'generic'
+  const programme = {
+    platform,
+    ...(typeof pr.url === 'string' && /^https?:\/\//.test(pr.url) ? { url: pr.url.slice(0, 300) } : {}),
+    ...(typeof pr.rateLimit === 'string' ? { rateLimit: pr.rateLimit.slice(0, 120) } : {}),
+    ...(Array.isArray(pr.exclusions) ? { exclusions: pr.exclusions.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 200)).slice(0, 20) } : {})
+  }
   return {
     profile,
+    programme,
     client: validShortText(d.client, 'the client or project', 120),
     authorityRef: validShortText(d.authorityRef, 'the authority reference', 160),
     authorizedBy: validShortText(d.authorizedBy, 'who gave the authority', 120),

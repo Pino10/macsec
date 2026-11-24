@@ -1,3 +1,42 @@
+## 1.37.0
+
+The operator toolbox: programme-aware bounty work and presets for the network/AD tools, in one
+release.
+
+### Bounty programme rules
+
+- An engagement now carries the programme **platform** (HackerOne, Bugcrowd, Intigriti or generic),
+  the programme URL, the stated rate limit and the exclusions.
+- The bounty draft prints the platform, programme URL, rate limit and exclusions, so the submission
+  starts with the rules it was tested under.
+- The fields are honest metadata, not an API integration. Nothing is uploaded or submitted.
+
+### Plugin presets and better parsers
+
+- The Plugins page has presets for:
+  - **Nmap** service scan (ports and versions);
+  - **NetExec** SMB (host and signing information, no credential attack);
+  - **ldapsearch** anonymous base search;
+  - **Nuclei** JSONL;
+  - **smbmap** share visibility.
+- A preset fills the form; it does not install the binary and never runs by itself. Install the tool,
+  check the absolute path, then run it under the engagement.
+- New **JSONL** parser: one JSON object per line, including the Nuclei shape (`info.name`,
+  `info.severity`, `matched-at`). Broken lines are skipped; the rest still count.
+- Remote presets still need a live engagement covering the host, and the confirmation that MacSec
+  cannot meter the external tool's requests.
+
+### What is not claimed
+
+- There is no dedicated AD module or BloodHound import yet; those tool presets are the bridge.
+- There is no sandbox and no real request accounting for arbitrary plugin binaries. Saying otherwise
+  would be fake. A proxy/container runner is the next honest step.
+- The programme fields are rules and reporting, not platform submission APIs.
+
+655 tests (650 passed, 5 skipped).
+
+---
+
 ## 1.36.0
 
 Bring-your-own tools and a submission draft for bounty programmes.

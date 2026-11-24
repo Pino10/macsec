@@ -661,6 +661,7 @@ export interface Channels {
   'loop:combine': { args: [string]; result: LoopState }
   'loop:verify': { args: [string, Reviewer]; result: LoopState }
   'plugins:list': { args: []; result: PluginDef[] }
+  'plugins:presets': { args: []; result: { name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: Severity; description: string; install: string }[] }
   'plugins:save': { args: [Record<string, unknown>]; result: PluginDef[] }
   'plugins:delete': { args: [string]; result: PluginDef[] }
   'plugins:run': { args: [string, string, boolean]; result: PluginRun }
@@ -795,7 +796,7 @@ export interface PluginDef {
   name: string
   bin: string
   args: string[]
-  parser: 'json' | 'lines' | 'regex'
+  parser: 'json' | 'jsonl' | 'lines' | 'regex'
   pattern?: string
   severity?: Severity
   description?: string

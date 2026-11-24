@@ -7,6 +7,12 @@ import { bountyReport } from '../src/main/exports'
 const plugin = (parser: PluginDef['parser'], pattern?: string): PluginDef => ({ id: 'p1', name: 'Tool', bin: '/bin/echo', args: [], parser, pattern, severity: 'medium' })
 
 describe('plugin output', () => {
+  it('reads JSONL, including the Nuclei shape', () => {
+    const line = JSON.stringify({ 'matched-at': 'https://app/x', info: { name: 'CVE test', severity: 'high' }, 'matcher-name': 'word' })
+    const out = parsePluginOutput(`${line}\nnot json\n`, plugin('jsonl'), 'https://app')
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ title: 'CVE test', severity: 'high', location: 'https://app/x' })
+  })
   it('reads a JSON array, keeps the title and defaults a bad severity', () => {
     const out = parsePluginOutput('[{"title":"Exposed panel","location":"/admin","evidence":"200"},{"title":"","location":"/x"}]', plugin('json'), 'https://app')
     expect(out).toHaveLength(1)
@@ -36,12 +42,15 @@ describe('the bounty draft', () => {
         { id: 'c', tool: 'x', title: 'False', severity: 'high', category: 'web', verdict: 'false-positive' }
       ]
     } as unknown as SessionDetail
-    const md = bountyReport(d, { client: 'Program', authorityRef: 'H1-1' })
+    const md = bountyReport(d, { client: 'Program', authorityRef: 'H1-1', programme: { platform: 'hackerone', url: 'https://hackerone.com/x', rateLimit: '5/s', exclusions: ['staging'] } })
     expect(md).toContain('IDOR on invoice')
     expect(md).toContain('GET /invoice/2 -> 200')
     expect(md).not.toContain('Info note')
     expect(md).not.toContain('False')
     expect(md).toContain('Program')
+    expect(md).toContain('hackerone')
+    expect(md).toContain('5/s')
+    expect(md).toContain('staging')
   })
   it('says so when there is nothing open', () => {
     const d = { id: 's', title: 'App', target: 'x', findings: [] } as unknown as SessionDetail

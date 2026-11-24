@@ -41,7 +41,7 @@ export function savePlugin(input: unknown): PluginDef[] {
   if (!name) throw new Error('Give the plugin a name.')
   if (!bin.startsWith('/') || !existsSync(bin)) throw new Error('The binary must be an absolute path that exists on this Mac.')
   const args = Array.isArray(p.args) ? p.args.filter((a): a is string => typeof a === 'string').slice(0, 50) : []
-  const parser = p.parser === 'lines' || p.parser === 'regex' ? p.parser : 'json'
+  const parser = p.parser === 'lines' || p.parser === 'regex' || p.parser === 'jsonl' ? p.parser : 'json'
   const pattern = typeof p.pattern === 'string' ? p.pattern.slice(0, 300) : undefined
   if (parser === 'regex' && !pattern) throw new Error('A regex parser needs a pattern.')
   const severity = SEVS.includes(p.severity as Severity) ? (p.severity as Severity) : 'medium'
@@ -56,6 +56,16 @@ export function deletePlugin(id: string): PluginDef[] {
   return listPlugins()
 }
 
+export function pluginPresets(): { name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: Severity; description: string; install: string }[] {
+  return [
+    { name: 'Nmap service scan', bin: '/opt/homebrew/bin/nmap', args: ['-sV', '--open', '-oG', '-', '{host}'], parser: 'regex', pattern: 'Ports: (.+)', severity: 'info', description: 'Open ports and service versions from an in-scope host.', install: 'brew install nmap' },
+    { name: 'NetExec SMB', bin: '/opt/homebrew/bin/nxc', args: ['smb', '{host}'], parser: 'lines', severity: 'info', description: 'SMB signing, dialect and host information. No credential attack.', install: 'pipx install netexec' },
+    { name: 'LDAP base search', bin: '/opt/homebrew/bin/ldapsearch', args: ['-x', '-H', 'ldap://{host}', '-s', 'base'], parser: 'lines', severity: 'info', description: 'Anonymous base search against an in-scope directory.', install: 'brew install openldap' },
+    { name: 'Nuclei JSONL', bin: '/opt/homebrew/bin/nuclei', args: ['-u', '{target}', '-jsonl', '-silent'], parser: 'jsonl', severity: 'high', description: 'Read a Nuclei JSONL result as findings. The operator supplies the templates and the target.', install: 'brew install nuclei' },
+    { name: 'smbmap', bin: '/opt/homebrew/bin/smbmap', args: ['-H', '{host}'], parser: 'lines', severity: 'info', description: 'SMB share visibility from an in-scope host.', install: 'pipx install smbmap' }
+  ]
+}
+
 export interface PluginOutput {
   title: string
   severity: Severity
@@ -66,7 +76,33 @@ export interface PluginOutput {
 /** Parsers are deliberately small and strict: no shell, no eval, no HTML. */
 export function parsePluginOutput(text: string, plugin: PluginDef, fallbackLocation: string): PluginOutput[] {
   const out: PluginOutput[] = []
-  if (plugin.parser === 'json') {
+  if (plugin.parser === 'json' || plugin.parser === 'jsonl') {
+    if (plugin.parser === 'jsonl') {
+      const rows: unknown[] = []
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue
+        try {
+          rows.push(JSON.parse(line))
+        } catch {
+          // A broken line is skipped; the other lines still count.
+        }
+      }
+      for (const raw of rows) {
+        const r = raw as Record<string, unknown>
+        const info = (r.info ?? {}) as Record<string, unknown>
+        const title = typeof r.title === 'string' ? r.title : typeof info.name === 'string' ? info.name : ''
+        if (!title) continue
+        const sev = String(r.severity ?? info.severity ?? '')
+        out.push({
+          title: title.slice(0, 200),
+          severity: SEVS.includes(sev as Severity) ? (sev as Severity) : plugin.severity ?? 'medium',
+          location: typeof r['matched-at'] === 'string' ? r['matched-at'] : typeof r.host === 'string' ? r.host : fallbackLocation,
+          evidence: typeof r['matcher-name'] === 'string' ? r['matcher-name'] : typeof r['matched-at'] === 'string' ? r['matched-at'] : ''
+        })
+        if (out.length >= 100) break
+      }
+      return out
+    }
     let data: unknown
     try {
       const start = text.indexOf('[')
