@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Box, ExternalLink, FolderOpen, Gauge, Globe, KeyRound, Laptop, LogIn, Radar, Telescope, UserX, Zap } from 'lucide-react'
 import type { ConfirmOptions, LocalSite, Reviewer, ScanMode } from '@shared/types'
 import { estimateWebScan, minutesText } from '@shared/estimate'
@@ -57,6 +57,10 @@ export default function WebScan(): React.JSX.Element {
   const [mode, setMode] = useState<ScanMode>('standard')
   const [pacing, setPacing] = useState<Pacing>('normal')
   const [reviewer, setReviewer] = useState<Reviewer>(settings?.reviewer ?? 'none')
+  const picked = useRef(false)
+  useEffect(() => {
+    if (!picked.current && settings?.reviewer) setReviewer(settings.reviewer)
+  }, [settings?.reviewer])
   const [ok, setOk] = useState(false)
   const [login, setLogin] = useState<Login>('none')
   const [box, setBox] = useState<'black' | 'white'>('black')
@@ -314,7 +318,14 @@ export default function WebScan(): React.JSX.Element {
         </FlowStep>
 
         <FlowStep n={6} title="The AI: who reads the results, and what it may do" help="The AI reads every finding and explains what matters for your stack. It can also run the two optional extras below, both on a fixed safe menu." state={valid ? (aiOn ? 'done' : 'current') : 'todo'}>
-          <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
+          <ReviewerChoice
+            value={reviewer}
+            onChange={(r) => {
+              picked.current = true
+              setReviewer(r)
+            }}
+            what="findings"
+          />
           <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
             <SwitchLine
               on={autopilot}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FileBox, FolderOpen, Play, Plus, RefreshCw, Smartphone } from 'lucide-react'
 import type { LiveSetupInfo, LocalProject, Reviewer } from '@shared/types'
 import { useApp } from '../store'
@@ -13,6 +13,11 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
   const [projects, setProjects] = useState<LocalProject[]>([])
   const [path, setPath] = useState('')
   const [reviewer, setReviewer] = useState<Reviewer>(settings?.reviewer ?? 'none')
+  const picked = useRef(false)
+  // Settings can arrive after this page mounts; without this the mobile check stayed on "none".
+  useEffect(() => {
+    if (!picked.current && settings?.reviewer) setReviewer(settings.reviewer)
+  }, [settings?.reviewer])
   const [liveOn, setLiveOn] = useState(false)
   const [onlineOn, setOnlineOn] = useState(false)
   const [setup, setSetup] = useState<LiveSetupInfo | null>(null)
@@ -122,7 +127,14 @@ export function MobileFlow({ start = 1 }: { start?: number }): React.JSX.Element
         </label>
       )}
       <FlowStep n={start + (isApk ? 2 : 1)} title="Who writes the report" state="current">
-        <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
+        <ReviewerChoice
+          value={reviewer}
+          onChange={(r) => {
+            picked.current = true
+            setReviewer(r)
+          }}
+          what="findings"
+        />
       </FlowStep>
       <div className="flow-go glass">
         <span className="hint grow">

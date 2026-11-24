@@ -42,3 +42,27 @@ Sources used to shape it:
   API. Those need the test target and a test account.
 - "No pinning evidence" is not "no pinning". It is a request to verify.
 - "No root detection strings" is not proof the app does nothing; it is a gap in the artefact.
+
+## Live techniques worth using (and what MacSec can automate)
+
+These are the techniques mobile testers use on a real test phone or a permitted emulator. MacSec's
+static checks tell you where to look; the live steps prove it.
+
+| Technique | Android | iOS | MacSec today |
+| --- | --- | --- | --- |
+| TLS interception with a user CA | mitmproxy/Burp, system CA on a rooted test image | Proxy + profile, certificate trust | Traffic capture (mitmproxy, person configures the phone) |
+| Certificate pinning bypass | Frida/objection, apk-mitm on a test build | Frida/objection on a jailbroken or test-signed build | Live test watches, does not bypass; bypass needs explicit approval |
+| Root/jailbreak detection bypass | Frida, Magisk DenyList | Frida, palera1n/rootless | Static presence check; bypass is manual |
+| Stored data | `run-as`, adb backup, `/data/data/<pkg>` | Keychain dump, app container, NSUserDefaults | Static backup/Keychain checks; extraction manual |
+| Exported components and intents | `am start`, `am broadcast`, drozer | URL schemes, universal links | Static manifest/scheme checks; runtime manual |
+| Task hijacking | malicious companion app, singleTask/taskAffinity | n/a | Static configuration check |
+| Tapjacking/overlay | overlay app, `filterTouchesWhenObscured` | n/a | Not yet static; manual |
+| Screenshot and app-switcher leakage | FLAG_SECURE test, screen recording | screen recording, app switcher snapshot | Indicator check; device test |
+| WebView and JS bridge | hostile page, deep link into WebView | WKWebView load with a hostile page | Static WebView symbols; runtime manual |
+| Deep link abuse | `adb shell am start -d ...` | `xcrun simctl openurl` on a simulator build | Static schemes; runtime manual |
+| Emulator/root integrity | Play Integrity, SafetyNet, custom checks | DeviceCheck/App Attest | Static checks; the app may refuse an emulator |
+| Backup and data extraction | `adb backup`, cloud backup rules | iTunes/Finder backup, Keychain migration | Static backup/Keychain classes; extraction manual |
+
+The app under review may deliberately refuse emulators or rooted devices. That is a control, not a
+bug; use a physical test phone or a vendor test build that permits instrumentation, with written
+authorization.
