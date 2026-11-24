@@ -1,3 +1,78 @@
+## 1.22.0
+
+The flow release. The web scan and the code review were both arranged around what the tool needed
+rather than what a person is deciding. This release rearranges both, adds the summary and the pace
+control that were missing, and gives the whole app one place to start.
+
+### Web scan
+
+- **The steps now follow the decision.** Which site, signed in or not, how much to cover, from
+  outside or with the code, which confirmations, then the AI. The old third step mixed black and
+  white box with Autopilot and the checklist, and put the reviewer's dependency in a different step.
+  Autopilot and the checklist now sit with the reviewer that runs them, and are disabled with a
+  reason until one is chosen.
+- **The consent belongs to one host.** The ownership tick and the active-tests tick reset when the
+  target changes, and so does the pasted session. A tick for one site can no longer carry to another.
+- **Presets say what they are.** The quick choices show which one is active, and none of them turns
+  on ffuf content discovery any more: discovery is its own switch, because it is hundreds of
+  requests, not a detail of "Public site".
+- **A summary bar that stays in view.** Above the Start button: the host, the mode, the pace, whether
+  you are signed in, how many confirmations, the AI choice, and an estimate of the requests and
+  time, with the biggest contributor named. If Start is disabled, the bar says why.
+- **A gentle pace.** The new pace control sends about a quarter of the requests a minute and pauses
+  longer between them, for a live site that must stay responsive. The estimate changes with it.
+- **Sign-in expiry is noticed.** If several member pages answer as if signed out during the
+  signed-in walk, the scan adds one clear note and says the results below may be missing pages,
+  instead of reporting them as hidden or clear.
+- **The code (white box) step is its own step** with a clear reason when it cannot start. The Burp
+  button is now a secondary button in the summary bar.
+
+### Code review
+
+- **One product, one name.** "Just my changes" and "Test it fully" moved off the Code review page.
+  They are special audits, and the page now points there once instead of carrying a second flow with
+  its own state. The full test launcher on the Overview goes to the audit page too.
+- **One obvious AI choice.** The published deep audits (Cloudflare, Anthropic) are behind an
+  "Advanced" disclosure with a plain description that they replace the standard reviewer. The
+  normal reviewer and skill choices are the default path again.
+- **Scanner controls.** A new advanced panel lists every scanner with a checkbox, and a deep review
+  can skip the Git history. That is the difference between five minutes and an hour on a large
+  repository.
+- **An estimate before you start.** Tokens, rough time, and whether the reviewer is included in a
+  plan, free on this Mac, or an API bill. It says estimate, because it is one.
+
+### Navigation and interface
+
+- **Start a test.** A new page with four cards (code review, web scan, API security, special
+  audits), a list of the other checks, and the last four results to pick up again. The New test
+  button and a new rail entry both open it, so the rail is no longer the only map.
+- **Cmd+K.** A command palette over every page, every result and every finding in the index. Arrow
+  keys and Enter, Escape to close, and a Search entry in the rail shows the shortcut.
+- **Tabs only where they have content.** OWASP no longer appears on a code review; only web, API and
+  mobile results show it.
+- **Rounded edges clip their children.** The rail, toasts, dialogs and jobs no longer let a close
+  button, a count or a badge poke past the rounded corner. The rail's active marker sits inside the
+  edge now.
+- **Switches are labels.** A switch and its title are one clickable row, with the explanation under
+  it. The web scan uses this for every confirmation and for the two AI extras.
+- **Smaller polish.** The action bar is sticky with a blurred background, the page header wraps on
+  narrow windows, the result tabs scroll, the Engine bar truncates long titles, and the start cards
+  and palette follow the rest of the design.
+
+### Under the hood
+
+- `shared/estimate.ts` holds both estimators, so the UI and the tests agree. `tests/v42` checks the
+  scaling and the wording.
+- The web scan accepts `pacing: 'gentle'`, which lowers the rate for Katana, Nuclei and ffuf and
+  lengthens the pause in MacSec's own client. The request carries it through `validWeb`.
+
+### Limits
+
+- This release is the flows, not the workflow. Saved profiles, bulk finding triage with an owner
+  and a due date, and CSV export are the next release, as planned.
+
+---
+
 ## 1.21.0
 
 The documentation release, and the last of the open items.

@@ -63,6 +63,13 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.22
+
+- `shared/estimate.ts`: the scan and review estimators, used by the Web scan and Code review pages and tested in `tests/v42`.
+- Web scan: `pacing: 'gentle'`, a sticky summary bar, host-bound consent, stateful presets, the AI extras beside the reviewer, and sign-in expiry detection in the signed-in walk.
+- Code review: special audits moved out, the deep audit behind an advanced disclosure, scanner checkboxes and `skipHistory` (threaded through `ReviewRequest`, `validReview`, `planScanners` and `review.ts`).
+- Navigation: a `new` page (Start a test), the `CommandPalette` (Cmd+K), and session tabs filtered by kind.
+
 ### Added in 1.21
 
 - `indexdb.ts`: the SQLite session index (`node:sqlite`, with a clean fallback), updated from `sessions.ts` saves and deletes, used by `search.ts`, pruned by `storage.ts`.

@@ -1,12 +1,12 @@
 import Logo from './Logo'
-import { ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar, Boxes, Crosshair } from 'lucide-react'
+import { ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar, Boxes, Crosshair, PlusCircle, Command } from 'lucide-react'
 import { Bell_ } from './Notifications'
 import { useApp, type Page } from '../store'
 
 type Item = { id: Page; label: string; icon: React.ReactNode }
 const I = 16
 export const GROUPS: { label: string | null; items: Item[] }[] = [
-  { label: null, items: [{ id: 'overview', label: 'Overview', icon: <LayoutDashboard size={I} /> }, { id: 'projects', label: 'Projects', icon: <FolderGit2 size={I} /> }] },
+  { label: null, items: [{ id: 'new', label: 'Start a test', icon: <PlusCircle size={I} /> }, { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={I} /> }, { id: 'projects', label: 'Projects', icon: <FolderGit2 size={I} /> }] },
   {
     label: 'Run a test',
     items: [
@@ -59,6 +59,13 @@ export default function Rail(): React.JSX.Element {
         ))}
       </nav>
       <div className="rail-foot">
+        <button className="rail-item" onClick={() => window.dispatchEvent(new Event('macsec:palette'))} aria-label="Search everything">
+          <span className="ri">
+            <Command size={16} />
+          </span>
+          Search
+          <span className="count">⌘K</span>
+        </button>
         <Bell_ />
         {FOOT.map(item)}
       </div>

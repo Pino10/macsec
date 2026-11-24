@@ -117,7 +117,7 @@ export interface ScannerRun {
 const EXCLUDES = [...SKIP_DIRS].filter((d) => d !== '.git')
 
 /** The scanners for one project, in the order they run. */
-export function planScanners(root: string, stats: ProjectStats, depth: ReviewDepth, out: string): ScannerRun[] {
+export function planScanners(root: string, stats: ProjectStats, depth: ReviewDepth, out: string, opts: { skipHistory?: boolean } = {}): ScannerRun[] {
   const runs: ScannerRun[] = []
   const has = (l: string): boolean => stats.languages.includes(l)
   const min = 60 * 1000
@@ -180,7 +180,7 @@ export function planScanners(root: string, stats: ProjectStats, depth: ReviewDep
   }
 
   // Secrets: the files now, and in Deep, every commit.
-  const history = depth === 'deep' && stats.git
+  const history = depth === 'deep' && stats.git && !opts.skipHistory
   runs.push({
     id: 'gitleaks',
     tool: 'Gitleaks',

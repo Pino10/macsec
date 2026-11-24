@@ -195,7 +195,8 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
   const host = new URL(url).host
   const headers = parseHeaders(req.headers)
   const headersB = parseHeaders(req.confirm?.headersB)
-  const mk = (cap: number): ConfirmClient => new ConfirmClient(url, { headers, cap, cancelled: () => s.cancelled, paused: () => op.paused })
+  const gentle = req.pacing === 'gentle'
+  const mk = (cap: number): ConfirmClient => new ConfirmClient(url, { headers, cap, delayMs: gentle ? 400 : 120, cancelled: () => s.cancelled, paused: () => op.paused })
   let carrier: string | undefined
   let codeNames: string[] = []
   const urlsFile = join(s.raw, 'urls.txt')
@@ -281,7 +282,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       await s.run(st.crawl, async (note, line) => {
         await ensure('katana')
         const out = join(s.raw, 'katana.jsonl')
-        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode !== 'quick' ? ['-jc'] : []), ...(req.mode !== 'quick' ? ['-jsluice'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
+        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode !== 'quick' ? ['-jc'] : []), ...(req.mode !== 'quick' ? ['-jsluice'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(gentle ? Math.max(2, Math.round(m.rate / 4)) : m.rate), '-c', '5', '-fs', 'rdn', '-o', out], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
           if (!existsSync(out)) throw e
           return ''
         })
@@ -298,10 +299,15 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         const known = new Set(urls)
         const queue = urls.filter((u) => !u.includes('?')).slice(0, 12)
         let added = 0
+        let loginish = 0
         while (queue.length && known.size < 400 && agent.left() > 4 && !s.cancelled) {
           const page = queue.shift() as string
           const r = await agent.get(page).catch(() => null)
-          if (!r || r.status !== 200 || !/html/i.test(r.headers.get('content-type') ?? '')) continue
+          if (!r) continue
+          // A session that expired mid-scan turns member pages into login answers. Say so, instead of
+          // reporting the missing pages as "hidden" or "clear".
+          if (r.status === 401 || r.status === 403 || (r.status >= 300 && r.status < 400) || /<input[^>]+type="?password/i.test(r.body.slice(0, 4000))) loginish++
+          if (r.status !== 200 || !/html/i.test(r.headers.get('content-type') ?? '')) continue
           for (const m of r.body.matchAll(/\b(?:href|src|action)=["']([^"'#]+)["']/gi)) {
             try {
               const next = new URL(m[1], r.url)
@@ -320,6 +326,10 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         urls = [...new Set(urls)].slice(0, 3000)
         writeFileSync(urlsFile, urls.join('\n'))
         note(`${added} member-only pages added to the list (${urls.length} in all)`)
+        if (loginish >= 3) {
+          note('Several member pages answered as if signed out: the sign-in may have expired')
+          return [{ id: fid('session-expired', host), tool: 'MacSec', category: 'web', severity: 'info', confidence: 'possible', title: 'Your sign-in may have expired during the scan', url, file: url, description: `${loginish} pages that the walk reached answered with a sign-in page or a redirect, even though the scan was signed in. Anything below that needed the login may be missing or reported signed out. Sign in again and run the scan again.`, fix: 'Sign in again in the same way, then run the scan again.' }]
+        }
         return []
       })
 
@@ -334,7 +344,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         const wl = writeWordlist(words, join(s.raw, 'ffuf-words.txt'))
         const out = join(s.raw, 'ffuf.json')
         const base = url.replace(/\/+$/, '')
-        await runTool({ name: 'ffuf', bin: 'ffuf', args: ['-u', `${base}/FUZZ`, '-w', wl, '-of', 'json', '-o', out, '-mc', '200,204,301,302,401,403,405', '-t', '5', '-rate', '20', '-timeout', '10', '-s', '-ac', '-noninteractive'], timeoutMs: 10 * 60_000, output: out }, op, s.raw, line).catch((e) => {
+        await runTool({ name: 'ffuf', bin: 'ffuf', args: ['-u', `${base}/FUZZ`, '-w', wl, '-of', 'json', '-o', out, '-mc', '200,204,301,302,401,403,405', '-t', gentle ? '2' : '5', '-rate', gentle ? '5' : '20', '-timeout', '10', '-s', '-ac', '-noninteractive'], timeoutMs: 10 * 60_000, output: out }, op, s.raw, line).catch((e) => {
           if (!existsSync(out)) throw e
           return ''
         })
@@ -654,7 +664,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       if (!bin) return note('Nuclei’s WordPress checks run below. Install WPScan for plugin and theme versions.')
       const out = join(s.raw, 'wpscan.json')
       // Passive plugin detection and read-only checks: no password guessing, no user lists.
-      await runTool({ name: 'wpscan', bin, absolute: true, args: ['--url', url, '--format', 'json', '--output', out, '--no-banner', '--random-user-agent', '--plugins-detection', 'passive', '--enumerate', 'vp,vt,cb,dbe', '--throttle', '150'], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
+      await runTool({ name: 'wpscan', bin, absolute: true, args: ['--url', url, '--format', 'json', '--output', out, '--no-banner', '--random-user-agent', '--plugins-detection', 'passive', '--enumerate', 'vp,vt,cb,dbe', '--throttle', gentle ? '600' : '150'], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
         if (!existsSync(out)) throw e
         return ''
       })
@@ -682,7 +692,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         '-etags', NOT_READ_ONLY,
         ...(req.mode === 'quick' ? ['-severity', 'critical,high,medium'] : []),
         '-duc', '-nc', '-silent', '-jsonl', '-o', out, '-stats', '-sj', '-si', '5',
-        '-rl', String(m.rate), '-c', '10', '-timeout', '10', '-retries', '1',
+        '-rl', String(gentle ? Math.max(2, Math.round(m.rate / 4)) : m.rate), '-c', gentle ? '5' : '10', '-timeout', '10', '-retries', '1',
       ]
       await runTool({ name: 'nuclei', bin: 'nuclei', args, timeoutMs: (req.mode === 'thorough' ? 120 : 45) * 60_000, output: out }, op, s.raw, line).catch((e) => {
         if (!existsSync(out)) throw e

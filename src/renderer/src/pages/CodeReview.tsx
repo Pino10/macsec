@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { LeakKit } from '../components/LeakKit'
-import { AuditFlow, type AuditKind } from './Audits'
-import { FileSearch, Gauge, Microscope, Radar, Zap } from 'lucide-react'
+import { FileSearch, Gauge, Microscope, Radar, ShieldQuestion, Zap } from 'lucide-react'
 import type { DeepEngine, DeepReviewerKind, ReviewDepth, ReviewFocus, Reviewer } from '@shared/types'
 import { useApp, type PresetSource } from '../store'
+import { estimateReview, minutesText, tokensText } from '@shared/estimate'
 import { FlowStep, PageHead, Seg } from '../ui'
 import SourcePicker, { sourceName } from '../components/SourcePicker'
 import ReviewerChoice from '../components/ReviewerChoice'
@@ -16,6 +16,22 @@ const DEPTHS: { id: ReviewDepth; icon: React.ReactNode; title: string; text: str
   { id: 'deep', icon: <Microscope size={18} />, title: 'Deep', text: 'Everything, the whole Git history and the full audit rules. The AI follows every entry point.' }
 ]
 
+const TOOLS: { id: string; name: string }[] = [
+  { id: 'semgrep', name: 'Semgrep' },
+  { id: 'bearer', name: 'Bearer' },
+  { id: 'bandit', name: 'Bandit' },
+  { id: 'gosec', name: 'gosec' },
+  { id: 'zizmor', name: 'zizmor' },
+  { id: 'hadolint', name: 'Hadolint' },
+  { id: 'checkov', name: 'Checkov' },
+  { id: 'syft', name: 'Syft' },
+  { id: 'grype', name: 'Grype' },
+  { id: 'gitleaks', name: 'Gitleaks' },
+  { id: 'trufflehog', name: 'TruffleHog' },
+  { id: 'osv-scanner', name: 'OSV-Scanner' },
+  { id: 'trivy', name: 'Trivy' }
+]
+
 export default function CodeReview(): React.JSX.Element {
   const { preset, setPreset, settings, act, busy, showSession, tools, setPage } = useApp()
   const api = window.macsec
@@ -24,19 +40,9 @@ export default function CodeReview(): React.JSX.Element {
   const [depth, setDepth] = useState<ReviewDepth>('standard')
   const [focus, setFocus] = useState<ReviewFocus>('security')
   const [keep, setKeep] = useState(false)
-  const [mode, setMode] = useState<'project' | 'changes' | 'full'>(() => {
-    // The Overview's "Test a project fully" lands here with that choice made.
-    try {
-      if (sessionStorage.getItem('macsec.reviewMode') === 'full') {
-        sessionStorage.removeItem('macsec.reviewMode')
-        return 'full'
-      }
-    } catch {
-      // Not available: start with the whole project.
-    }
-    return 'project'
-  })
   const [skills, setSkills] = useState<string[] | undefined>(undefined)
+  const [skip, setSkip] = useState<string[]>([])
+  const [skipHistory, setSkipHistory] = useState(false)
   const [deep, setDeep] = useState<DeepEngine | null>(null)
   const [deepAi, setDeepAi] = useState<DeepReviewerKind>('claude')
   const localPath = source?.kind === 'local' ? source.path : null
@@ -57,25 +63,13 @@ export default function CodeReview(): React.JSX.Element {
       <PageHead title="Code review" desc="Every free scanner that fits your code, then an AI reviewer that checks their findings and looks for what scanners miss: broken access checks, logic flaws, unsafe flows across files." />
 
       <div className="mode-pick">
-        <Seg
-          label="What to review"
-          value={mode}
-          onChange={setMode}
-          options={[
-            ['project', 'Whole project'],
-            ['changes', 'Just my changes'],
-            ['full', 'Test it fully: code and live site']
-          ]}
-        />
-        <span className="hint">
-          {mode === 'project' ? 'Every file, every scanner, then the AI reviewer.' : mode === 'changes' ? 'Only what changed on the current Git branch, with Claude Code’s own /security-review. Good before you merge.' : 'A code review and a web scan of the same project, joined in one AI report.'}
+        <span className="hint grow">
+          Every file, every scanner that fits, then the AI reviewer. Want only your branch’s changes, or the code and its live site in one test? Those are special audits.
         </span>
+        <button className="btn btn-sm" onClick={() => setPage('audit')}>
+          <ShieldQuestion size={14} /> Open special audits
+        </button>
       </div>
-
-      {mode !== 'project' ? (
-        <AuditFlow kinds={mode === 'changes' ? CHANGES : FULL} start="Start review" />
-      ) : (
-      <>
 
       {missing > 0 && (
         <div className="notice">
@@ -110,9 +104,15 @@ export default function CodeReview(): React.JSX.Element {
         </FlowStep>
 
         <FlowStep n={2} title="Who reads the results" help="The scanners always run first. The AI then reads the code and every scanner result, decides what is real, and writes the report." state={source ? 'current' : 'todo'}>
-          <DeepAudit engine={deep} onEngine={setDeep} ai={deepAi} onAi={setDeepAi} projectPath={localPath} />
           {!deep && <ReviewerChoice value={reviewer} onChange={setReviewer} what="code" />}
           {!deep && reviewer.startsWith('claude') && <SkillPicker site={source?.kind === 'local' ? source.path : null} reviewer={reviewer} onChange={setSkills} />}
+          <details className="advanced">
+            <summary>Advanced: a published deep audit instead of the standard review</summary>
+            <p className="hint">
+              Cloudflare’s and Anthropic’s own security reviews, using the AI you pick there. They replace the reviewer above, take much longer, and are the most thorough option.
+            </p>
+            <DeepAudit engine={deep} onEngine={setDeep} ai={deepAi} onAi={setDeepAi} projectPath={localPath} />
+          </details>
         </FlowStep>
 
         <FlowStep n={3} title="How deep" state={source ? 'current' : 'todo'}>
@@ -142,6 +142,32 @@ export default function CodeReview(): React.JSX.Element {
               </label>
             )}
           </div>
+          {!deep && (
+            <p className="hint">
+              The AI reads about {tokensText(estimateReview({ depth, reviewer }).tokens)} tokens: roughly {minutesText(estimateReview({ depth, reviewer }).minutes)} in all. {estimateReview({ depth, reviewer }).note}
+            </p>
+          )}
+          <details className="advanced">
+            <summary>Scanners and Git history</summary>
+            <p className="hint">Turn off what you do not need. A quick review of a huge repository is often faster without the history or the dependency databases.</p>
+            <div className="scan-toggles">
+              {TOOLS.map((t) => (
+                <label key={t.id} className="check">
+                  <input
+                    type="checkbox"
+                    checked={!skip.includes(t.id)}
+                    onChange={(e) => setSkip((prev) => (e.target.checked ? prev.filter((x) => x !== t.id) : [...prev, t.id]))}
+                  />
+                  {t.name}
+                </label>
+              ))}
+            </div>
+            {depth === 'deep' && (
+              <label className="check">
+                <input type="checkbox" checked={skipHistory} onChange={(e) => setSkipHistory(e.target.checked)} /> Skip the Git history (keys in old commits are not looked for)
+              </label>
+            )}
+          </details>
         </FlowStep>
 
         <div className="flow-go glass">
@@ -165,6 +191,8 @@ export default function CodeReview(): React.JSX.Element {
                   depth,
                   focus,
                   keepCode: keep,
+                  skip,
+                  ...(skipHistory ? { skipHistory: true } : {}),
                   skills: !deep && reviewer.startsWith('claude') ? skills : undefined
                 })
               )
@@ -175,11 +203,7 @@ export default function CodeReview(): React.JSX.Element {
           </button>
         </div>
       </div>
-      </>
-      )}
       <LeakKit />
     </>
   )
 }
-const CHANGES: AuditKind[] = ['changes']
-const FULL: AuditKind[] = ['full']

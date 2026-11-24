@@ -152,6 +152,8 @@ export interface WebScanRequest {
   codePath?: string
   /** Pages a recon already found on this host, so a scan does not start from nothing. */
   seedUrls?: string[]
+  /** Gentle: a quarter of the usual request rate and a longer pause, for a site that must stay responsive. */
+  pacing?: 'normal' | 'gentle'
   /** Walk the person's web checklist item by item (needs an AI reviewer for the items a scan cannot test). */
   checklist?: boolean
   /** The AI picks the next checks from a fixed safe menu, and MacSec runs them (needs an AI reviewer). */
@@ -251,6 +253,8 @@ export interface ReviewRequest {
   keepCode: boolean
   /** Tool ids to skip. */
   skip?: string[]
+  /** Do not walk the Git history, even in a deep review (a huge repository, or a fresh clone). */
+  skipHistory?: boolean
   /** Skills for a Claude Code review (ids from review:skill-plan). Empty: the ones that fit. */
   skills?: string[]
 }

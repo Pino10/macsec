@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Box, ExternalLink, FolderOpen, Gauge, Globe, KeyRound, Laptop, LogIn, Radar, Telescope, UserX, Zap } from 'lucide-react'
 import type { ConfirmOptions, LocalSite, Reviewer, ScanMode } from '@shared/types'
+import { estimateWebScan, minutesText } from '@shared/estimate'
 import { useApp } from '../store'
-import { FlowStep, PageHead, Seg, Switch } from '../ui'
+import { FlowStep, PageHead, Seg, SwitchLine } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
 
 export const MODES: { id: ScanMode; icon: React.ReactNode; title: string; text: string }[] = [
@@ -21,6 +22,29 @@ export const isLocal = (u: string): boolean => {
 }
 
 type Login = 'none' | 'browser' | 'paste'
+type Pacing = 'normal' | 'gentle'
+type ConfirmKey = 'discover' | 'fuzz' | 'waf' | 'auth' | 'authz' | 'logic' | 'inject' | 'proto'
+
+const CONFIRM_FIELDS: { key: ConfirmKey; title: string; help: string }[] = [
+  { key: 'discover', title: 'Content discovery with ffuf', help: 'Asks for up to 435 common paths at 20 a second, signed out, with ffuf’s own calibration. Every path that answers is asked again and proved. Read-only: no redirects, no parameters fuzzed, no cookie sent.' },
+  { key: 'fuzz', title: 'Hidden pages and parameters', help: 'Looks for pages and settings that are not linked, and tells you which are real. Sites that answer yes to everything are detected and ignored.' },
+  { key: 'waf', title: 'Web firewall tests', help: 'Finds which firewall answers, what it blocks, and whether a harmless marker gets past it. A way through is reported at once so the owner can tighten the rule.' },
+  { key: 'inject', title: 'Injection tests on every page and form', help: 'Sends harmless markers into every parameter and search-style form it finds and reads what comes back: unescaped output, database errors, a calculated expression, a line break in a header. It only reads: forms that send data are listed, never submitted.' },
+  { key: 'proto', title: 'Sign-in protocols, tokens and cross-site checks', help: 'OAuth and OpenID, JWTs, GraphQL, CORS and anti-forgery checks. Only reads, with made-up addresses that cannot exist.' },
+  { key: 'logic', title: 'Business logic checks', help: 'Open redirects, a poisoned host header, endless wrong codes, price or role fields the browser sends. Anything that would change data is a lead, never tried.' },
+  { key: 'auth', title: 'Login checks', help: 'Eight wrong guesses for a user that does not exist, and whether the login reveals which usernames exist.' },
+  { key: 'authz', title: 'Two-account access check', help: 'Compares what a second account can open with what the first can. Needs you signed in above, and a second account below.' }
+]
+
+/** The same options as a preset, so the buttons can show which one is active. */
+const PRESETS: [string, Partial<Record<ConfirmKey, boolean>>][] = [
+  ['None (read-only)', {}],
+  ['Public site', { fuzz: true, waf: true, logic: true, inject: true, proto: true }],
+  ['Login and accounts', { auth: true, logic: true, inject: true, proto: true }],
+  ['Shop or booking flow', { fuzz: true, auth: true, logic: true, inject: true, proto: true }]
+]
+
+const emptyConfirm = (): ConfirmOptions => ({ fuzz: false, auth: false, authz: false, waf: false, logic: false, inject: false, proto: false, discover: false })
 
 export default function WebScan(): React.JSX.Element {
   const { settings, act, busy, showSession, notify } = useApp()
@@ -30,6 +54,7 @@ export default function WebScan(): React.JSX.Element {
   const [site, setSite] = useState('')
   const [url, setUrl] = useState('')
   const [mode, setMode] = useState<ScanMode>('standard')
+  const [pacing, setPacing] = useState<Pacing>('normal')
   const [reviewer, setReviewer] = useState<Reviewer>(settings?.reviewer ?? 'none')
   const [ok, setOk] = useState(false)
   const [login, setLogin] = useState<Login>('none')
@@ -39,10 +64,11 @@ export default function WebScan(): React.JSX.Element {
   const [autopilot, setAutopilot] = useState(false)
   const [headers, setHeaders] = useState('')
   const [captured, setCaptured] = useState<number | null>(null)
-  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false, logic: false, inject: false, proto: false, discover: false })
+  const [cc, setCc] = useState<ConfirmOptions>(emptyConfirm())
   const [ccOk, setCcOk] = useState(false)
   const setC = (p: Partial<ConfirmOptions>): void => setCc((x) => ({ ...x, ...p }))
-  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf || cc.logic || cc.inject || cc.proto || cc.discover
+  const ccOn = CONFIRM_FIELDS.some((f) => !!cc[f.key])
+  const ccCount = CONFIRM_FIELDS.filter((f) => !!cc[f.key]).length
 
   useEffect(() => {
     void api.invoke('web:sites').then((s) => {
@@ -53,9 +79,36 @@ export default function WebScan(): React.JSX.Element {
 
   const target = where === 'local' ? (sites.find((s) => s.name === site)?.url ?? '') : url.trim()
   const valid = /^https?:\/\/[^\s]+$/.test(target)
+  const host = valid ? new URL(target).host : ''
   const needsOk = valid && !isLocal(target)
   const signedIn = login !== 'none' && headers.trim().length > 0
+  const aiOn = reviewer !== 'none'
   const ccReady = !ccOn || (ccOk && (!cc.authz || (signedIn && !!cc.headersB?.trim())))
+
+  // A consent, a session and an active test set belong to one host. Moving to another host starts
+  // again: no tick and no cookie carries over to a different site.
+  useEffect(() => {
+    setOk(false)
+    setCcOk(false)
+    setHeaders('')
+    setCaptured(null)
+    setLogin('none')
+  }, [host])
+
+  const est = estimateWebScan({ mode, pacing, confirm: ccOn, discover: !!cc.discover, autopilot: autopilot && aiOn, checklist: checklist && aiOn, signedIn, white: box === 'white' })
+  const why = !valid
+    ? 'Choose a site or enter an address.'
+    : needsOk && !ok
+      ? `Confirm that you are allowed to test ${host}.`
+      : login !== 'none' && !signedIn
+        ? 'Sign in, or choose signed out.'
+        : !ccReady
+          ? 'The two-account check needs you signed in and a second account below.'
+          : box === 'white' && where === 'url' && !code
+            ? 'Choose the code folder for the white box check.'
+            : ''
+
+  const active = (set: Partial<Record<ConfirmKey, boolean>>): boolean => CONFIRM_FIELDS.every((f) => !!cc[f.key] === !!set[f.key])
 
   return (
     <>
@@ -67,7 +120,7 @@ export default function WebScan(): React.JSX.Element {
             value={where}
             onChange={setWhere}
             options={[
-              ['local', <><Laptop size={14} /> A Laramac site</>],
+              ['local', <><Laptop size={14} /> A site on this Mac</>],
               ['url', <><Globe size={14} /> Any address</>]
             ]}
           />
@@ -85,7 +138,7 @@ export default function WebScan(): React.JSX.Element {
           )}
         </FlowStep>
 
-        <FlowStep n={2} title="Signed out, or signed in too" help="Signed in, the scan reaches the pages only members see, and checks that private pages really need the login." state={valid ? (login === 'none' || signedIn ? 'done' : 'current') : 'todo'}>
+        <FlowStep n={2} title="Signed out, or signed in too" help="Signed in, the scan reaches the pages only members see, and checks that private pages really need the login. The session is used by MacSec's own requests only: the scanner tools run signed out." state={valid ? (login === 'none' || signedIn ? 'done' : 'current') : 'todo'}>
           <div className="choices" role="radiogroup" aria-label="Sign-in">
             <button className="choice" role="radio" aria-checked={login === 'none'} onClick={() => setLogin('none')}>
               <span className="ci" style={{ ['--g' as string]: '#8c95b8' }}>
@@ -99,7 +152,7 @@ export default function WebScan(): React.JSX.Element {
                 <LogIn size={18} />
               </span>
               <strong>Sign in through MacSec</strong>
-              <span>A private window opens your site. Sign in as usual and close it; MacSec keeps that login for this scan only.</span>
+              <span>A private window opens your site. Sign in as usual and close it; the login is kept for this scan only.</span>
             </button>
             <button className="choice" role="radio" aria-checked={login === 'paste'} onClick={() => setLogin('paste')}>
               <span className="ci" style={{ ['--g' as string]: '#8b6cff' }}>
@@ -129,9 +182,34 @@ export default function WebScan(): React.JSX.Element {
             </div>
           )}
           {login === 'paste' && <textarea className="input mono" rows={3} placeholder={'Cookie: laravel_session=…\nAuthorization: Bearer …'} value={headers} onChange={(e) => setHeaders(e.target.value)} aria-label="Request headers" />}
+          {signedIn && <p className="hint">If the sign-in expires during the scan, MacSec notices and says so instead of reporting missing pages.</p>}
         </FlowStep>
 
-        <FlowStep n={3} title="Black box or white box" help="Black box tests the site from outside, like an attacker with no inside knowledge. White box also reads the site's own code, so it knows every route and parameter, finds pages nothing links to, and checks them on the live site." state={valid ? 'current' : 'todo'}>
+        <FlowStep n={3} title="How much to cover" state={valid ? 'current' : 'todo'}>
+          <div className="choices" role="radiogroup" aria-label="Mode">
+            {MODES.map((m) => (
+              <button key={m.id} className="choice" role="radio" aria-checked={mode === m.id} onClick={() => setMode(m.id)}>
+                <span className="ci">{m.icon}</span>
+                <strong>{m.title}</strong>
+                <span>{m.text}</span>
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Seg<Pacing>
+              label="Pace"
+              value={pacing}
+              onChange={setPacing}
+              options={[
+                ['normal', 'Normal pace'],
+                ['gentle', 'Gentle: a quarter of the rate']
+              ]}
+            />
+            <span className="hint">Gentle sends far fewer requests a minute and pauses longer. Use it on a live site that must stay responsive.</span>
+          </div>
+        </FlowStep>
+
+        <FlowStep n={4} title="From outside, or with the code" help="Black box tests the site as a visitor could. White box also reads the site's own code, so it knows every route and parameter, finds pages nothing links to, and checks them live. The code is only read." state={valid ? 'current' : 'todo'}>
           <div className="choices" role="radiogroup" aria-label="Approach">
             <button className="choice" role="radio" aria-checked={box === 'black'} onClick={() => setBox('black')}>
               <span className="ci"><Box size={18} /></span>
@@ -153,75 +231,34 @@ export default function WebScan(): React.JSX.Element {
                   <button className="btn" onClick={async () => setCode((await act('pick', () => api.invoke('web:pick-code'))) ?? code)}>
                     <FolderOpen size={14} /> {code ? 'Choose another folder' : 'Choose the code folder'}
                   </button>
-                  <span className="hint mono">{code ?? 'No folder chosen yet.'}</span>
+                  <span className="hint mono">{code ?? 'No folder chosen yet. The scan cannot start without it.'}</span>
                 </>
               )}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 12 }}>
-            <Switch on={autopilot} onChange={() => setAutopilot(!autopilot)} label="Autopilot" />
-            <div>
-              <strong>Autopilot: the AI chooses what to test next</strong>
-              <div className="hint">After the normal steps, the AI reads what was found and picks up to 14 more checks from a fixed safe menu (read a page, injection markers, hidden parameters, CORS, GraphQL, OAuth, tokens, business logic), in up to three rounds. MacSec runs each one with its own safety rules and proof. The AI never sends requests or writes findings itself. Tick it only for a site you may test. It needs an AI choice in the last step.</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 12 }}>
-            <Switch on={checklist} onChange={() => setChecklist(!checklist)} label="Walk my checklist" />
-            <div>
-              <strong>Walk my checklist</strong>
-              <div className="hint">Goes through your 638-item web checklist for this site. Items MacSec can test are marked found or clear. The AI you pick below judges the rest from the evidence only, and says "try by hand" where it cannot know. It needs an AI choice in the last step.</div>
-            </div>
-          </div>
         </FlowStep>
 
-        <FlowStep n={4} title="How much to cover" state={valid ? 'current' : 'todo'}>
-          <div className="choices" role="radiogroup" aria-label="Mode">
-            {MODES.map((m) => (
-              <button key={m.id} className="choice" role="radio" aria-checked={mode === m.id} onClick={() => setMode(m.id)}>
-                <span className="ci">{m.icon}</span>
-                <strong>{m.title}</strong>
-                <span>{m.text}</span>
-              </button>
-            ))}
-          </div>
-        </FlowStep>
-
-        <FlowStep n={5} title="Control confirmations (optional)" help="Active checks that try a harmless version of a problem, so every finding comes with proof and nothing is a guess. They only use harmless test strings, never change data, and stop if the server struggles." state={valid ? 'current' : 'todo'}>
-          <div className="stack" style={{ display: 'grid', gap: 10 }}>
+        <FlowStep n={5} title="Control confirmations (optional)" help="Active checks that try a harmless version of a problem, so every finding comes with proof. They use harmless test strings, never change data, and stop if the server struggles." state={valid ? 'current' : 'todo'}>
+          <div className="stack" style={{ display: 'grid', gap: 12 }}>
             <div role="group" aria-label="Quick choices" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span className="hint">Quick choices:</span>
-              {(
-                [
-                  ['None', { fuzz: false, waf: false, auth: false, authz: false, logic: false, inject: false, proto: false, discover: false }],
-                  ['Public site', { fuzz: true, waf: true, auth: false, authz: false, logic: true, inject: true, proto: true, discover: true }],
-                  ['Login and accounts', { fuzz: false, waf: false, auth: true, authz: false, logic: true, inject: true, proto: true, discover: false }],
-                  ['Shop or booking flow', { fuzz: true, waf: false, auth: true, authz: false, logic: true, inject: true, proto: true, discover: true }]
-                ] as const
-              ).map(([name, set]) => (
-                <button key={name} className="btn btn-sm" onClick={() => setC(set)}>
+              <span className="hint">Presets:</span>
+              {PRESETS.map(([name, set]) => (
+                <button
+                  key={name}
+                  className={active(set) ? 'btn btn-sm btn-primary' : 'btn btn-sm'}
+                  aria-pressed={active(set)}
+                  onClick={() => {
+                    setCc({ ...emptyConfirm(), ...set })
+                    setCcOk(false)
+                  }}
+                >
                   {name}
                 </button>
               ))}
+              <span className="hint">Content discovery is never part of a preset; turn it on below when you want it.</span>
             </div>
-            {(
-              [
-                ['discover', 'Content discovery with ffuf', 'Asks the site for up to 435 common paths at 20 a second, signed out, with its own calibration. Every path that answers is asked again and proved, and each one joins the pages tested below. Read-only: no redirects, no parameters fuzzed, no cookie sent.'],
-                ['fuzz', 'Hidden pages and parameters', 'Looks for pages and settings that are not linked, and tells you which are real. Sites that answer yes to everything are detected and ignored.'],
-                ['waf', 'Web firewall tests', 'Finds which firewall answers, what it blocks, and whether a harmless marker gets past it. A way through is reported at once so the owner can tighten the rule.'],
-                ['inject', 'Injection tests on every page and form', 'Sends harmless markers into every parameter and every search-style form it finds (signed in too, if you signed in above) and reads what comes back: unescaped output, database errors, a calculated expression, a line break in a header. It only reads: forms that send data are listed, never submitted.'],
-                ['proto', 'Sign-in protocols, tokens, GraphQL and cross-site checks', 'Checks how the site signs people in and talks to other sites. OAuth and OpenID: a missing or fixed state value, the implicit flow, a callback address the server accepts without checking. Tokens (JWT): no signature, a weak secret, no expiry, and whether the server really checks the signature of your own token. GraphQL: open schema, open IDE, mutations over GET. Other sites: CORS that repeats any origin, forms without an anti-forgery token, session ids in links. All of it only reads, with made-up addresses that cannot exist.'],
-                ['logic', 'Business logic checks', 'Tests for open redirects, a poisoned host header, forms that accept endless wrong codes, price or role fields the browser sends, and steps of a flow that can be skipped. Anything that would change data is listed as a lead for you to test by hand.'],
-                ['auth', 'Login checks', 'Eight wrong guesses for a user that does not exist (to see if anything slows them), and whether the login reveals which usernames exist.'],
-                ['authz', 'Two-account access check', 'Compares what a second account can open with what the first can. Needs you to be signed in above, and a second account below.']
-              ] as const
-            ).map(([k, t, d]) => (
-              <div key={k} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <Switch on={!!cc[k]} onChange={() => setC({ [k]: !cc[k] })} label={t} />
-                <div>
-                  <strong>{t}</strong>
-                  <div className="hint">{d}</div>
-                </div>
-              </div>
+            {CONFIRM_FIELDS.map((f) => (
+              <SwitchLine key={f.key} on={!!cc[f.key]} onChange={() => setC({ [f.key]: !cc[f.key] })} label={f.title} help={f.help} />
             ))}
             {cc.auth && (
               <>
@@ -246,42 +283,67 @@ export default function WebScan(): React.JSX.Element {
               <label className="consent">
                 <input type="checkbox" checked={ccOk} onChange={(e) => setCcOk(e.target.checked)} />
                 <span>
-                  <strong style={{ color: 'var(--ink)' }}>I am allowed to run active tests on {valid ? new URL(target).host : 'this site'}.</strong> Each finding is repeated once before it is reported. Nothing is saved except the proof.
+                  <strong style={{ color: 'var(--ink)' }}>I am allowed to run active tests on {valid ? host : 'this site'}.</strong> Each finding is repeated once before it is reported. Nothing is saved except the proof.
+                </span>
+              </label>
+            )}
+            {needsOk && (
+              <label className="consent">
+                <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
+                <span>
+                  <strong style={{ color: 'var(--ink)' }}>I own {host}, or have written permission to test it.</strong> Scanning sites you are not allowed to test can be against the law, even when the checks only read.
                 </span>
               </label>
             )}
           </div>
         </FlowStep>
 
-        <FlowStep n={6} title="Who writes the report" help="The AI reads every finding and explains what matters for your stack, with the exact configuration to fix it." state={valid ? 'current' : 'todo'}>
+        <FlowStep n={6} title="The AI: who reads the results, and what it may do" help="The AI reads every finding and explains what matters for your stack. It can also run the two optional extras below, both on a fixed safe menu." state={valid ? (aiOn ? 'done' : 'current') : 'todo'}>
           <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
+          <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+            <SwitchLine
+              on={autopilot}
+              disabled={!aiOn}
+              onChange={() => setAutopilot(!autopilot)}
+              label="Autopilot: the AI chooses what to test next"
+              help={aiOn ? 'After the normal steps, the AI reads what was found and picks up to 14 more checks from a fixed safe menu, in up to three rounds. MacSec runs each one with its own safety rules and proof. Tick it only for a site you may test.' : 'Choose an AI first. Without one, Autopilot cannot run.'}
+            />
+            <SwitchLine
+              on={checklist}
+              disabled={!aiOn}
+              onChange={() => setChecklist(!checklist)}
+              label="Walk my 638-item checklist"
+              help={aiOn ? 'Goes through your web checklist for this site. Items MacSec can test are marked found or clear; the AI judges the rest from the evidence only and says “try by hand” where it cannot know.' : 'Choose an AI first. Without one, the checklist cannot be judged.'}
+            />
+          </div>
         </FlowStep>
+      </div>
 
-        {needsOk && (
-          <label className="consent">
-            <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
-            <span>
-              <strong style={{ color: 'var(--ink)' }}>I own {new URL(target).host}, or have written permission to test it.</strong> Scanning sites you are not allowed to test can be against the law, even when the checks only read.
-            </span>
-          </label>
-        )}
-
-        <div className="flow-go glass">
-          <span className="hint grow">{valid ? `Scans ${target}${signedIn ? ', signed in' : ''}` : 'Choose a site or enter an address.'}</span>
-          <button className="btn" onClick={() => void act('burp', () => api.invoke('burp:open')).then(() => notify({ kind: 'info', text: 'Burp Suite is opening for hands-on testing.' }))}>
-            <ExternalLink size={15} /> Burp Suite
-          </button>
-          <button
-            className="btn btn-primary btn-lg"
-            disabled={!valid || (needsOk && !ok) || (login !== 'none' && !signedIn) || !ccReady || busy.has('web') || (box === 'white' && where === 'url' && !code)}
-            onClick={async () => {
-              const s = await act('web', () => api.invoke('web:start', { target: where === 'local' ? { kind: 'local', name: site } : { kind: 'url', url: target }, mode, authorized: ok, headers: signedIn ? headers : undefined, confirm: ccOn ? cc : undefined, codePath: box === 'white' ? (where === 'local' ? `${settings?.wwwPath ?? ''}/${site}` : (code ?? undefined)) : undefined, checklist: checklist && reviewer !== 'none', autopilot: autopilot && reviewer !== 'none', reviewer }))
-              if (s) showSession(s.id)
-            }}
-          >
-            <Radar size={17} /> Start scan
-          </button>
+      {/* One bar that stays in view: what will run, how much of it, and why it cannot start. */}
+      <div className="flow-go glass">
+        <div className="grow">
+          <div className="summary-line">
+            <strong>{valid ? host : 'No site chosen'}</strong>
+            <span className="hint">{mode} · {pacing === 'gentle' ? 'gentle pace' : 'normal pace'} · {signedIn ? 'signed in' : 'signed out'} · {ccOn ? `${ccCount} confirmation${ccCount === 1 ? '' : 's'}` : 'read-only'}{aiOn ? ' · AI report' : ''}</span>
+          </div>
+          <div className="hint">
+            About {est.requests.toLocaleString()} requests, roughly {minutesText(est.minutes)}. Most of it: {est.heaviest}.
+          </div>
+          {why && <div className="hint" style={{ color: 'var(--warn)' }}>{why}</div>}
         </div>
+        <button className="btn" onClick={() => void act('burp', () => api.invoke('burp:open')).then(() => notify({ kind: 'info', text: 'Burp Suite is opening for hands-on testing.' }))}>
+          <ExternalLink size={15} /> Burp
+        </button>
+        <button
+          className="btn btn-primary btn-lg"
+          disabled={!!why || busy.has('web')}
+          onClick={async () => {
+            const s = await act('web', () => api.invoke('web:start', { target: where === 'local' ? { kind: 'local', name: site } : { kind: 'url', url: target }, mode, pacing, authorized: ok, headers: signedIn ? headers : undefined, confirm: ccOn ? cc : undefined, codePath: box === 'white' ? (where === 'local' ? `${settings?.wwwPath?.replace(/\/$/, '')}/${site}` : (code ?? undefined)) : undefined, checklist: checklist && aiOn, autopilot: autopilot && aiOn, reviewer }))
+            if (s) showSession(s.id)
+          }}
+        >
+          <Radar size={17} /> {busy.has('web') ? 'Starting…' : 'Start scan'}
+        </button>
       </div>
     </>
   )
