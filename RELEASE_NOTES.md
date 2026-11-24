@@ -1,3 +1,51 @@
+## 1.34.0
+
+The review loop: tools first, then a blind AI review, then the merge, then a second opinion. It is
+four stages in one release, each with its own tests, and a human decides at the end.
+
+### Stage 1: tools
+
+The mobile scan now saves a redacted **evidence pack** in the session: the manifest, Info.plist,
+entitlements, provisioning details, the Hermes bundle strings and the library list. The tool findings
+are kept separately; they are not in the evidence.
+
+### Stage 2: blind AI review
+
+- A new **Review desk** tab on a mobile result runs the chosen AI against the evidence only. The
+  prompt says it has not seen the tool findings and does not include them.
+- The AI must return JSON with a location for every finding; a finding with no location is dropped,
+  not guessed. Every answer is `possible`.
+- Malformed JSON or a missing answer is an error, never an empty "all clear".
+- The blind findings are stored in `blind-findings.json`; the tool findings are untouched.
+
+### Stage 3: combine
+
+- Matching is by **place** plus title similarity, with stop words removed. The same title at a
+  different place does not merge.
+- Each combined finding keeps `tools`, `ai` or both, the original ids, agreement, conflict and the
+  evidence from each side.
+- Nothing is deleted and nothing becomes confirmed. An AI-only finding stays AI-only.
+
+### Stage 4: re-review
+
+- An optional verifier sees the combined list **without the source labels** and answers
+  supported, refuted or uncertain. A missing answer becomes `uncertain`, not silent agreement.
+- The verifier is a second opinion; the reviewer makes the final call.
+- The report (`review-loop.md`) records sources, agreement, the verifier's answer and the exact
+  caveat: AI findings are possible, not confirmed.
+
+### Limits, said plainly
+
+- For an APK/IPA the blind stage is an **evidence review**, not a source review: the AI sees the
+  manifest, plists, entitlements and bundle strings, not decompiled source.
+- Two AI passes cost tokens and time; the desk shows each stage before it runs.
+- Old mobile sessions have no evidence pack; run the scan again to use the loop.
+- The verifier can be wrong; it never raises confidence by itself.
+
+648 tests (643 passed, 5 skipped).
+
+---
+
 ## 1.33.2
 
 The mobile scan was recording the AI report but not the reviewer, so the session said "No AI" while
