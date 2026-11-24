@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.30.0
+
+- The Amass decision: 5.1.3 against subfinder 2.17.0 on `owasp.org`; Amass timed out at seven minutes with no result, subfinder returned 158. Do not add it.
+- Xcode 27.2 is selected; its licence must be accepted before `xcodebuild` or the system git work (`sudo xcodebuild -license accept`).
+
 ### Added in 1.29.0
 
 - `corpus/sql/joern.md`: the Joern 4.0.691 commands and the Java-pair result.
