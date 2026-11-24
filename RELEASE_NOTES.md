@@ -1,3 +1,46 @@
+## 1.25.1
+
+The SQL corpus, and the first real numbers from it. The point of this release is not a new rule; it
+is a labelled thing to measure rules against, with a holdout split and clean code that must stay
+clean.
+
+### What is new
+
+- **Eight labelled samples** across PHP, Python, JavaScript and Java: four that put request data into
+  a query, four that use a prepared statement. Every expected line is recorded, the clean files are
+  asserted to have no concatenation, and the JavaScript and Java cases are a **holdout** split that
+  rules are not written against.
+- **The measurement.** Findings are matched to a labelled line within two lines, two rules pointing
+  at the same query count once, a clean file that is flagged is a false positive, and a labelled
+  line with nothing is a miss. Precision and recall are reported for the whole corpus, the training
+  split and the holdout split separately.
+- **The first Semgrep numbers.** With `p/sql-injection` on the corpus:
+
+  | Split | Precision | Recall |
+  | --- | --- | --- |
+  | Training (PHP, Python) | 1.0 | 1.0 |
+  | Holdout (JavaScript, Java) | 1.0 | 0.5 |
+  | All | 1.0 | 0.75 |
+
+  The miss is the JavaScript template literal (`${req.query.name}` inside the query). Java is found
+  by two rules at the query; they count as one problem. That is a real gap in the existing engine,
+  and exactly the kind of thing the corpus exists to show.
+- **Joern is ready to be measured, not measured.** There is a query template in
+  `scripts/joern-sql.sc`, a parser for its JSON, and the same scoring. Joern is not installed here,
+  so no number is claimed for it. The decision rule is written down: Joern ships only if it finds
+  the holdout cases the existing engines miss (starting with that JavaScript one) without a
+  false-positive rate that a small corpus can hide, and within a runtime and disk budget worth it.
+- **`npm run corpus:sql`** runs the measurement against the Semgrep MacSec installed, writes
+  `corpus/sql/report.json`, and prints the three rows.
+
+### Limits
+
+- Eight samples is a direction, not a statistic. The next step is thirty or more across frameworks,
+  plus clean code from a real application, before any engine decision is treated as settled.
+- The corpus is code in the repository, not bundled into the app. It is a development instrument.
+
+---
+
 ## 1.25.0
 
 The measuring stick, before any new engine. Two harnesses that run without a scanner installed, and
