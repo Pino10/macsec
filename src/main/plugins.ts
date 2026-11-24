@@ -10,6 +10,7 @@ import type { Finding, PluginDef, PluginRun, SessionInfo, Severity } from '../sh
 import { dirs } from './paths'
 import { readSession, saveFindings, sessionDetail, sessionDir } from './sessions'
 import { currentEngagement, engagementProblem } from './engagement'
+import { startMeteredProxy } from './pluginproxy'
 import { fid } from './scanners/parse'
 import { log } from './logs'
 
@@ -45,8 +46,9 @@ export function savePlugin(input: unknown): PluginDef[] {
   const pattern = typeof p.pattern === 'string' ? p.pattern.slice(0, 300) : undefined
   if (parser === 'regex' && !pattern) throw new Error('A regex parser needs a pattern.')
   const severity = SEVS.includes(p.severity as Severity) ? (p.severity as Severity) : 'medium'
+  const metering = p.metering === 'proxy' ? 'proxy' : 'none'
   const list = load().filter((x) => x.name.toLowerCase() !== name.toLowerCase())
-  const plugin: PluginDef = { id: `pl-${randomBytes(4).toString('hex')}`, name, bin, args, parser, ...(pattern ? { pattern } : {}), severity, ...(typeof p.description === 'string' ? { description: p.description.slice(0, 500) } : {}) }
+  const plugin: PluginDef = { id: `pl-${randomBytes(4).toString('hex')}`, name, bin, args, parser, ...(pattern ? { pattern } : {}), severity, metering, ...(typeof p.description === 'string' ? { description: p.description.slice(0, 500) } : {}) }
   write([plugin, ...list])
   return listPlugins()
 }
@@ -56,12 +58,12 @@ export function deletePlugin(id: string): PluginDef[] {
   return listPlugins()
 }
 
-export function pluginPresets(): { name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: Severity; description: string; install: string }[] {
+export function pluginPresets(): { name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: Severity; description: string; install: string; metering?: 'proxy' | 'none' }[] {
   return [
     { name: 'Nmap service scan', bin: '/opt/homebrew/bin/nmap', args: ['-sV', '--open', '-oG', '-', '{host}'], parser: 'regex', pattern: 'Ports: (.+)', severity: 'info', description: 'Open ports and service versions from an in-scope host.', install: 'brew install nmap' },
     { name: 'NetExec SMB', bin: '/opt/homebrew/bin/nxc', args: ['smb', '{host}'], parser: 'lines', severity: 'info', description: 'SMB signing, dialect and host information. No credential attack.', install: 'pipx install netexec' },
     { name: 'LDAP base search', bin: '/opt/homebrew/bin/ldapsearch', args: ['-x', '-H', 'ldap://{host}', '-s', 'base'], parser: 'lines', severity: 'info', description: 'Anonymous base search against an in-scope directory.', install: 'brew install openldap' },
-    { name: 'Nuclei JSONL', bin: '/opt/homebrew/bin/nuclei', args: ['-u', '{target}', '-jsonl', '-silent'], parser: 'jsonl', severity: 'high', description: 'Read a Nuclei JSONL result as findings. The operator supplies the templates and the target.', install: 'brew install nuclei' },
+    { name: 'Nuclei JSONL', bin: '/opt/homebrew/bin/nuclei', args: ['-u', '{target}', '-jsonl', '-silent'], parser: 'jsonl', severity: 'high', description: 'Read a Nuclei JSONL result as findings. The operator supplies the templates and the target.', install: 'brew install nuclei', metering: 'proxy' },
     { name: 'smbmap', bin: '/opt/homebrew/bin/smbmap', args: ['-H', '{host}'], parser: 'lines', severity: 'info', description: 'SMB share visibility from an in-scope host.', install: 'pipx install smbmap' }
   ]
 }
@@ -164,12 +166,20 @@ export async function runPlugin(sessionId: string, pluginId: string, confirmed: 
     if (problem) throw new Error(problem)
   }
   const args = p.args.map((a) => a.replace(/\{target\}/g, target).replace(/\{host\}/g, host).replace(/\{url\}/g, target).replace(/\{session\}/g, sessionId))
+  const e = host ? currentEngagement() : null
+  const cap = e ? Math.max(1, Math.min(p.metering === 'proxy' ? 1000 : 1, e.caps.requests - e.used.requests)) : 200
+  let proxy: Awaited<ReturnType<typeof startMeteredProxy>> | null = null
+  let child: ReturnType<typeof execFile> | null = null
+  if (p.metering === 'proxy') proxy = await startMeteredProxy(cap, () => child?.kill('SIGTERM'))
   const out = await new Promise<string>((resolve, reject) => {
-    execFile(p.bin, args, { cwd: sessionDir(sessionId), timeout: 10 * 60_000, maxBuffer: 8 * 1024 * 1024, env: process.env }, (e, stdout, stderr) => {
-      if (e && !stdout) return reject(new Error(`${p.name} failed: ${String(stderr).trim().split('\n').slice(-2).join(' ')}`))
+    child = execFile(p.bin, args, { cwd: sessionDir(sessionId), timeout: 10 * 60_000, maxBuffer: 8 * 1024 * 1024, env: proxy ? { ...process.env, HTTP_PROXY: proxy.url, HTTPS_PROXY: proxy.url, ALL_PROXY: proxy.url, NO_PROXY: '127.0.0.1,localhost', MACSEC_PLUGIN_PROXY: proxy.url } : process.env }, (err, stdout, stderr) => {
+      if (err && !stdout) return reject(new Error(`${p.name} failed: ${String(stderr).trim().split('\n').slice(-2).join(' ')}`))
       resolve(String(stdout))
     })
-  })
+  }).finally(() => void proxy?.close())
+  const metered = !!proxy
+  const requests = proxy?.count() ?? 0
+  const exceeded = proxy?.exceeded() ?? false
   const parsed = parsePluginOutput(out, p, host || target)
   const findings: Finding[] = parsed.map((x) => ({
     id: fid(`Plugin: ${p.name}`, x.title, x.location),
@@ -186,5 +196,5 @@ export async function runPlugin(sessionId: string, pluginId: string, confirmed: 
   const d = sessionDetail(sessionId)
   saveFindings(sessionId, [...d.findings, ...findings])
   log('info', `Plugin ${p.name}: ${findings.length} finding${findings.length === 1 ? '' : 's'}`, sessionId)
-  return { session: readSession(sessionId) as SessionInfo, added: findings.length, output: out.slice(-4000), detail: sessionDetail(sessionId) }
+  return { session: readSession(sessionId) as SessionInfo, added: findings.length, output: out.slice(-4000), detail: sessionDetail(sessionId), metered, requests, exceeded }
 }

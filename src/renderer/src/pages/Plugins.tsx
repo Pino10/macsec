@@ -9,13 +9,13 @@ export default function Plugins(): React.JSX.Element {
   const { sessions, showSession, act, notify } = useApp()
   const api = window.macsec
   const [list, setList] = useState<PluginDef[]>([])
-  const [presets, setPresets] = useState<{ name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: string; description: string; install: string }[]>([])
+  const [presets, setPresets] = useState<{ name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: string; description: string; install: string; metering?: 'proxy' | 'none' }[]>([])
   const [preset, setPreset] = useState('')
   const [session, setSession] = useState('')
   const [plugin, setPlugin] = useState('')
   const [ok, setOk] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ name: '', bin: '', args: '["--target","{target}"]', parser: 'json' as PluginDef['parser'], severity: 'medium', pattern: '', description: '' })
+  const [form, setForm] = useState({ name: '', bin: '', args: '["--target","{target}"]', parser: 'json' as PluginDef['parser'], severity: 'medium', pattern: '', description: '', metering: 'none' as 'proxy' | 'none' })
   useEffect(() => {
     void api.invoke('plugins:list').then(setList).catch(() => setList([]))
     void api.invoke('plugins:presets').then(setPresets).catch(() => setPresets([]))
@@ -34,7 +34,7 @@ export default function Plugins(): React.JSX.Element {
       notify({ kind: 'error', text: `Arguments: ${(e as Error).message}` })
       return
     }
-    const r = await act('plugin-save', () => api.invoke('plugins:save', { name: form.name, bin: form.bin, args, parser: form.parser, pattern: form.pattern || undefined, severity: form.severity, description: form.description }))
+    const r = await act('plugin-save', () => api.invoke('plugins:save', { name: form.name, bin: form.bin, args, parser: form.parser, pattern: form.pattern || undefined, severity: form.severity, description: form.description, metering: form.metering }))
     if (r) {
       setList(r)
       setForm({ ...form, name: '', bin: '', description: '' })
@@ -46,7 +46,7 @@ export default function Plugins(): React.JSX.Element {
     try {
       const r = await act('plugin-run', () => api.invoke('plugins:run', session, plugin, ok))
       if (r) {
-        notify({ kind: 'info', text: `${r.added} finding${r.added === 1 ? '' : 's'} added to the result.` })
+        notify({ kind: r.exceeded ? 'error' : 'info', text: `${r.added} finding${r.added === 1 ? '' : 's'} added. ${r.metered ? `${r.requests} request${r.requests === 1 ? '' : 's'} counted${r.exceeded ? '; budget exhausted' : ''}.` : 'Unmetered: raw tool traffic is not counted.'}` })
         showSession(session)
       }
     } finally {
@@ -55,7 +55,7 @@ export default function Plugins(): React.JSX.Element {
   }
   return (
     <>
-      <PageHead title="Plugins" desc="Bring a tool MacSec does not know. You declare the binary, its arguments and how to read its output. There is no shell, no automatic run and no hidden network access; a remote target needs an engagement that covers it." />
+      <PageHead title="Plugins" desc="Bring a tool MacSec does not know. You declare the binary, its arguments, how to read its output and whether HTTP traffic can be metered through MacSec's local proxy. There is no shell, no automatic run and no sandbox; a remote target needs an engagement that covers it." />
       <div className="split" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div className="panel" style={{ padding: 16, display: 'grid', gap: 10 }}>
           <strong>Add a plugin</strong>
@@ -70,7 +70,7 @@ export default function Plugins(): React.JSX.Element {
               onClick={() => {
                 const x = presets.find((v) => v.name === preset)
                 if (!x) return
-                setForm({ name: x.name, bin: x.bin, args: JSON.stringify(x.args), parser: x.parser, severity: x.severity, pattern: x.pattern ?? '', description: `${x.description} Install: ${x.install}` })
+                setForm({ name: x.name, bin: x.bin, args: JSON.stringify(x.args), parser: x.parser, severity: x.severity, pattern: x.pattern ?? '', description: `${x.description} Install: ${x.install}`, metering: x.metering ?? 'none' })
               }}
             >
               Use preset
@@ -92,6 +92,10 @@ export default function Plugins(): React.JSX.Element {
               {['critical', 'high', 'medium', 'low', 'info'].map((s) => (<option key={s} value={s}>{s}</option>))}
             </select>
             {form.parser === 'regex' && <input className="input mono" placeholder="Pattern with one capture group" value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} aria-label="Pattern" />}
+            <select className="input" value={form.metering} onChange={(e) => setForm({ ...form, metering: e.target.value as 'proxy' | 'none' })} aria-label="Metering">
+              <option value="none">Unmetered (raw TCP tools)</option>
+              <option value="proxy">Metered proxy (HTTP/HTTPS tools)</option>
+            </select>
           </div>
           <input className="input" placeholder="What it does (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} aria-label="Description" />
           <button className="btn btn-primary" disabled={!form.name.trim() || !form.bin.trim()} onClick={() => void save()}>
