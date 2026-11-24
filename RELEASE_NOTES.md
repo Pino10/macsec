@@ -1,3 +1,115 @@
+## 1.24.0
+
+The 1.24 set, in one release. Everything that can be built and tested here is in; the few items that
+need a 400 MB engine, an Android SDK or an Apple developer account are listed below with what they
+actually need, rather than pretended into the release.
+
+### Code scanning
+
+- **Psalm and PHPStan, on the project's own terms.** When a PHP project already has
+  `vendor/bin/psalm` with `psalm.xml` (or `.dist`), the review runs Psalm's **taint analysis**: it
+  follows untrusted input to a dangerous sink and reports only those. When `vendor/bin/phpstan`
+  and a config exist, it runs the project's PHPStan and keeps **only the security messages**, so a
+  type warning is not a vulnerability. MacSec uses exactly the analysers and configuration the
+  project chose: nothing is installed into it, nothing is configured behind its owner's back. Both
+  have their own checkbox in the scanner panel, so they can be skipped per review.
+- **The SQL rules are still Semgrep's, and they already run.** `p/sql-injection` is part of every
+  Standard and deep review, together with the language packs. I did not add a second, unlabelled
+  SQL rule set: without a corpus to measure it against, it would add noise, not findings. That
+  evaluation is on the next list, not claimed here.
+- **The PHP data flow is now cross-function where the project's analysers support it.** Psalm's
+  taint analysis is the cross-function engine in this release; Joern remains the candidate for a
+  proper call graph, below.
+
+### AI
+
+- **An independent verification agent.** On any finding with code still on the Mac, the result now
+  offers "Ask a second AI to try to disprove this". It starts a separate Claude Code session that
+  sees the finding and a masked 80-line excerpt, never the first reviewer's reasoning, and answers
+  in exactly two lines: `VERDICT` (seconded, refuted or uncertain) and `REASON`. The answer is
+  stored beside the finding and never changes its confidence. Secrets in the excerpt are masked
+  before it leaves the Mac, and the agent runs in plan mode with a settings file that denies the
+  Keychain, SSH, cloud credentials and the rest.
+- **The automated accuracy gate is unchanged and still runs in CI.** Expanding its corpus is listed
+  below as not done, because a corpus written in a hurry measures nothing.
+
+### Recon
+
+- **The attack-surface graph.** The Surface tab now opens with a picture: the target in the middle,
+  the pages or files around it, and the findings as dots coloured by severity. It is built only
+  from what the session already holds, drawn locally with SVG, and clicking a dot opens its finding.
+  No telemetry and no cloud rendering.
+- **The existing change tracking stays** (`Since last time`): new, fixed and still there, compared
+  with the previous test of the same target.
+
+### Burp
+
+- **Burp XML import.** An API test can now load a Burp Proxy export (`.xml`) the same way it loads a
+  HAR: requests are read from the raw request lines and the Host header, one endpoint per method and
+  path, duplicates removed. The cookie or token that made a request signed in is kept only as the
+  fact that it was signed in; no value is stored, and a test asserts it.
+- There is no Burp API integration. Burp has no free headless API to drive, so import and a
+  Burp-friendly export is the honest boundary.
+
+### What is not in this release, and what each one needs
+
+- **Joern.** A JVM engine of about 400 MB with its own server. It is an evaluation, not an install:
+  it has to find things Semgrep, Bearer and Psalm miss on the same labelled samples to earn its
+  place. Next release, with a download and a benchmark.
+- **Dedicated SQL rule set.** Needs a labelled corpus first. `p/sql-injection` covers the common
+  cases today.
+- **Automated patch generation and validation.** Needs a scratch copy, the project's test command
+  and a time limit before it can be allowed to propose anything. Not rushed into a release.
+- **Deeper repository-wide tracing.** Needs the call graph Joern would provide.
+- **More IDOR and business-logic verification.** Existing controlled confirmations already do the
+  two-account work; more coverage is a catalogue and runner change, listed next.
+- **Amass.** A Go tool; passive mode only, and it needs an evaluation against the current subfinder
+  pass rather than a blind add.
+- **Virtual-host discovery.** Designed, not built: a bounded Host-header list against one address,
+  compared with a name that cannot exist, for hosts the person owns.
+- **JADX, Apktool, Ghidra, LIEF.** All are downloads with checksums and their own caches; Ghidra is
+  about 400 MB plus a JDK. They belong in the tool install path, not in a UI release.
+- **iOS dynamic testing.** Blocked by hardware and an account: it needs Xcode, a developer-signed
+  app and a physical device. MacSec can drive Frida over USB but cannot sign an IPA for you.
+- **Android emulator orchestration.** Needs the Android SDK and an AVD; a large install.
+- **Objection.** A Python wrapper around Frida; the Frida path exists, Objection is an add-on.
+- **AI decompiled-code analysis.** The AI reviewer already reads code; pointing it at decompiled
+  sources needs the decompilers above.
+- **Real APK and IPA fixtures, cross-engine regression, scanner install validation in CI.** The
+  parsers and the Burp import are covered by tests (605 passing). Real binaries raise
+  redistribution and signing questions that a fixture in the repository cannot answer.
+
+### The ledger
+
+| Item | Status |
+| --- | --- |
+| PHPStan and Psalm | Shipped (project-local, config-gated) |
+| Dedicated SQL rules | Existing Semgrep pack; new corpus-led set next |
+| Cross-function data flow | Shipped for PHP through Psalm taint; Joern next |
+| Framework coverage | Existing packs; deeper checks next |
+| Independent AI verifier | Shipped (on demand) |
+| AI accuracy benchmarks | Existing gate; expanded corpus next |
+| Patch generation and validation | Not shipped; needs a scratch copy and tests |
+| Repository-wide tracing | Not shipped; needs a call graph |
+| IDOR and business logic | Existing controlled checks; more next |
+| Amass | Not shipped; passive evaluation next |
+| Virtual-host discovery | Not shipped; designed |
+| Visual attack-surface graph | Shipped |
+| Asset-change monitoring | Existing since-last-time diff |
+| API auth and route mapping | Improved by Burp import; deeper mapping next |
+| JADX and Apktool | Not shipped; checksummed downloads next |
+| Ghidra and LIEF | Not shipped; large downloads |
+| iOS dynamic testing | Blocked: Xcode, signing, a device |
+| Emulator orchestration | Not shipped; Android SDK |
+| Frida and Objection | Frida exists; Objection next |
+| AI decompiled analysis | Not shipped; needs the decompilers |
+| Burp integration | Shipped as import; no free headless API |
+| Integration tests and fixtures | Parsers and import tested; real binaries and CI matrix next |
+
+Tests: 605 passed, 4 skipped.
+
+---
+
 ## 1.23.0
 
 The workflow release. 1.22 rearranged the flows; this one closes the loop between finding something

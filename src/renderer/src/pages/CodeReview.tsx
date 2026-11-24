@@ -22,6 +22,8 @@ const TOOLS: { id: string; name: string }[] = [
   { id: 'bearer', name: 'Bearer' },
   { id: 'bandit', name: 'Bandit' },
   { id: 'gosec', name: 'gosec' },
+  { id: 'phpstan', name: 'PHPStan (the project’s own)' },
+  { id: 'psalm', name: 'Psalm (taint analysis)' },
   { id: 'zizmor', name: 'zizmor' },
   { id: 'hadolint', name: 'Hadolint' },
   { id: 'checkov', name: 'Checkov' },

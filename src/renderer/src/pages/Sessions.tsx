@@ -13,6 +13,7 @@ import Markdown from '../components/Markdown'
 import { SessionMasvs, SessionOwasp } from '../components/OwaspList'
 import { ReconPages } from '../components/ReconPages'
 import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
+import SurfaceGraph from '../components/SurfaceGraph'
 import { FixDiff, LeakHelp } from '../components/FixHelp'
 import { CodeView, Counts, Empty, KindIcon, PageHead, Sev, Spectrum, StepIcon, ago, duration, kindName } from '../ui'
 
@@ -431,7 +432,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
       )}
 
       {tab === 'paths' && <AttackPaths detail={detail} onPick={(fid) => { setTab('findings'); setSel(fid) }} />}
-      {tab === 'surface' && <Surface id={id} />}
+      {tab === 'surface' && <Surface id={id} detail={detail} onPick={setSel} />}
       {tab === 'checklist' && <ChecklistView id={id} />}
       {tab === 'owasp' && (
         <>
@@ -570,6 +571,7 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
   const api = window.macsec
   const { act, settings, notify } = useApp()
   const simple = !!settings?.explainSimply
+  const [asking, setAsking] = useState(false)
   const triage = async (t: Finding['triage'] | null, remember?: 'site' | 'everywhere'): Promise<void> => {
     const d = await act('triage', () => api.invoke('findings:triage', id, f.id, t ?? null, remember))
     if (d) onChange(d)
@@ -592,6 +594,27 @@ function Detail({ f, id, canOpen, canFix, from, onChange }: { f: Finding; id: st
             </>
           )}
         </div>
+      )}
+      {f.secondOpinion && (
+        <p className="hint" style={{ margin: '0 0 8px' }}>
+          Second opinion ({f.secondOpinion.by}, {new Date(f.secondOpinion.at).toLocaleDateString()}): <strong>{f.secondOpinion.verdict}</strong>. {f.secondOpinion.reason}
+        </p>
+      )}
+      {!f.secondOpinion && canOpen && f.severity !== 'info' && !f.triage && (
+        <button
+          className="btn btn-sm"
+          style={{ marginBottom: 8 }}
+          disabled={asking}
+          data-tip="A separate AI session, with no knowledge of the first reviewer, tries to disprove this finding. It never changes the confidence."
+          onClick={async () => {
+            setAsking(true)
+            const d = await act('second', () => api.invoke('findings:second-opinion', id, f.id))
+            if (d) onChange(d)
+            setAsking(false)
+          }}
+        >
+          <Bot size={13} /> {asking ? 'Asking a second AI…' : 'Ask a second AI to try to disprove this'}
+        </button>
       )}
       {(f.owner || f.due) && (
         <p className="hint" style={{ margin: '0 0 8px' }}>
@@ -820,14 +843,25 @@ function ReconChanges({ delta }: { delta: NonNullable<SurfaceData['delta']> }): 
 }
 
 /** A recon's hosts, scripts, endpoints and parameters. */
-function Surface({ id }: { id: string }): React.JSX.Element {
+function Surface({ id, detail, onPick }: { id: string; detail: SessionDetail; onPick: (fid: string) => void }): React.JSX.Element {
   const [d, setD] = useState<SurfaceData | null>(null)
   useEffect(() => {
     void window.macsec.invoke('recon:data', id).then(setD)
   }, [id])
-  if (!d) return <div className="panel" style={{ padding: 20 }}><span className="hint">The map appears when the recon has collected it.</span></div>
+  const graph = <SurfaceGraph findings={detail.findings} target={detail.target} onPick={onPick} />
+  if (!d) {
+    return (
+      <div style={{ display: 'grid', gap: 14 }}>
+        {graph}
+        <div className="panel" style={{ padding: 20 }}>
+          <span className="hint">The recon map appears when the recon has collected it.</span>
+        </div>
+      </div>
+    )
+  }
   return (
     <div style={{ display: 'grid', gap: 14 }}>
+      {graph}
       {d.delta && <ReconChanges delta={d.delta} />}
       {d.jsmap && <JsMap id={id} m={d.jsmap} />}
       {d.pages && <ReconPages pages={d.pages} />}

@@ -156,6 +156,16 @@ export function triageFinding(id: string, findingId: string, triage: Finding['tr
   return sessionDetail(id)
 }
 
+/** Store the independent verifier's answer beside one finding. It never changes confidence. */
+export function setSecondOpinion(id: string, findingId: string, opinion: Finding['secondOpinion']): void {
+  const f = join(sessionDir(id), 'findings.json')
+  const list = existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as Finding[]) : []
+  const item = list.find((x) => x.id === findingId)
+  if (!item) throw new Error('That finding is not in this session.')
+  item.secondOpinion = opinion
+  writeFileSync(f, JSON.stringify(list, null, 2))
+}
+
 /**
  * Mark several findings at once. An owner and a due date are optional, and only kept while the
  * finding is triaged; clearing the triage clears them too.

@@ -6,7 +6,7 @@ import { existsSync, readdirSync, statSync } from 'fs'
 import { extname, join } from 'path'
 import type { Finding, ReviewDepth } from '../../shared/types'
 import { dirs } from '../paths'
-import { parseBandit, parseBearer, parseGitleaks, parseGosec, parseHadolint, parseZizmor, parseGrype, parseSyftLicences, parseCheckov, parseOsv, parseSemgrep, parseTrivy, parseTrufflehog } from './parse'
+import { parseBandit, parseBearer, parseGitleaks, parseGosec, parseHadolint, parsePhpstan, parsePsalm, parseZizmor, parseGrype, parseSyftLicences, parseCheckov, parseOsv, parseSemgrep, parseTrivy, parseTrufflehog } from './parse'
 
 export const SKIP_DIRS = new Set(['node_modules', 'vendor', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', 'target', 'bin', 'obj', '.venv', 'venv', '__pycache__', '.idea', '.vscode', 'coverage', 'Pods', 'DerivedData', '.turbo', '.cache', 'storage', 'bower_components'])
 
@@ -202,6 +202,33 @@ export function planScanners(root: string, stats: ProjectStats, depth: ReviewDep
       parse: parseTrufflehog,
       timeoutMs: 20 * min
     })
+  }
+
+  // PHP projects that bring their own analysers: use exactly what the project set up.
+  if (has('PHP')) {
+    const vendor = (b: string): string => join(root, 'vendor', 'bin', b)
+    if (existsSync(vendor('psalm')) && (existsSync(join(root, 'psalm.xml')) || existsSync(join(root, 'psalm.xml.dist')))) {
+      runs.push({
+        id: 'psalm',
+        tool: 'Psalm',
+        label: 'Psalm: the project’s own taint analysis',
+        bin: vendor('psalm'),
+        args: ['--taint-analysis', '--output-format=json', '--no-progress', '--no-cache'],
+        parse: parsePsalm,
+        timeoutMs: 10 * min
+      })
+    }
+    if (existsSync(vendor('phpstan')) && (existsSync(join(root, 'phpstan.neon')) || existsSync(join(root, 'phpstan.neon.dist')))) {
+      runs.push({
+        id: 'phpstan',
+        tool: 'PHPStan',
+        label: 'PHPStan: the project’s own analysis (security messages only)',
+        bin: vendor('phpstan'),
+        args: ['analyse', '--error-format=json', '--no-progress', '--memory-limit=1G'],
+        parse: parsePhpstan,
+        timeoutMs: 10 * min
+      })
+    }
   }
 
   // Dependencies: two databases see different advisories, duplicates are merged later.

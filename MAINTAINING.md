@@ -63,6 +63,13 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.24
+
+- `scanners/parse.ts`: `parsePhpstan` (security messages only) and `parsePsalm` (taint issues); `plan.ts` runs them only from the project's own `vendor/bin` and config, through `review.ts`'s absolute-path spawn.
+- `secondopinion.ts`: the independent verifier, with the masked excerpt, the fixed two-line answer, its own settings file and the `findings:second-opinion` channel; it never changes confidence.
+- `SurfaceGraph.tsx`: the offline SVG graph in the Surface tab.
+- `apispec.ts`: Burp XML import (raw request lines and Host header, no stored credentials), plus the format in the API page and the picker.
+
 ### Added in 1.23
 
 - `profiles.ts` + `ProfileBar`: saved choices for web scans and code reviews, with the secret-key refusal and a 50 profile cap.

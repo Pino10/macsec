@@ -6,7 +6,7 @@ import { FlowStep, PageHead, Seg } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
 import { MODES } from './WebScan'
 
-const FORMAT = { postman: 'Postman collection', openapi: 'OpenAPI', swagger: 'Swagger', har: 'Recorded traffic (HAR)' }
+const FORMAT = { postman: 'Postman collection', openapi: 'OpenAPI', swagger: 'Swagger', har: 'Recorded traffic (HAR)', burp: 'Burp export' }
 const API_MODES = MODES.map((m) => ({ ...m, text: m.id === 'quick' ? 'Reviews the file and makes ordinary requests to 25 endpoints.' : m.id === 'standard' ? 'Up to 120 endpoints, plus Nuclei’s checks for exposed docs and settings.' : 'Up to 500 endpoints, everything included.' }))
 
 export default function ApiSecurity(): React.JSX.Element {

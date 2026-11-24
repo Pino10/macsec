@@ -19,7 +19,7 @@ export interface Endpoint {
 }
 
 export interface ParsedSpec {
-  format: 'postman' | 'openapi' | 'swagger' | 'har'
+  format: 'postman' | 'openapi' | 'swagger' | 'har' | 'burp'
   name: string
   baseUrl: string
   endpoints: Endpoint[]
@@ -42,6 +42,7 @@ function fill(path: string, examples: Record<string, unknown> = {}): string {
 const join = (base: string, path: string): string => `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
 
 export function parseSpec(text: string, fileName = 'api'): ParsedSpec {
+  if (/^\s*(<\?xml[^>]*>\s*)?<items[\s>]/.test(text)) return parseBurpXml(text)
   let doc: Record<string, unknown>
   try {
     doc = JSON.parse(text) as Record<string, unknown>
@@ -151,4 +152,39 @@ function parseHar(doc: Record<string, unknown>): ParsedSpec {
     endpoints.push({ method: e.request.method.toUpperCase(), path: u.pathname, url: e.request.url, params: [...u.searchParams.keys()].map((n) => ({ name: n, in: 'query' })), secured: (e.request.headers ?? []).some((h) => /^(authorization|cookie|x-api-key)$/i.test(h.name)), examples: [] })
   }
   return { format: 'har', name: 'Recorded traffic', baseUrl: endpoints[0] ? new URL(endpoints[0].url).origin : '', endpoints, hasAuthScheme: endpoints.some((e) => e.secured), saved: [] }
+}
+
+/** A Burp Proxy export: the raw requests it saved, read without keeping any cookie or token. */
+function parseBurpXml(text: string): ParsedSpec {
+  const seen = new Set<string>()
+  const endpoints: Endpoint[] = []
+  for (const m of text.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const block = m[1]
+    let raw = ''
+    const encoded = /<request\s+base64="true">([\s\S]*?)<\/request>/i.exec(block)
+    if (encoded) {
+      try {
+        raw = Buffer.from(encoded[1].trim(), 'base64').toString('utf8')
+      } catch {
+        continue
+      }
+    } else {
+      const plain = /<request[^>]*>([\s\S]*?)<\/request>/i.exec(block)
+      raw = plain ? plain[1] : ''
+    }
+    if (!raw) continue
+    const lines = raw.split(/\r?\n/)
+    const [method, target] = (lines[0] ?? '').split(' ')
+    if (!method || !target || !/^[A-Z]+$/.test(method)) continue
+    const host = /^host:\s*(.+)$/im.exec(raw)?.[1]?.trim()
+    if (!host) continue
+    const path = target.split('?')[0]
+    const key = `${method} ${path}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    const secured = /^(cookie|authorization):/im.test(raw)
+    endpoints.push({ method, path, url: `https://${host}${path}`, name: `${method} ${path}`, params: [], secured: secured ? true : null, examples: [] })
+  }
+  if (!endpoints.length) throw new Error('That Burp export has no requests MacSec can read.')
+  return { format: 'burp', name: 'Burp export', baseUrl: new URL(endpoints[0].url).origin, endpoints, hasAuthScheme: endpoints.some((e) => e.secured), saved: [] }
 }
