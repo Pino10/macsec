@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.29.0 | Joern measured on the Java pair (1.0/1.0), not yet the whole corpus | [1.29.0](RELEASE_NOTES.md#1290) |
 | 1.28.0 | A real MIT APK fixture and the zip, manifest and dex decode path tested | [1.28.0](RELEASE_NOTES.md#1280) |
 | 1.27.1 | Fixes the Results crash (React hook order) | [1.27.1](RELEASE_NOTES.md#1271) |
 | 1.27.0 | Modern interface pass, window controls aligned, bounded virtual-host discovery | [1.27.0](RELEASE_NOTES.md#1270) |

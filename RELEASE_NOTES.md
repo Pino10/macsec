@@ -1,3 +1,34 @@
+## 1.29.0
+
+Joern is measured, on the Java pair. It is a first data point, not a verdict, and the release says
+so.
+
+### What was run
+
+- Joern 4.0.691 (macOS arm64, 1.76 GB) with OpenJDK 21. The CPG was built from
+  `corpus/sql/java`, and a query selected `createQuery` calls whose argument contains `" + "`.
+- It found `Hibernate.java:9` (the vulnerable concatenation) and did **not** find
+  `HibernateClean.java:10` (the bound-parameter version).
+- Java holdout pair: **precision 1.0, recall 1.0**. Parse plus query was about two minutes on two
+  small files.
+- The other 31 cases are six other languages this Java frontend does not cover, so no whole-corpus
+  Joern number is claimed. The acceptance rule stands: beat 0.5 holdout recall on all 33, stay under
+  one false positive in ten clean files, and justify 1.76 GB and the runtime.
+
+### Also in this release
+
+- The 1.28.0 MIT APK fixture and its zip/manifest/dex test.
+- The 1.27.1 Results crash fix.
+- The 1.27.0 interface pass and virtual-host discovery.
+
+### Still open
+
+- Amass versus subfinder: Amass passive did not finish inside the bounded run.
+- Patch generation in a scratch copy: not shipped.
+- Whole-corpus Joern: needs the other language frontends and a slower, deliberate run.
+
+---
+
 ## 1.28.0
 
 The first real mobile fixture, with its decode path tested, and the 1.27.1 crash fix carried in.
