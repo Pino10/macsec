@@ -265,7 +265,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       await s.run(st.crawl, async (note, line) => {
         await ensure('katana')
         const out = join(s.raw, 'katana.jsonl')
-        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode !== 'quick' ? ['-jc'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out, ...headerArgs(headers, '-H')], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
+        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode !== 'quick' ? ['-jc'] : []), ...(req.mode !== 'quick' ? ['-jsluice'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out, ...headerArgs(headers, '-H')], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
           if (!existsSync(out)) throw e
           return ''
         })

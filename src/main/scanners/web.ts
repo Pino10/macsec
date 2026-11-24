@@ -62,17 +62,42 @@ export function parseHttpx(jsonl: string): Fingerprint[] {
   return lines<R>(jsonl).map((r) => ({ url: r.url, status: r.status_code, title: r.title, server: r.webserver, tech: r.tech ?? [] }))
 }
 
-/** Every URL Katana found, de-duplicated, same host only. */
+/**
+ * Every URL Katana found, de-duplicated, same host only. With `-jsluice`, Katana also writes the
+ * endpoints and paths jsluice pulled out of the JavaScript; they arrive under a few different field
+ * names, so every plausible one is read and resolved against the script they came from.
+ */
 export function parseKatana(jsonl: string, host: string): string[] {
-  type R = { request?: { endpoint?: string; method?: string } }
+  type R = {
+    request?: { endpoint?: string; method?: string }
+    url?: string
+    endpoint?: string
+    data?: string
+    source?: string
+    tag?: string
+    jsluice?: unknown
+  }
   const out = new Set<string>()
   for (const r of lines<R>(jsonl)) {
-    const u = r.request?.endpoint
-    if (!u) continue
-    try {
-      if (new URL(u).host === host) out.add(u.split('#')[0])
-    } catch {
-      // Not a URL.
+    const candidates: string[] = []
+    if (r.request?.endpoint) candidates.push(r.request.endpoint)
+    if (typeof r.url === 'string') candidates.push(r.url)
+    if (typeof r.endpoint === 'string') candidates.push(r.endpoint)
+    if (typeof r.data === 'string' && (r.tag === 'jsluice' || r.data.startsWith('http') || r.data.startsWith('/'))) candidates.push(r.data)
+    if (Array.isArray(r.jsluice)) {
+      for (const one of r.jsluice) {
+        const o = one as { url?: string; data?: string; kind?: string }
+        if (typeof o.url === 'string') candidates.push(o.url)
+        if (typeof o.data === 'string') candidates.push(o.data)
+      }
+    }
+    for (const c of candidates) {
+      try {
+        const u = new URL(c, r.source)
+        if (u.host === host && /^https?:$/.test(u.protocol)) out.add(u.href.split('#')[0])
+      } catch {
+        // Not an address.
+      }
     }
   }
   return [...out]

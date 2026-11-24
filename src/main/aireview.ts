@@ -86,7 +86,7 @@ export function reviewPrompt(name: string, focus: ReviewFocus, depth: ReviewDept
     depth === 'deep' ? 'This is a deep review: read every entry point and follow the data through the code. Take the time you need.' : depth === 'quick' ? 'This is a quick review: concentrate on the most exposed code (routes, auth, database access, uploads).' : '',
     CHECKLIST,
     scannerBrief(findings),
-    'Use your security skills if they are available: start with review-vectors to plan which areas apply, then security-code-review and every vector skill that applies (api-security-review, auth-session-review, injection-catalog, client-side-review, business-logic-review, infra-config-review, supply-chain-review, cloud-baas-review, ai-app-review, electron-review, privacy-data-review), then secrets-triage, dependency-triage and security-report. Say which areas were not applicable.',
+    'Use your security skills if they are available: start with review-vectors to plan which areas apply, then security-code-review and every vector skill that applies (api-security-review, api-authorization, auth-session-review, injection-catalog, client-side-review, js-deep-analysis, business-logic-review, attack-chains, privilege-escalation, infra-config-review, supply-chain-review, cloud-baas-review, ai-app-review, electron-review, privacy-data-review), then secrets-triage, dependency-triage and security-report. When two findings add up to a real attack, say so as a path with the one fix that breaks it. Say which areas were not applicable.',
     'Do not modify any file. Do not run anything.',
     OUTPUT
   ]
@@ -178,7 +178,7 @@ export async function reviewWithClaude(root: string, prompt: string, depth: Revi
   // With a local model, Claude Code talks to LM Studio's Anthropic-compatible API instead of Anthropic.
   const env = local ? localModelEnv(local) : {}
   // Free LLM API routes to big hosted models: they get the full method, not the short local one.
-  const method = local ? `\n\nFollow this method:\n${skillText(['untrusted-content-guard', 'review-vectors', 'security-code-review', free ? 'false-positive-check' : 'local-model-review', 'security-report'])}` : ''
+  const method = local ? `\n\nFollow this method:\n${skillText(['untrusted-content-guard', 'review-vectors', 'security-code-review', 'attack-chains', free ? 'false-positive-check' : 'local-model-review', 'security-report'])}` : ''
   if (local && !free) {
     const ctx = await ensureLmContext(local.baseUrl, local.model, local.token)
     if (!ctx.ok) throw new Error(ctx.note)

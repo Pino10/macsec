@@ -658,6 +658,123 @@ A short list only, one GET each: \`.git/HEAD\`, \`.env\`, server-status, phpinfo
 ## 6. Prioritise
 Rank leads by: reachable without sign-in > admin or internal function > handles money or personal data > old or unmaintained. Use attack-surface-report for the write-up.`
   },
+  'attack-chains': {
+    description: 'Turn two or more real findings into the attack they enable, name the cheapest fix that breaks it, and show the person how it would happen. Use when results contain several findings that could add up.',
+    body: `# Attack chains: how small findings become a real attack
+
+A report that lists findings one by one asks the owner to imagine the attack. Do that work for them: name the path, show each step on real evidence, and name the one fix that breaks it.
+
+## When a path is real
+
+A path is only worth reporting when **every** step is supported by something the scan saw, and each step is a different finding. If a step is a guess, say so and call it a lead, not a path.
+
+Common paths:
+- an exposed file (Git folder, .env, dump, state file) with a key or password in it, then the service that key opens;
+- a public source map that names private routes and API calls, then a route that answers without a role check;
+- username enumeration plus no limit on wrong passwords, then account takeover with a weak password;
+- an open build or cluster tool with secrets around it, then the servers it manages;
+- unescaped output plus a script-readable session cookie, then session theft;
+- numbered records plus a missing ownership check, then cross-account data theft;
+- an upload that is served from the same site, then stored script execution on your domain;
+- any website can read the API (reflected CORS with credentials) plus user data, then browser-side data theft;
+- a debug page plus secrets or database details, then a full map of the system;
+- an open redirect plus a login page, then convincing phishing;
+- a host header trusted in links plus a password reset, then reset-token theft;
+- a version on the known-exploited list with no shield in front, then commodity exploitation.
+
+## How to present one
+
+1. **The path**, in one sentence a non-expert understands: "Someone reads your Git folder, takes the key, and uses your cloud account."
+2. **The steps**, each one a finding the person can open, in order.
+3. **What it needs** (a signed-in visitor, a weak password, a click) and **what it does not need** (no insider, no special access).
+4. **Break it here:** the single cheapest step to remove, and why that step removes the whole path.
+5. **What would make it a false alarm** (the key was already rotated, the route checks the role, the upload is served from another domain).
+
+## Writing rules
+
+- Never claim you exploited the chain. Say "this is how it would go", and keep to what was found.
+- If the same path can be broken by two different fixes, say both and mark the cheaper one.
+- Do not pad: three sharp paths are worth more than twelve vague ones.`
+  },
+  'api-authorization': {
+    description: 'Find broken object and function authorization in APIs: cross-account reads, tenant leaks, mass assignment and admin functions reachable with a normal token. Use for API reviews and any app with ids in its addresses.',
+    body: `# API authorization
+
+Authentication says who you are. Authorization decides what this request may touch. Most API findings that pay are the second one.
+
+## What to look for
+
+- **Object level (BOLA/IDOR):** an id in the path, query or body that the server uses without checking that the caller owns it. Try the same request with a second account's id, and with no token.
+- **Function level:** admin or internal endpoints reachable with a normal token. Compare what the interface shows with what the API allows.
+- **Tenant boundaries:** an organization or workspace id from the request, used without a membership check. Two accounts in two tenants make this provable.
+- **Mass assignment:** a body that sets fields the client should never set (role, plan, owner, verified, balance). Try one harmless field that the UI does not send.
+- **Field level:** responses that include more than the caller should see (other users' fields, internal flags, password hashes, tokens).
+- **GraphQL:** authorize in every resolver, not in the client. One operation per type, tested with two accounts.
+- **Pagination and search:** counting, sorting and filters that cross accounts; export endpoints with the same problem and worse impact.
+
+## Method that holds up
+
+1. Two accounts you control, in different tenants if possible.
+2. Save the exact request that proves it, signed in as account B, with account A's object id.
+3. Show the control: the same request signed out, and the same request for B's own object.
+4. State the data class involved (names, emails, invoices, tokens) and how many records the id range suggests, without enumerating.
+
+## Reporting
+
+One finding per missing check, not per record. Name the check ("the server never verified that the invoice belongs to the caller"), the consequence in one sentence, and the fix on the server, not in the client.`
+  },
+  'js-deep-analysis': {
+    description: 'Read a site the way its own front end does: source maps, jsluice and katana extraction, bundles, DOM sinks, postMessage, secrets and what changed since last time. Use for web scans and any app with a JavaScript front end.',
+    body: `# JavaScript deep analysis
+
+The front end is a map of the back end. Read it before probing.
+
+## What to collect
+
+- **Bundles and chunks:** every script the page loads, plus the lazy chunks named by the runtime (webpack, Vite, Next.js). A chunk named "admin" is worth opening.
+- **Source maps:** a published map rebuilds the original source. Search it for routes, feature flags, internal hosts, GraphQL operations and secrets. Note the map itself as a finding when it is public.
+- **jsluice and katana extraction:** endpoint strings, paths and parameters the code builds. These are better than guessing.
+- **Secrets:** key shapes (cloud keys, bearer tokens, private keys), then check whether each is a placeholder. Never test a key against a provider.
+- **DOM sinks:** innerHTML, document.write, insertAdjacentHTML, eval, new Function, v-html, dangerouslySetInnerHTML, {@html}, |safe, bypassSecurityTrust. A sink matters only when data reaches it.
+- **Message passing:** addEventListener("message") handlers that never check event.origin, and any postMessage that carries data.
+- **Build variables:** NEXT_PUBLIC_, VITE_, REACT_APP_ and similar. Names only: values are public by definition, and a secret among them is the finding.
+- **What changed:** diff the endpoints and routes with the previous scan. New code is where new bugs are.
+
+## What to do with it
+
+1. Turn each named endpoint and route into one request with your own account, signed in and signed out.
+2. Look for the route the menu hides, and test whether the server checks the role.
+3. Follow data from a page input to the sink inside the rebuilt source; if it is reachable, that is a real lead.
+4. Do not report a sink alone. Report the flow, with the file and line from the rebuilt source.
+
+## Limits
+
+A rebuilt source is a copy, not the deployed code. Say which file and line you read, and mark the result "possible" until a live request proves it.`
+  },
+  'privilege-escalation': {
+    description: 'Climb from a low-privilege foothold to admin or to another tenant, using the flaws a scan found. Use after any finding that gives a normal account, a token or a small capability.',
+    body: `# Privilege escalation
+
+A low-privilege account is a starting point, not a limit. Show the owner how far it goes, in the smallest number of steps, with proof.
+
+## The ladder
+
+1. **What you have:** a normal account, a token, an upload, an internal address, a read of one record.
+2. **What trusts it:** endpoints that accept your token for a higher role, fields the client may set, ids that other roles own, internal services reachable from the app, caches shared between users.
+3. **What changes your level:** role or plan fields in a request, an admin route without a server check, an invitation or approval flow you can drive, a token with a claim you can change, a template or expression you can run.
+4. **What you reach:** other tenants, admin functions, the database, the host.
+
+## Rules
+
+- Only with test accounts you own, on a system you are engaged to test.
+- One step per request, and each step saved with its proof. Stop at the first level that shows the impact; do not walk the whole ladder for fun.
+- Never touch other customers' data beyond the single record that proves the crossing, and never change it.
+- If a step needs a victim click or a stolen token, say so and rate it accordingly.
+
+## Present it
+
+A short path: "with a normal account, set role=admin in the profile update, then open /admin/users and read every user." One finding per missing check, one fix per finding, and the cheapest one first.`
+  },
   'waf-deception': {
     description: 'Tell a WAF honeypot, port mimic or decoy file from a real finding, and say which results are noise. Use whenever a scan shows every port open, hundreds of pages that look the same, or suspicious files that answer too easily.',
     body: `# WAF honeypots, port mimics and decoy files

@@ -63,6 +63,13 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.18
+
+- `chains.ts`: 16 path rules, `impact` and `breakAt` on every chain; rendered in the Attack paths tab, the fix plan, the executive PDF and Assets.
+- Four skills used by the AI flows: `attack-chains`, `api-authorization`, `js-deep-analysis`, `privilege-escalation` (see `METHOD` in `aisummary.ts` and `reviewPrompt` in `aireview.ts`).
+- `scanners/web.ts`: `parseKatana` also reads jsluice results; `webscan.ts` passes `-jsluice` to Katana in Standard and Thorough.
+- `pages/Assets.tsx` rebuilt: legend, filters, sort, per-asset fix list and attack paths.
+
 ### Added in 1.17
 
 - `src/main/wafdeception.ts`: the deception checks (structure, not size), the port-mimic check, the one note, the AI note, and the `waf-deception` skill (in `seckit/skills.ts`, kept out of code-review plans).
