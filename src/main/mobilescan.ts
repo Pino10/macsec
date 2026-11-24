@@ -28,6 +28,7 @@ import { summarizeWithAi, summaryPrompt } from './aisummary'
 import { log } from './logs'
 import { appInArchive, baseApkIn, deepLinks, entitlementFindings, formatOf, frameworkNames, privacyManifest, protoManifestToXml, sdkFindings, urlFindings, type MobileFormat } from './mobiledeep'
 import { bundleFindings, infoPlistExtra, provisioningFindings, signedEntitlementFindings, signingAuthorityFindings } from './ioschecks'
+import { androidManifestGaps, keychainClasses, pinningGap, resilienceGap, screenshotGap, webviewGap } from './mobilegaps'
 
 const SKIP = new Set(['node_modules', 'build', 'Pods', '.gradle', '.git', 'DerivedData', '.dart_tool', 'vendor'])
 
@@ -216,7 +217,10 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
       } else {
         const manifests = kind === 'source' ? findFiles(root, (n) => n === 'AndroidManifest.xml') : []
         const plists = findFiles(root, (n) => n === 'Info.plist').filter((p) => kind === 'source' || /Payload\/[^/]+\.app\/Info\.plist$/.test(p))
-        for (const m of manifests) found.push(...checkAndroidManifest(readFileSync(m, 'utf8'), relative(root, m), mobsfRules), ...checkTargetSdk(readFileSync(m, 'utf8'), relative(root, m)), ...deepLinks(readFileSync(m, 'utf8'), relative(root, m)))
+        for (const m of manifests) {
+          const xml = readFileSync(m, 'utf8')
+          found.push(...checkAndroidManifest(xml, relative(root, m), mobsfRules), ...checkTargetSdk(xml, relative(root, m)), ...deepLinks(xml, relative(root, m)), ...androidManifestGaps(xml, relative(root, m)))
+        }
         for (const p of plists) {
           const xml = await plistXml(p)
           found.push(...checkInfoPlist(xml, relative(root, p), mobsfRules), ...infoPlistExtra(xml, relative(root, p)))
@@ -325,7 +329,15 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
         const r = scanCode(text, kind === 'apk' ? 'android' : 'ios', { hasPinSet: nsc })
         refs = r.refs
         const appDirs = kind === 'ipa' ? findFiles(unpacked, (n) => n === 'Info.plist').filter((p) => /Payload\/[^/]+\.app\/Info\.plist$/.test(p)).map((p) => join(p, '..')) : []
-        r.findings.push(...sdkFindings(kind === 'apk' ? text : `${text}\n${appDirs.map(frameworkNames).join('\n')}`, kind === 'apk' ? 'android' : 'ios'), ...urlFindings(text), ...bundleFindings(text, kind === 'apk' ? 'assets/index.android.bundle' : 'main.jsbundle'))
+        r.findings.push(
+          ...sdkFindings(kind === 'apk' ? text : `${text}\n${appDirs.map(frameworkNames).join('\n')}`, kind === 'apk' ? 'android' : 'ios'),
+          ...urlFindings(text),
+          ...bundleFindings(text, kind === 'apk' ? 'assets/index.android.bundle' : 'main.jsbundle'),
+          ...resilienceGap(text, kind === 'apk' ? 'android' : 'ios', kind === 'apk' ? 'classes.dex' : 'main.jsbundle'),
+          ...webviewGap(text, kind === 'apk' ? 'android' : 'ios', kind === 'apk' ? 'AndroidManifest.xml' : 'main.jsbundle')
+        )
+        if (kind === 'apk') r.findings.push(...screenshotGap('android', text, false, 'classes.dex'), ...pinningGap(text, 'android', 'res/xml/network_security_config.xml'))
+        else r.findings.push(...keychainClasses(text, 'OmniBisic Bank'))
         note(`${bufs.length} compiled ${bufs.length === 1 ? 'file' : 'files'} read, ${r.hosts.length} servers named`)
         return [...out, ...r.findings]
       })

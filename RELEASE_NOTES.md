@@ -1,3 +1,34 @@
+## 1.33.0
+
+The mobile scanner now covers the platform, resilience and privacy checks that the OmniBisic review
+found by hand, and it says what it cannot know without a running app.
+
+- **Android task hijacking**: an exported `singleTask` activity without `taskAffinity` is reported
+  as a low finding for Android 8-9, with the reason and the platform fix.
+- **Android backup**: `allowBackup="true"` without `dataExtractionRules` or `fullBackupContent`
+  is a low finding, because tokens can land in a cloud backup.
+- **Pinning evidence**: a missing pin-set, CertificatePinner, pin hash or TrustKit is reported as an
+  informational gap; the scan no longer implies pinning exists because a string says so.
+- **Resilience**: the absence of root, jailbreak, debugger or Frida checks is a low finding for a
+  banking app; the presence is recorded.
+- **WebView**: script or file access is a finding that asks for the host allow-list and the bridge
+  to be checked, not a vulnerability claim.
+- **Screenshot**: Android's missing `FLAG_SECURE` reference is an indicator with the inlined-constant
+  caveat; iOS keeps the `ScreenshotBlockEnabled` check.
+- **iOS Keychain classes**: `kSecAttrAccessibleAlways` (medium) and `WhenUnlocked` without
+  `ThisDeviceOnly` (low) are now reported.
+- **Coverage map**: `MOBILE_COVERAGE.md` maps the checks to MASVS STORAGE, CRYPTO, AUTH, NETWORK,
+  PLATFORM, CODE, RESILIENCE and PRIVACY, and lists what still needs a live test.
+- Carried from 1.32.0: signed entitlements (profile vs app), ad hoc/team/devices/expiry, signing
+  authority, Info.plist keys and permissions, and test-host/key detection in the Hermes bundle for
+  both platforms.
+
+The OmniBisic reports are not in this repository; they stay on the machine, as asked.
+
+641 tests (636 passed, 5 skipped).
+
+---
+
 ## 1.32.0
 
 The mobile scan now reads the things that were missing on iOS, and it stops reporting a profile wildcard that the signed app never asks for.
