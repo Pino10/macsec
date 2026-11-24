@@ -297,7 +297,8 @@ export async function verifyCombined(sessionId: string, reviewer: Reviewer): Pro
 
 export function loopReport(sessionId: string, combined: CombinedFinding[]): string {
   const s = readSession(sessionId)
-  const lines = [`# Review loop: ${s.title}`, '', `Build: \`${s.target}\``, '', `| Severity | Finding | Sources | Verifier |`, `| --- | --- | --- | --- |`]
+  const blindRan = combined.some((c) => c.sources.includes('ai'))
+  const lines = [`# Review loop: ${s.title}`, '', `Build: \`${s.target}\``, '', `Blind AI review: ${blindRan ? 'ran' : 'not run'}. ${blindRan ? 'This is a two-source loop.' : 'This is a single-source review; the verifier is a second opinion on tool findings, not an independent discovery pass.'}`, '', `| Severity | Finding | Sources | Verifier |`, `| --- | --- | --- | --- |`]
   for (const c of combined) lines.push(`| ${c.severity} | ${c.title.replace(/\|/g, '\\|')} | ${c.sources.join(' + ')}${c.conflict ? ' (conflict)' : ''} | ${c.verifier?.verdict ?? 'not run'} |`)
   lines.push('', '## Findings', '')
   for (const c of combined) {

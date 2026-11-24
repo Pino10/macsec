@@ -63,6 +63,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.34.1
+
+- The Review desk allows a single-source combine when blind AI is skipped; `loopReport` states whether the blind stage ran.
+
 ### Added in 1.34.0
 
 - `reviewloop.ts`: evidence pack, blind prompt/parser, merge with provenance, source-blind verifier and report; `loop:*` IPC and the Review desk tab.
