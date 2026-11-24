@@ -27,6 +27,7 @@ import { codeText, onlineChecks, scanCode, signingFindings, type Refs } from './
 import { summarizeWithAi, summaryPrompt } from './aisummary'
 import { log } from './logs'
 import { appInArchive, baseApkIn, deepLinks, entitlementFindings, formatOf, frameworkNames, privacyManifest, protoManifestToXml, sdkFindings, urlFindings, type MobileFormat } from './mobiledeep'
+import { bundleFindings, infoPlistExtra, provisioningFindings, signedEntitlementFindings, signingAuthorityFindings } from './ioschecks'
 
 const SKIP = new Set(['node_modules', 'build', 'Pods', '.gradle', '.git', 'DerivedData', '.dart_tool', 'vendor'])
 
@@ -102,6 +103,9 @@ async function unpackApp(zip: string, dest: string): Promise<void> {
 }
 
 /** Converts a binary plist to XML with macOS's own plutil; XML plists are read as they are. */
+const runApple = (bin: string, args: string[]): Promise<string> =>
+  new Promise((resolve) => execFile(bin, args, { maxBuffer: 30 * 1024 * 1024 }, (_e, out) => resolve(out?.toString() ?? '')))
+
 function plistXml(file: string): Promise<string> {
   const raw = readFileSync(file)
   if (!raw.subarray(0, 6).toString('latin1').startsWith('bplist')) return Promise.resolve(raw.toString('utf8'))
@@ -213,12 +217,30 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
         const manifests = kind === 'source' ? findFiles(root, (n) => n === 'AndroidManifest.xml') : []
         const plists = findFiles(root, (n) => n === 'Info.plist').filter((p) => kind === 'source' || /Payload\/[^/]+\.app\/Info\.plist$/.test(p))
         for (const m of manifests) found.push(...checkAndroidManifest(readFileSync(m, 'utf8'), relative(root, m), mobsfRules), ...checkTargetSdk(readFileSync(m, 'utf8'), relative(root, m)), ...deepLinks(readFileSync(m, 'utf8'), relative(root, m)))
-        for (const p of plists) found.push(...checkInfoPlist(await plistXml(p), relative(root, p), mobsfRules))
+        for (const p of plists) {
+          const xml = await plistXml(p)
+          found.push(...checkInfoPlist(xml, relative(root, p), mobsfRules), ...infoPlistExtra(xml, relative(root, p)))
+        }
         // Source projects keep the network rules and the Firebase settings as plain files.
         for (const f of findFiles(root, (n) => /^network[_-]?security[_-]?config\.xml$/i.test(n), 10)) found.push(...checkNetworkSecurityConfig(readFileSync(f, 'utf8'), relative(root, f)))
         for (const f of findFiles(root, (n) => n === 'google-services.json' || n === 'GoogleService-Info.plist', 10)) found.push(...checkFirebaseConfig(readFileSync(f, 'utf8'), relative(root, f)))
         // A built iOS app carries its signing profile: it shows whether this is a development build.
-        if (kind === 'ipa') for (const f of findFiles(unpacked, (n) => n === 'embedded.mobileprovision', 3)) found.push(...checkProvisioning(readFileSync(f, 'latin1'), relative(unpacked, f)), ...entitlementFindings(readFileSync(f, 'latin1'), relative(unpacked, f)))
+        if (kind === 'ipa') {
+          const app = findFiles(unpacked, (n) => n === 'Info.plist').find((p) => /Payload\/[^/]+\.app\/Info\.plist$/.test(p))
+          const dir = app ? join(app, '..') : null
+          for (const f of findFiles(unpacked, (n) => n === 'embedded.mobileprovision', 3)) {
+            const rel = relative(unpacked, f)
+            const profile = (await runApple('/usr/bin/security', ['cms', '-D', '-i', f])) || readFileSync(f, 'latin1')
+            found.push(...checkProvisioning(profile, rel), ...provisioningFindings(profile, rel))
+          }
+          // What the signed app requests, not what the profile merely permits.
+          if (dir) {
+            const ent = await runApple('/usr/bin/codesign', ['-d', '--entitlements', ':-', dir])
+            if (ent.trim()) found.push(...signedEntitlementFindings(ent, relative(unpacked, dir)))
+            const dv = await runApple('/usr/bin/codesign', ['-dv', '--verbose=4', dir])
+            found.push(...signingAuthorityFindings(dv, relative(unpacked, dir)))
+          }
+        }
         // Source projects keep entitlements in plain .entitlements files.
         if (kind === 'source') for (const f of findFiles(root, (n) => n.endsWith('.entitlements'), 10)) found.push(...entitlementFindings(readFileSync(f, 'utf8'), relative(root, f)))
         // The privacy manifest: Apple asks every app (and each SDK) for one.
@@ -282,6 +304,7 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
         const out: Finding[] = []
         if (kind === 'apk') {
           bufs = files.slice(0, 20).map((p) => readFileSync(p))
+          for (const b of findFiles(unpacked, (n) => /^index\.android\.bundle$|\.jsbundle$/i.test(n), 5)) bufs.push(readFileSync(b))
           if (format === 'apk') out.push(...signingFindings(readFileSync(req.path), unpacked))
           else note(format === 'aab' ? 'The store signs a bundle itself, so signing is not checked' : 'Signing is not checked in a .apks set')
         } else {
@@ -290,6 +313,8 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
           const exe = dir ? /<key>CFBundleExecutable<\/key>\s*<string>([^<]+)<\/string>/.exec(readFileSync(app!, 'latin1'))?.[1] : null
           const bin = dir && exe && !/[/\\]|^\.\.?$/.test(exe) ? join(dir, exe) : null
           bufs = bin && existsSync(bin) && lstatSync(bin).isFile() && statSync(bin).size < 400 * 1024 * 1024 ? [readFileSync(bin)] : []
+          const jsb = dir ? join(dir, 'main.jsbundle') : null
+          if (jsb && existsSync(jsb)) bufs.push(readFileSync(jsb))
         }
         if (!bufs.length) {
           note('No compiled code found')
@@ -300,7 +325,7 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
         const r = scanCode(text, kind === 'apk' ? 'android' : 'ios', { hasPinSet: nsc })
         refs = r.refs
         const appDirs = kind === 'ipa' ? findFiles(unpacked, (n) => n === 'Info.plist').filter((p) => /Payload\/[^/]+\.app\/Info\.plist$/.test(p)).map((p) => join(p, '..')) : []
-        r.findings.push(...sdkFindings(kind === 'apk' ? text : `${text}\n${appDirs.map(frameworkNames).join('\n')}`, kind === 'apk' ? 'android' : 'ios'), ...urlFindings(text))
+        r.findings.push(...sdkFindings(kind === 'apk' ? text : `${text}\n${appDirs.map(frameworkNames).join('\n')}`, kind === 'apk' ? 'android' : 'ios'), ...urlFindings(text), ...bundleFindings(text, kind === 'apk' ? 'assets/index.android.bundle' : 'main.jsbundle'))
         note(`${bufs.length} compiled ${bufs.length === 1 ? 'file' : 'files'} read, ${r.hosts.length} servers named`)
         return [...out, ...r.findings]
       })
