@@ -279,7 +279,7 @@ export interface SessionStep {
   lastLine?: string
 }
 
-export type SessionKind = 'code-review' | 'web-scan' | 'api-scan' | 'mobile-scan' | 'recon' | 'audit'
+export type SessionKind = 'code-review' | 'web-scan' | 'api-scan' | 'mobile-scan' | 'recon' | 'audit' | 'ad-audit'
 
 export type AuditRequest =
   | { kind: 'full'; path: string; site: string; reviewer: Reviewer; depth: ReviewDepth; authorized: boolean }
@@ -660,6 +660,8 @@ export interface Channels {
   'loop:blind': { args: [string, Reviewer]; result: LoopState }
   'loop:combine': { args: [string]; result: LoopState }
   'loop:verify': { args: [string, Reviewer]; result: LoopState }
+  'ad:pick': { args: []; result: string | null }
+  'ad:start': { args: [string]; result: SessionInfo }
   'plugins:list': { args: []; result: PluginDef[] }
   'plugins:presets': { args: []; result: { name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: Severity; description: string; install: string; metering?: 'proxy' | 'none' }[] }
   'plugins:save': { args: [Record<string, unknown>]; result: PluginDef[] }

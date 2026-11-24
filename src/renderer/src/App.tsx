@@ -23,6 +23,7 @@ import Assets from './pages/Assets'
 import Sessions from './pages/Sessions'
 import Tools from './pages/Tools'
 import Plugins from './pages/Plugins'
+import Ad from './pages/Ad'
 import Logs from './pages/Logs'
 import Settings from './pages/Settings'
 import Updates from './pages/Updates'
@@ -149,6 +150,7 @@ function Shell(): React.JSX.Element {
               {page === 'assets' && <Assets />}
               {page === 'tools' && <Tools />}
               {page === 'plugins' && <Plugins />}
+              {page === 'ad' && <Ad />}
               {page === 'logs' && <Logs />}
               {page === 'settings' && <Settings />}
             </div>

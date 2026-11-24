@@ -1,3 +1,36 @@
+## 1.40.0
+
+The AD review module: read a BloodHound export and report what it actually shows.
+
+### AD review
+
+- New **AD review** page: choose a BloodHound JSON or ZIP export.
+- The import reads users, computers, groups and domains, including nested `Properties`, a single
+  array or a JSON object with those keys, and JSONL.
+- Findings:
+  - Kerberoastable service accounts (SPN present, enabled, not krbtgt);
+  - AS-REP roastable accounts (`dontreqpreauth`);
+  - unconstrained and constrained delegation;
+  - `AdminCount=1`;
+  - password never expires and password not required;
+  - computers where LAPS is not detected.
+- Every finding is **possible**, never confirmed: an export can be stale, and this does not prove
+  the live domain still looks like it.
+- This is an **export review**. It does not touch a domain, guess a password, request a ticket or run
+  a credential attack. The Nmap/NetExec/ldapsearch presets are the separate live-tool path.
+- The path is chosen in the dialog and remembered for that start; the renderer cannot pass an
+  arbitrary file path.
+
+### Also in this release
+
+- The container plugin runner from 1.39 is included when 1.39 has not published: an internal Docker
+  network, the metering proxy as the only route, budget refusal and cleanup. Docker or Colima must
+  be running.
+
+660 tests (655 passed, 5 skipped).
+
+---
+
 ## 1.39.0
 
 Plugins can now run in a **container on an internal Docker network**, with the metering proxy as the
