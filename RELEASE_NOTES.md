@@ -4,7 +4,7 @@
 - **Four more skills, and the functions that use them.** `attack-chains` (how small findings become one attack, how to write it), `api-authorization` (cross-account reads, tenant leaks, mass assignment), `js-deep-analysis` (source maps, bundles, sinks, what changed) and `privilege-escalation` (climbing from a normal account). They are loaded by the web, API, server and code-review AI, not just listed.
 - **jsluice, through Katana.** The web scan now runs Katana with `-jsluice` in Standard and Thorough, so the endpoints and paths jsluice finds in the JavaScript join the pages MacSec tests next. No new download: it uses the Katana already installed.
 - **Assets page rebuilt.** It opens with what the score means (and the four bands), filters by kind, sorts worst first, and each asset shows its spark, its counts, what is proven, how long fixes took, the fix list with the score change, and the attack paths with the place to break them. Refreshing is explicit, and the empty and loading states say what is happening.
-- **Tests.** 5 new path tests, plus the skill and jsluice parsers; 581 passed, 4 skipped.
+- **Tests.** 5 new path tests, plus the skill and jsluice parsers; 574 passed, 4 skipped.
 
 Limits, on purpose: a path is a story built from findings, not a test that the chain works, and the app says so.
 
