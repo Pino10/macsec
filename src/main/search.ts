@@ -5,6 +5,7 @@
  */
 import type { SessionInfo } from '../shared/types'
 import { listSessions, sessionDetail } from './sessions'
+import { indexFindings, indexSessionRow, isBuilt, markBuilt, searchIndex } from './indexdb'
 
 export interface SearchHit {
   sessionId: string
@@ -18,9 +19,12 @@ export interface SearchHit {
   where: string
 }
 
-export function searchFindings(query: string, limit = 80): SearchHit[] {
+export async function searchFindings(query: string, limit = 80): Promise<SearchHit[]> {
   const term = String(query ?? '').trim().toLowerCase()
   if (term.length < 2) return []
+  const indexed = await searchIndex(term, limit)
+  if (indexed && indexed.length) return indexed
+  if (indexed && (await isBuilt())) return []
   const out: SearchHit[] = []
   for (const s of listSessions().slice(0, 300)) {
     if (out.length >= limit) break
@@ -37,6 +41,19 @@ export function searchFindings(query: string, limit = 80): SearchHit[] {
       out.push({ sessionId: s.id, sessionTitle: s.title, kind: s.kind, at: s.createdAt, findingId: f.id, title: f.title, severity: f.severity, tool: f.tool, where })
       if (out.length >= limit) break
     }
+  }
+  // First run (or an index that cannot be used): read the sessions once, then warm the index.
+  if (indexed !== null) {
+    for (const s of listSessions().slice(0, 300)) {
+      try {
+        const d = sessionDetail(s.id)
+        await indexSessionRow(s)
+        await indexFindings(s.id, d.findings, s.createdAt)
+      } catch {
+        // A session that cannot be read is skipped.
+      }
+    }
+    await markBuilt()
   }
   return out
 }

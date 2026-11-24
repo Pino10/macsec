@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.21
+
+- `indexdb.ts`: the SQLite session index (`node:sqlite`, with a clean fallback), updated from `sessions.ts` saves and deletes, used by `search.ts`, pruned by `storage.ts`.
+- `RELEASE_NOTES.md`: every version from 1.14 written out in full; the README carries a release history table. When cutting a release, write the section in the same shape: what is new, under the hood, limits, and what is still open.
+
 ### Added in 1.20
 
 - `cli.ts` + `baseline.ts`: the headless door (`--headless` in `index.ts`, before any window), argument rules, baseline identity (`checkId|place`), exit codes and `--json`.
