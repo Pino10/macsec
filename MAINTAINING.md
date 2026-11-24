@@ -63,6 +63,12 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.35.0
+
+- Engagement profiles (`EngagementProfile` in `shared/impact.ts`, normalised in `engagement.ts`, select in the Impact form).
+- Review loop evidence adapters for code, web, API and recon; the Review desk is available on every session kind.
+- Raw evidence file and no-hidden-findings behaviour from the unreleased 1.34.2 are included.
+
 ### Added in 1.34.2
 
 - `reviewloop.ts` keeps `evidence.raw.txt` (0600, local only), keeps no-location AI findings as `not stated`, and combines `info` notes; the findings view starts with `info` on.

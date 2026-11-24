@@ -1,3 +1,51 @@
+## 1.35.0
+
+The general engagement and the review loop for every target. 1.34.2 was tagged but its release build
+was cancelled before publishing; its evidence changes are part of this release.
+
+### Engagement profiles
+
+- The engagement now records what kind of authority it is: **pentest**, **bounty**, **red-team**,
+  **internal** or **lab**.
+- Scope, caps, window and the typed confirmation are unchanged: a profile changes the default
+  reporting and the way the engagement is described, not the proof gates.
+- The bounty profile is a scope/authority label for now. The submission workflow, programme rates
+  and duplicate handling are the next slice, not claimed here.
+
+### Review loop for every session
+
+- The **Review desk** is available on code review, web, API, recon, mobile and audit results, not
+  only mobile.
+- Evidence adapters:
+  - code: the source files, bounded and masked;
+  - mobile: manifest, Info.plist, entitlements, provisioning and bundle strings;
+  - web: the URL list, JavaScript map and code map;
+  - recon: hosts, URLs, endpoints and JavaScript map;
+  - API: the saved request and the API description.
+- The blind AI still sees evidence only, never the tool findings. The merge, source-blind verifier
+  and report are the same as 1.34.0.
+- Web/API evidence is the surface (URLs, scripts, endpoints, spec), not saved HTTP responses. The
+  blind review is therefore a **surface review** there; it is labelled as such by the evidence it
+  gets. Saving representative responses is a later addition.
+
+### Evidence robustness
+
+- Raw evidence stays local in `evidence.raw.txt` (0600); the masked copy is what the AI sees.
+- `info` findings are visible by default; AI findings without a location are kept as "not stated"
+  instead of being dropped; combined lists include info notes.
+- The report masks only the secret value, not the finding, its location or what proves it.
+
+### Next
+
+- The plugin runner: declare an external tool, its arguments, parser, cleanup and per-engagement
+  approval, so a red teamer can bring a tool MacSec does not know.
+- Bounty submission export and programme rules.
+- Internal network and AD modules.
+
+648 tests (643 passed, 5 skipped).
+
+---
+
 ## 1.34.2
 
 Evidence is now kept in full locally, and nothing that was seen is silently dropped from the list.

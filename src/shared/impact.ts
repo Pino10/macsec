@@ -46,7 +46,11 @@ export interface EngagementCaps {
   minutes: number
 }
 
+export type EngagementProfile = 'pentest' | 'bounty' | 'red-team' | 'internal' | 'lab'
+
 export interface EngagementDraft {
+  /** What kind of authority this is. The proof gates are the same; the reporting and defaults are not. */
+  profile?: EngagementProfile
   client: string
   /** The written authority: a contract or ticket number, an email subject, a programme reference. */
   authorityRef: string

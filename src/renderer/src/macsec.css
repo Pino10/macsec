@@ -3329,3 +3329,17 @@ h2 {
 .loop-row:last-child {
   border-bottom: 0;
 }
+.loop-ai {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--well);
+}
+.loop-ai > .choices {
+  flex: 1;
+  min-width: 260px;
+}
