@@ -1,3 +1,24 @@
+## 1.34.1
+
+The review loop can now be used in a **single-source** mode, and it says so.
+
+- **Fast pass:** tools plus the normal AI summary, without opening the desk. This is what the scan
+  already does.
+- **Assurance loop:** tools, blind AI, merge, source-blind verifier. Use it for pilot, external
+  assessment and BoG.
+- **Single-source:** if you skip the blind AI, the desk still lets you combine the tool findings and
+  run the verifier. The report records "Blind AI review: not run. This is a single-source review;
+  the verifier is a second opinion on tool findings, not an independent discovery pass."
+- No agreement statistic is implied when only one source existed.
+
+Why keep the blind stage: independence is about not showing the reviewer the answer, not about the
+quality of the model. A strong model that has already seen the tool findings is anchored by them.
+Skip blind for speed, never for an assurance claim.
+
+648 tests (643 passed, 5 skipped). Build clean.
+
+---
+
 ## 1.34.0
 
 The review loop: tools first, then a blind AI review, then the merge, then a second opinion. It is

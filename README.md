@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.34.1 | Review loop is optional: fast pass, full assurance or a labelled single-source run | [1.34.1](RELEASE_NOTES.md#1341) |
 | 1.34.0 | Review loop: tool scan, blind AI review, merge with provenance, source-blind verifier | [1.34.0](RELEASE_NOTES.md#1340) |
 | 1.33.2 | The mobile session now records the reviewer, so the AI report and the header agree | [1.33.2](RELEASE_NOTES.md#1332) |
 | 1.33.1 | Mobile scan now follows the saved AI reviewer; picker no longer resets to none while loading | [1.33.1](RELEASE_NOTES.md#1331) |

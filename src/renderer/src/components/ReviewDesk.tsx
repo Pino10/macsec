@@ -69,6 +69,11 @@ export default function ReviewDesk({ id, reviewer, toolCount }: { id: string; re
             <button className="btn btn-sm" disabled={busy !== '' || !s?.blind.length} onClick={() => void run('combine', () => api.invoke('loop:combine', id))}>
               <Combine size={12} /> {busy === 'combine' ? 'Combining…' : 'Combine'}
             </button>
+            {!s?.blind.length && (
+              <button className="link" disabled={busy !== ''} onClick={() => void run('combine', () => api.invoke('loop:combine', id))}>
+                Skip the blind AI and combine tool findings only
+              </button>
+            )}
           </div>
         </div>
         <div className="loop-stage" data-done={verified > 0}>
@@ -98,7 +103,7 @@ export default function ReviewDesk({ id, reviewer, toolCount }: { id: string; re
         </div>
       )}
       <p className="hint">
-        AI findings and verifier answers are possible, not confirmed. A finding becomes confirmed only with evidence or your decision. The report is saved as review-loop.md in the session folder.
+        AI findings and verifier answers are possible, not confirmed. A finding becomes confirmed only with evidence or your decision. If you skip the blind AI, this is a single-source review: the verifier is only a second opinion, not an independent discovery pass. The report is saved as review-loop.md in the session folder.
       </p>
     </div>
   )
