@@ -656,6 +656,10 @@ export interface Channels {
   'ignored:remove': { args: [string]; result: { key: string; scope: 'site' | 'everywhere'; title: string; place?: string; at: string }[] }
   'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null, ('site' | 'everywhere')?]; result: SessionDetail }
   /** Mark several findings at once, with an optional owner and due date. */
+  'loop:state': { args: [string]; result: LoopState }
+  'loop:blind': { args: [string, Reviewer]; result: LoopState }
+  'loop:combine': { args: [string]; result: LoopState }
+  'loop:verify': { args: [string, Reviewer]; result: LoopState }
   'patches:propose': { args: [string, string]; result: PatchRecord }
   'patches:list': { args: [string]; result: PatchRecord[] }
   'patches:apply': { args: [string, string]; result: PatchRecord }
@@ -747,6 +751,38 @@ export interface Channels {
   'impact:runs': { args: []; result: ImpactRun[] }
   /** Fill in the fields a plan step cannot know (the expected string, a read-back address, an undo note). */
   'impact:update-step': { args: [{ planId: string; stepId: string; patch: Partial<PlannedStep> }]; result: ImpactPlan }
+}
+
+export interface BlindFinding {
+  id: string
+  title: string
+  severity: Severity
+  location: string
+  evidence: string
+  why: string
+  fix: string
+  confidence: 'possible'
+}
+
+export interface CombinedFinding {
+  id: string
+  title: string
+  severity: Severity
+  locations: string[]
+  sources: ('tools' | 'ai')[]
+  toolIds: string[]
+  aiIds: string[]
+  agreement: boolean
+  conflict: boolean
+  evidence: string
+  verifier?: { verdict: 'supported' | 'refuted' | 'uncertain'; reason: string; at: string }
+}
+
+export interface LoopState {
+  evidence: boolean
+  blind: BlindFinding[]
+  combined: CombinedFinding[]
+  report: boolean
 }
 
 export interface PatchRecord {

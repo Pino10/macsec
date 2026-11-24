@@ -7,13 +7,14 @@ import { issueText } from '@shared/insights'
 import { tokensText } from '@shared/estimate'
 import { verificationOf, VERIFICATION_TEXT, asvsOf } from '@shared/verification'
 import { ArrowLeft, Bot, Check, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText, Globe } from 'lucide-react'
-import { SEVERITIES, type Finding, type FindingCategory, type SearchHit, type SessionDetail, type SessionInfo, type Severity, type SessionCompare, type VhostHit, type PatchRecord } from '@shared/types'
+import { SEVERITIES, type Finding, type FindingCategory, type SearchHit, type SessionDetail, type SessionInfo, type Severity, type SessionCompare, type VhostHit, type PatchRecord, type Reviewer } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
 import { SessionMasvs, SessionOwasp } from '../components/OwaspList'
 import { ReconPages } from '../components/ReconPages'
 import ThreatCore, { postureScore, postureWord } from '../components/ThreatCore'
 import SurfaceGraph from '../components/SurfaceGraph'
+import ReviewDesk from '../components/ReviewDesk'
 import { FixDiff, LeakHelp } from '../components/FixHelp'
 import { CodeView, Counts, Empty, KindIcon, PageHead, Sev, Spectrum, StepIcon, ago, duration, kindName } from '../ui'
 
@@ -134,7 +135,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
   const [showFp, setShowFp] = useState(false)
   const [paused, setPaused] = useState(false)
   const [onlyProven, setOnlyProven] = useState(false)
-  const [tab, setTab] = useState<'findings' | 'paths' | 'owasp' | 'report' | 'run' | 'surface' | 'checklist'>('findings')
+  const [tab, setTab] = useState<'findings' | 'paths' | 'owasp' | 'report' | 'run' | 'surface' | 'checklist' | 'desk'>('findings')
   const [sel, setSel] = useState<string | null>(null)
   const [sureDelete, setSureDelete] = useState(false)
   const [selecting, setSelecting] = useState(false)
@@ -373,6 +374,11 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
               Checklist
             </button>
           )}
+          {s.kind === 'mobile-scan' && (
+            <button role="tab" aria-selected={tab === 'desk'} onClick={() => setTab('desk')}>
+              Review desk
+            </button>
+          )}
           {(s.kind === 'recon' || s.kind === 'web-scan') && (
             <button role="tab" aria-selected={tab === 'surface'} onClick={() => setTab('surface')}>
               {s.kind === 'recon' ? 'Pages and hosts' : 'JavaScript map'}
@@ -433,6 +439,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
 
       {tab === 'paths' && <AttackPaths detail={detail} onPick={(fid) => { setTab('findings'); setSel(fid) }} />}
       {tab === 'surface' && <Surface id={id} detail={detail} onPick={setSel} />}
+      {tab === 'desk' && <ReviewDesk id={id} reviewer={(s.reviewer ?? 'none') as Reviewer} toolCount={detail.findings.length} />}
       {tab === 'checklist' && <ChecklistView id={id} />}
       {tab === 'owasp' && (
         <>

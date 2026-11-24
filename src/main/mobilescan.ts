@@ -25,6 +25,7 @@ import { findAdb, getFridaServer, liveTest, packageFromManifest, realExec, valid
 import { extract } from './download'
 import { codeText, onlineChecks, scanCode, signingFindings, type Refs } from './mobilestatic'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
+import { writeEvidence } from './reviewloop'
 import { log } from './logs'
 import { appInArchive, baseApkIn, deepLinks, entitlementFindings, formatOf, frameworkNames, privacyManifest, protoManifestToXml, sdkFindings, urlFindings, type MobileFormat } from './mobiledeep'
 import { bundleFindings, infoPlistExtra, provisioningFindings, signedEntitlementFindings, signingAuthorityFindings } from './ioschecks'
@@ -369,6 +370,8 @@ async function runMobile(id: string, req: MobileScanRequest, kind: 'source' | 'a
         return liveTest({ exec: realExec, adb, frida, serial: live.serial, apk: req.path, pkg, confirmed: live.confirmed, note, fridaServer: (arch) => getFridaServer(realExec, toolPath('frida'), arch, note), scriptPath: join(s.raw, 'watch.js'), cancelled: () => s.cancelled })
       })
     }
+
+    if (kind !== 'source') await writeEvidence(id, unpacked).catch(() => undefined)
 
     if (st.ai)
       await s.run(st.ai, async () => {

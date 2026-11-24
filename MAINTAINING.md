@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.34.0
+
+- `reviewloop.ts`: evidence pack, blind prompt/parser, merge with provenance, source-blind verifier and report; `loop:*` IPC and the Review desk tab.
+- Mobile scans write `evidence.txt`; loop files live in the session folder.
+
 ### Added in 1.33.2
 
 - `startMobileScan` saves the session after setting `reviewer`; without it the AI step ran but the UI said "No AI". Regression test in `tests/v52-mobile-reviewer.test.ts`.
