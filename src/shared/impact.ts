@@ -33,6 +33,7 @@ export type ImpactActionId =
   | 'content-discovery'
   | 'auth-bypass'
   | 'sql-injection-proof'
+  | 'msf-run'
 
 export type ImpactMethod = 'GET' | 'POST' | 'PUT' | 'PATCH'
 
@@ -87,7 +88,7 @@ export interface ImpactActionInfo {
   cleanup: string
   risk: string
   /** What the person has to give it. */
-  needs: ('url' | 'param' | 'verifyUrl' | 'request' | 'expect')[]
+  needs: ('url' | 'param' | 'verifyUrl' | 'request' | 'expect' | 'module')[]
 }
 
 export interface PlannedStep {
@@ -105,6 +106,8 @@ export interface PlannedStep {
   verifyUrl?: string
   /** For replay-request: a string the answer must contain to count as proof. */
   expect?: string
+  /** For msf-run: the Metasploit module, from MacSec's run-only allowlist. */
+  module?: string
   /** The finding this step chains from. */
   from?: string
   why: string

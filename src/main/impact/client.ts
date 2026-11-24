@@ -95,6 +95,11 @@ export class ImpactClient {
 
   constructor(private o: ImpactClientOptions) {}
 
+  /** The authority this client is spending, for a runner that needs to know what is allowed. */
+  get engagement(): Engagement {
+    return this.o.engagement
+  }
+
   left(): { requests: number; writes: number } {
     return { requests: this.o.budget.requests - this.requests, writes: this.o.budget.writes - this.writes }
   }

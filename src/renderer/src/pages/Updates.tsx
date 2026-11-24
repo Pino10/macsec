@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowDownToLine, CheckCircle2, ChevronDown, Database, ExternalLink, RefreshCw, Wrench } from 'lucide-react'
+import { AlertTriangle, ArrowDownToLine, CheckCircle2, ChevronDown, Database, ExternalLink, RefreshCw, Wrench } from 'lucide-react'
 import type { ReleaseNote, UpdateStatus } from '@shared/types'
 import { useApp } from '../store'
 import { PageHead } from '../ui'
@@ -74,6 +74,16 @@ export default function Updates(): React.JSX.Element {
           </button>
         )}
       </section>
+
+      {st?.error && (
+        <div className="notice" style={{ marginTop: 12 }}>
+          <AlertTriangle size={17} style={{ color: 'var(--warn)', flexShrink: 0 }} />
+          <span className="grow">{st.error}</span>
+          <button className="btn btn-sm" disabled={busy.has('app-check')} onClick={() => void check()}>
+            <RefreshCw size={13} /> Try again
+          </button>
+        </div>
+      )}
 
       {u && u.notes && (
         <section className="upd-notes glass">

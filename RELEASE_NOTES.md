@@ -1,3 +1,14 @@
+## 1.17.0
+
+- **WAF honeypots and deception, learned from the people who run them.** Shields waste a scanner's time: a port mimic accepts every connection so a scan shows every port open; dynamic path spoofing answers random paths with 200 and a nearly identical page, nudging the length so a size filter stops working; decoy .env and .sql files are served to catch scanners; tarpits hold the scanner open. MacSec now checks for all of it, compares structure instead of size, adds one note that says "this is deception", and turns the matching findings down to info instead of reporting them. The scan's AI is told to judge noise as noise and to point at the results that do not fit the pattern.
+- **A `waf-deception` skill**, with the tricks, the vendor fingerprints (Cloudflare, Imperva, Akamai, F5, AWS, Sucuri, Wordfence, ModSecurity) and what to do, so the reviewer reads a honeypot as a honeypot.
+- **Metasploit runs, with a callback as the proof.** One approved module from a short run-only list, always with `cmd/unix/generic` and a single curl or wget back to this Mac. The callback carries the target's address and a one-off marker, which proves the command ran. No meterpreter, no session, no handler, no persistence. It only runs when the engagement marks a staging target this Mac can reach. EternalBlue, BlueKeep, Spring4Shell, ProxyLogon and Drupalgeddon 2 are deliberately absent: they crash a host or write files MacSec cannot remove.
+- **API security: a described sign-in that is not enforced.** When a spec says an endpoint needs a token and the same request with no token answers with data, MacSec reports it.
+- **JavaScript: what is new since last time.** After the JS pass, MacSec compares endpoints and routes with the previous scan of the same host and lists the new ones first, because new code is where new bugs are.
+- **The update check cannot fail silently any more.** It tries the API, then the releases feed, then github.com itself, and the Updates page shows the reason with a Try again button if all three fail.
+
+Tests: the new deception, run-only list, callback, planner and tool suites all pass.
+
 ## 1.16.0
 
 - **More of the bug-bounty toolkit, with the same rules.** **gau** adds the URLs the internet already knows about a domain (Wayback, Common Crawl and others) to recon, passively. **wafw00f** names the firewall in front of a site during a web scan when control confirmations are on. **sqlmap** is in the toolbox for one thing only: a bounded fingerprint of one parameter under a written engagement, with `--risk=1 --level=1 --technique=BE`, one thread, no dump, no shell, no file read or write, and its requests counted against the cap.

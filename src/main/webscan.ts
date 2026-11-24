@@ -15,7 +15,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import type { Finding, ScanMode, SessionInfo, WebScanRequest } from '../shared/types'
 import { beginOp, endOp, runTool, SessionRun } from './engine'
-import { createSession, saveAiReport, saveChecklist, savePlan } from './sessions'
+import { createSession, listSessions, saveAiReport, saveChecklist, savePlan, sessionDir } from './sessions'
 import { proofOf } from './seckit/confirm'
 import { planContext, planMarkdown, profileSite } from './testplan'
 import { checkHeaders, parseFfuf, parseHttpx, parseKatana, parseNuclei, pathSeverity, SENSITIVE_PATHS, type Fingerprint } from './scanners/web'
@@ -30,7 +30,8 @@ import { askAi, summarizeWithAi, summaryPrompt } from './aisummary'
 import { crawlJs } from './jsdeep'
 import { cveFindings, epssFor, liveCves } from './cvelive'
 import { devopsChecks, dnsChecks, protectionFinding } from './webposture'
-import { groupDecoyFiles } from './decoys'
+import { detectWaf, groupDecoyFiles } from './decoys'
+import { assessWebDeception, deceptionFinding, WAF_DECEPTION_NOTE, type PageSample } from './wafdeception'
 import { bannersOf, type Product } from './seckit/confirm'
 import { checkTls, keysInJavaScript, signedOutCheck } from './webextra'
 import { logicChecks } from './bizlogic'
@@ -218,6 +219,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     crawl: m.depth ? s.step('katana', `Map the site, ${m.depth} levels deep`) : null,
     files: s.step('exposed', `Look for files that should not be public (${m.paths})`),
     discover: req.confirm?.discover ? s.step('ffuf', 'Content discovery with ffuf, then each hit proved') : null,
+    deception: s.step('deception', 'Check whether the site is a WAF honeypot'),
     js: m.depth ? s.step('js', 'Look for keys in the site’s public JavaScript') : null,
     infra: s.step('infra', 'Firewall, CDN, hosting, DNS and mail settings'),
     devops: s.step('devops', 'DevOps and infrastructure left open (Jenkins, Grafana, registries, clusters, state files, Git)'),
@@ -326,6 +328,28 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         return found
       })
 
+    await s.run(st.deception, async (note) => {
+      const c = mk(20)
+      const home = await c.get('/').catch(() => null)
+      if (!home) return []
+      const random: PageSample[] = []
+      for (let i = 0; i < 6; i++) {
+        const r = await c.get(`/macsec-${Math.random().toString(36).slice(2, 9)}-${i}`).catch(() => null)
+        if (r) random.push({ url: r.url, status: r.status, length: r.body.length, body: r.body, ms: r.ms })
+      }
+      const decoyHits = s.findings.filter((f) => /^(Public file|Exists but protected): /.test(f.title)).length
+      const vendors = (() => {
+        try {
+          return detectWaf(home.headers, home.body, home.headers.getSetCookie?.().join('; ') ?? '').map((w) => w.name)
+        } catch {
+          return []
+        }
+      })()
+      const v = assessWebDeception({ home: { url: home.url, status: home.status, length: home.body.length, body: home.body, ms: home.ms }, random, decoyHits, vendors })
+      note(v.deceptive ? `${v.confidence === 'strong' ? 'Strong' : 'Likely'} signs of deception: ${v.reasons[0] ?? ''}` : 'The site answers honestly: pages that do not exist say so')
+      return v.deceptive ? [deceptionFinding(url, v, 'web')] : []
+    })
+
     if (st.js) await s.run(st.js, (note) => keysInJavaScript(urls, host, s.raw, op, headers, note))
     // Versions found anywhere in this scan are matched against the live vulnerability databases at the end of these steps.
     const found: { product: Product; host: string }[] = []
@@ -362,6 +386,40 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         note(`${r.scripts.length} scripts (${r.chunksFound} found through chunk lists), ${r.endpoints.length} endpoints, ${r.routes.length} routes, ${r.scripts.filter((x) => x.sourceMap).length} source maps`)
         return r.findings
       })
+
+    // What is new in the JavaScript since the last scan of this host: the most useful signal a bug
+    // hunter has, because a new endpoint is where new bugs are.
+    if (st.jsdeep && !s.cancelled) {
+      try {
+        const mapFile = join(s.raw, 'js-map.json')
+        const previous = listSessions().find((x) => x.kind === 'web-scan' && x.id !== id && x.status === 'done' && x.target === host)
+        const prevFile = previous ? join(sessionDir(previous.id), 'raw', 'js-map.json') : ''
+        if (existsSync(mapFile) && prevFile && existsSync(prevFile)) {
+          const cur = JSON.parse(readFileSync(mapFile, 'utf8')) as { endpoints?: string[]; routes?: string[] }
+          const prev = JSON.parse(readFileSync(prevFile, 'utf8')) as { endpoints?: string[]; routes?: string[] }
+          const before = new Set([...(prev.endpoints ?? []), ...(prev.routes ?? [])])
+          const fresh = [...new Set([...(cur.endpoints ?? []), ...(cur.routes ?? [])])].filter((u) => !before.has(u))
+          if (fresh.length) {
+            s.add([
+              {
+                id: fid('js-new', host, String(fresh.length)),
+                tool: 'MacSec',
+                category: 'web',
+                severity: 'info',
+                confidence: 'confirmed',
+                title: `${fresh.length} endpoint${fresh.length === 1 ? '' : 's'} in the JavaScript ${fresh.length === 1 ? 'is' : 'are'} new since the last scan of ${host}`,
+                url: url,
+                file: url,
+                description: `Compared with the scan on ${previous!.createdAt.slice(0, 10)}: ${fresh.slice(0, 12).join(', ')}${fresh.length > 12 ? ', and more' : ''}. New code is where new bugs are: test these first, signed in and signed out.`,
+                fix: 'Nothing to fix. This is a lead for your next test.'
+              }
+            ])
+          }
+        }
+      } catch {
+        // The comparison is a bonus: never let it stop a scan.
+      }
+    }
 
     if (st.code)
       await s.run(st.code, async (note) => {
@@ -637,7 +695,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
 
     if (st.ai)
       await s.run(st.ai, async () => {
-        const tech = `${fp[0] ? `Detected: ${[fp[0].server, ...fp[0].tech].filter(Boolean).join(', ')}.` : ''}\n${planContext(profile, ran)}`
+        const tech = `${fp[0] ? `Detected: ${[fp[0].server, ...fp[0].tech].filter(Boolean).join(', ')}.` : ''}\n${planContext(profile, ran)}\n\n${WAF_DECEPTION_NOTE}`
         const r = await summarizeWithAi(req.reviewer, summaryPrompt('web', url, tech, s.findings.filter((f) => f.severity !== 'info')), op, s.raw)
         for (const f of s.findings) {
           const d = r.details.get(f.id)

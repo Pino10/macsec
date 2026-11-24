@@ -709,6 +709,8 @@ export interface Channels {
   'impact:save-engagement': { args: [EngagementDraft]; result: Engagement }
   'impact:revoke': { args: [string]; result: Engagement }
   'impact:catalog': { args: []; result: ImpactActionInfo[] }
+  /** The exploit modules MacSec may run, with what each one does. */
+  'impact:msf-modules': { args: []; result: { module: string; cve: string; title: string; what: string; port: number; risk: string }[] }
   'impact:plan': { args: [ImpactPlanRequest]; result: { plan: ImpactPlan; cost: { chars: number; tokens: number; calls: number } | null } }
   'impact:run': { args: [ImpactRunRequest]; result: ImpactRun }
   'impact:stop': { args: []; result: boolean }

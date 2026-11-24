@@ -44,7 +44,7 @@ import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from 
 import { reconData, startRecon } from './reconscan'
 import { markChecklistItem, readChecklist, readRequest, saveFindings, saveRequest, stripSecrets, triageFinding } from './sessions'
 import { checkForUpdate, installUpdate, releaseNotes, updateStatus } from './updater'
-import { catalog as msfCatalog } from './msf'
+import { catalog as msfCatalog, RUN_MODULES } from './msf'
 import { installForClaude, installedForClaude, removeFromClaude } from './seckit/skills'
 import { azureLogin, cloudStatus, isLocalHost } from './infraaudit'
 import { expandTargets } from './targets'
@@ -1222,6 +1222,7 @@ function registerIpc(): void {
   handle('impact:save-engagement', (draft) => saveEngagement(draft))
   handle('impact:revoke', (id) => revokeEngagement(String(id)))
   handle('impact:catalog', () => IMPACT_ACTIONS)
+  handle('impact:msf-modules', () => RUN_MODULES)
   handle('impact:runs', () => listRuns())
   handle('impact:stop', () => {
     requestStop()

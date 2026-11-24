@@ -9,7 +9,8 @@
  *
  * The Azure sign-in lives in MacSec's own tools folder. AWS uses your existing profile, read only.
  */
-import { spoofedPorts, WEB_PORTS } from './decoys'
+import { WEB_PORTS } from './decoys'
+import { assessPortDeception } from './wafdeception'
 import { execFile } from 'child_process'
 import { existsSync, readdirSync, readFileSync } from 'fs'
 import { homedir } from 'os'
@@ -199,7 +200,7 @@ async function server(id: string, req: Server): Promise<void> {
       const scanned = req.ports === 'top100' ? 100 : 1000
       for (const h of [...new Set(open.map((p) => p.host))]) {
         const mine = open.filter((p) => p.host === h)
-        const sp = spoofedPorts(mine.map((p) => p.port), scanned)
+        const sp = assessPortDeception(mine, scanned)
         if (!sp.spoofed) continue
         open = open.filter((p) => p.host !== h || WEB_PORTS.has(p.port))
         spoofNotes.push({ host: h, count: mine.length, reason: sp.reason })
@@ -232,9 +233,9 @@ async function server(id: string, req: Server): Promise<void> {
         category: 'network' as const,
         severity: 'info' as const,
         confidence: 'possible' as const,
-        title: `${n.host}: ${n.count} ports answered, probably a firewall or shield`,
+        title: `${n.host}: ${n.count} ports answered, probably a firewall, port mimic or decoy`,
         file: n.host,
-        description: `${n.reason} MacSec did not report these ports one by one and did not run service checks on them. Only the web ports (80, 443, 8080, 8443) were kept.`,
+        description: `${n.reason} That is what a port mimic or a WAF decoy does: it accepts every connection so a scan looks full of open ports. MacSec did not report these ports one by one, ran no service checks on them, and kept only the web ports (80, 443, 8080, 8443). This is defence, not a finding.`,
         fix: 'Nothing to fix if a shield answers for the server. To test the real server, scan its own address behind the shield, with the owner’s permission.'
       }))
     )

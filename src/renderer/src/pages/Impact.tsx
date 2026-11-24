@@ -217,6 +217,7 @@ function missingFields(s: PlannedStep): string[] {
   if ((s.action === 'replay-request' || s.action === 'auth-bypass') && !s.expect) out.push('the string that proves it')
   if (s.action === 'replay-request' && !s.url.includes('?')) out.push('the address and method you mean')
   if (s.action === 'upload-write' && !s.verifyUrl) out.push('where the file can be read back')
+  if (s.action === 'msf-run' && !s.module) out.push('which Metasploit module to run')
   if (s.write && !s.undo) out.push('how to undo it')
   return out
 }
@@ -242,6 +243,12 @@ function StepEditor({ s, plan, onSaved, onCancel }: { s: PlannedStep; plan: Impa
   const [method, setMethod] = useState<NonNullable<PlannedStep['method']>>(s.method ?? 'GET')
   const [headers, setHeaders] = useState(Object.entries(s.headers ?? {}).map(([k, v]) => `${k}: ${v}`).join('\n'))
   const [body, setBody] = useState(s.body ?? '')
+  const [module, setModule] = useState(s.module ?? '')
+  const [modules, setModules] = useState<{ module: string; cve: string; title: string; what: string; risk: string }[]>([])
+  const api2 = window.macsec
+  useEffect(() => {
+    if (s.action === 'msf-run') void api2.invoke('impact:msf-modules').then(setModules)
+  }, [api2, s.action])
   const replay = s.action === 'replay-request'
   const upload = s.action === 'upload-write'
   const needExpect = replay || s.action === 'auth-bypass'
@@ -250,6 +257,7 @@ function StepEditor({ s, plan, onSaved, onCancel }: { s: PlannedStep; plan: Impa
     if (needExpect) patch.expect = expect.trim()
     if (upload) patch.verifyUrl = verifyUrl.trim()
     if (s.write) patch.undo = undo.trim()
+    if (s.action === 'msf-run') patch.module = module
     if (replay) {
       patch.method = method
       patch.body = body
@@ -288,6 +296,27 @@ function StepEditor({ s, plan, onSaved, onCancel }: { s: PlannedStep; plan: Impa
           <textarea className="input mono" rows={3} value={headers} onChange={(e) => setHeaders(e.target.value)} placeholder={'Accept: application/json\nContent-Type: application/json'} aria-label="Headers" />
           <textarea className="input mono" rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Request body, if the request sends one" aria-label="Body" />
         </>
+      )}
+      {s.action === 'msf-run' && (
+        <div style={{ display: 'grid', gap: 6 }}>
+          <span className="hint">The module to run. Metasploit is needed, and the target must be able to reach this Mac.</span>
+          <select className="input mono" value={module} onChange={(e) => setModule(e.target.value)} aria-label="Metasploit module">
+            <option value="">Pick a module</option>
+            {modules.map((m) => (
+              <option key={m.module} value={m.module}>
+                {m.title} ({m.cve})
+              </option>
+            ))}
+          </select>
+          {(() => {
+            const chosen = modules.find((m) => m.module === module)
+            return chosen ? (
+              <span className="hint">
+                {chosen.what} {chosen.risk}
+              </span>
+            ) : null
+          })()}
+        </div>
       )}
       {s.write && (
         <label className="hint" style={{ display: 'grid', gap: 4 }}>

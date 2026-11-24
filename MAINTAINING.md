@@ -63,6 +63,13 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.17
+
+- `src/main/wafdeception.ts`: the deception checks (structure, not size), the port-mimic check, the one note, the AI note, and the `waf-deception` skill (in `seckit/skills.ts`, kept out of code-review plans).
+- `msf.ts`: `RUN_MODULES` (the run-only allowlist) and `runArgs`; `impact/actions.ts`: `msf-run` with a callback listener (`setMsfRunRunner` for tests). Run modules are never on the check list.
+- `updater.ts`: three ways to check for a release (API, feed, github.com redirect), and a failure shown on the page instead of thrown at the button.
+- `apiscan.ts`: a secured endpoint that answers with no token is reported. `webscan.ts`: new endpoints and routes compared with the previous scan of the same host.
+
 ### Added in 1.16
 
 - Tools: `gau` (release), `wafw00f` and `sqlmap` (python), Homebrew installs for app tools (`installApp`, `brewPath`, `ToolInfo.formula`) and versions for app tools (`toolVersion` now runs an installed app's `versionArgs`).
