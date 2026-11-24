@@ -1,3 +1,29 @@
+## 1.30.0
+
+Two decisions, both made from actual runs rather than another deferral.
+
+### Amass is not worth adding
+
+- **Subfinder 2.17.0**, passive, on `owasp.org`: **158 unique subdomains**, exit 0, under three minutes.
+- **Amass 5.1.3**, passive, same domain, same network: **did not finish in seven minutes** (timeout at 420 seconds, no results; an earlier run reached about 94 percent of its source queries after two minutes with nothing emitted).
+- Decision: **do not add Amass**. The roadmap asked for an evaluation before another recon dependency, and the evaluation says the dependency costs minutes without a result here. Amass may be useful with API keys or active mode, but neither is allowed (passive only), so it is not the tool for MacSec.
+- Limits: one domain, no API keys, one network. Enough to refuse a dependency that cannot produce a number; not enough to judge Amass everywhere.
+
+### Xcode is selected, but its licence is not accepted
+
+- `xcode-select -p` reports `/Applications/Xcode.app/Contents/Developer`, and `xcodebuild -version` reports **Xcode 27.2 (27B52)**.
+- However, every `xcodebuild` call fails with "You have not agreed to the Xcode license agreements", and because the developer directory is Xcode, the system `git` shim now fails too.
+- Fix, once, in Terminal: `sudo xcodebuild -license accept`. Or, to go back to the Command Line Tools only: `sudo xcode-select -s /Library/Developer/CommandLineTools`.
+- Even licensed, dynamic iOS testing needs a signing identity and a device, and an IPA cannot be redistributed.
+
+### Patch generation
+
+Not shipped, and this is the one item I will not fake. It needs, in one piece: a scratch copy, the project's own test command with a time cap, a scanner pass on the patched copy, a diff the person reads, a typed confirmation, and a rollback that is tested. A patch that passes tests but adds a vulnerability is a failed fix; a path that can write into a project without those checks is worse than no feature.
+
+The rest of the backlog is now only this.
+
+---
+
 ## 1.29.0
 
 Joern is measured, on the Java pair. It is a first data point, not a verdict, and the release says

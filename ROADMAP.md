@@ -30,9 +30,9 @@ Status after 1.26.1, verified against the release itself.
    - [ ] Ship only if it beats 0.5 holdout recall, stays under one false positive in ten clean
          files, and justifies its runtime and disk. Otherwise the number is the deliverable.
 3. **Amass against subfinder, passive only.**
-   - [ ] Run both on a fixed domain list; compare unique subdomains, false positives, runtime and
-         the dependency footprint.
-   - [ ] Add Amass only if it finds something subfinder does not, often enough.
+   - [x] Run both on a fixed domain: subfinder returned 158 names in under three minutes; Amass did
+         not finish in seven minutes with no result.
+   - [x] Decision: do not add Amass. Passive-only is the rule, and it cannot produce a number here.
 4. **Bounded virtual-host discovery.**
    - [x] A fixed Host-header list against one address, compared with a name that cannot exist, at
          a slow rate, for hosts the person owns.
