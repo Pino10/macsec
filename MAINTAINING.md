@@ -63,6 +63,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.38.0
+
+- `pluginproxy.ts`: local HTTP/CONNECT metering proxy; plugin `metering: proxy`; result reports counted requests and exceeded. Not a sandbox; raw tools unmetered.
+
 ### Added in 1.37.0
 
 - `ProgrammeInfo` on the engagement (platform, URL, rate limit, exclusions); bounty draft prints it.

@@ -1,3 +1,32 @@
+## 1.38.0
+
+Plugin tools can now be **metered** through a local proxy. It is metering, not a sandbox, and the
+page says so.
+
+### Metered proxy
+
+- A plugin can declare `metering: proxy`. MacSec then starts a local proxy on 127.0.0.1, gives the
+  child `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `MACSEC_PLUGIN_PROXY`, and counts every plain
+  HTTP request and every CONNECT tunnel.
+- The budget is the engagement's remaining request cap (or 200 for a local target with no
+  engagement). At the cap the proxy answers 429, sets the exceeded flag and kills the child.
+- The result says how many requests were counted and whether the budget was exhausted.
+- The Nuclei preset uses the metered mode.
+
+### What it does not do
+
+- It is **not a sandbox**. A tool that ignores the proxy environment, opens raw TCP/UDP, or resolves
+  its own sockets is not counted. SMB, LDAP and Nmap presets stay unmetered and say so.
+- It does not inspect TLS; it counts CONNECT tunnels, not the requests inside them.
+- It does not persist the count into the engagement's historical usage; the cap is checked for that
+  run, and the run reports the count. A full accounting layer needs the proxy to be the only route,
+  which needs a container or network namespace, not just an environment variable.
+- There is still no dedicated AD module or BloodHound import.
+
+656 tests (651 passed, 5 skipped).
+
+---
+
 ## 1.37.0
 
 The operator toolbox: programme-aware bounty work and presets for the network/AD tools, in one
