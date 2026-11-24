@@ -1,0 +1,133 @@
+{
+  "at": "2026-11-24T08:46:04.217Z",
+  "engine": "semgrep",
+  "config": "p/sql-injection",
+  "bin": "/Users/badpino/MacSec/tools/bin/semgrep",
+  "corpus": 8,
+  "findings": 4,
+  "raw": [
+    {
+      "file": "java/Vulnerable.java",
+      "line": 8,
+      "checkId": "java.lang.security.audit.sqli.tainted-sql-from-http-request.tainted-sql-from-http-request",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "java/Vulnerable.java",
+      "line": 9,
+      "checkId": "java.lang.security.audit.formatted-sql-string.formatted-sql-string",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "php/vulnerable.php",
+      "line": 5,
+      "checkId": "php.lang.security.injection.tainted-sql-string.tainted-sql-string",
+      "tool": "Semgrep"
+    },
+    {
+      "file": "python/vulnerable.py",
+      "line": 9,
+      "checkId": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+      "tool": "Semgrep"
+    }
+  ],
+  "score": {
+    "cases": [
+      {
+        "id": "php-request-to-query",
+        "split": "train",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "php-prepared",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-format-to-execute",
+        "split": "train",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "python-parameterised",
+        "split": "train",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "javascript-template-to-query",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 1,
+        "missed": [
+          "sqli at javascript/vulnerable.js:8"
+        ],
+        "extra": []
+      },
+      {
+        "id": "javascript-parameterised",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "java-concat-to-execute",
+        "split": "holdout",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      },
+      {
+        "id": "java-prepared",
+        "split": "holdout",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "missed": [],
+        "extra": []
+      }
+    ],
+    "train": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1
+    },
+    "holdout": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1,
+      "recall": 0.5
+    },
+    "all": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1,
+      "recall": 0.75
+    }
+  }
+}

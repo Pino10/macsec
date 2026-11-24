@@ -1,7 +1,7 @@
 {
   "name": "macsec",
   "productName": "MacSec",
-  "version": "1.25.0",
+  "version": "1.25.1",
   "description": "A free security workbench for macOS: deep code review, web and API scanning for your own projects, with AI.",
   "main": "./out/main/index.js",
   "author": "MacSec contributors",
@@ -16,7 +16,8 @@
     "test": "vitest run",
     "benchmark": "vitest run tests/v40-cli.test.ts -t \"accuracy gate\"",
     "harness": "MACSEC_LIVE=1 vitest run tests/v45-harness.test.ts",
-    "harness:offline": "vitest run tests/v45-harness.test.ts"
+    "harness:offline": "vitest run tests/v45-harness.test.ts",
+    "corpus:sql": "MACSEC_SQL_EVAL=1 vitest run tests/v46-sqlcorpus.test.ts --reporter=verbose"
   },
   "optionalDependencies": {
     "electron-liquid-glass": "^1.1.1"

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "description": "Labelled SQL injection samples for measuring engines. Each expected line is where the query is executed or built with request data. The holdout split must not be used to write or tune rules.",
+  "toleranceLines": 2,
+  "cases": [
+    { "id": "php-request-to-query", "language": "PHP", "file": "php/vulnerable.php", "split": "train", "expect": [{ "line": 6, "kind": "sqli" }] },
+    { "id": "php-prepared", "language": "PHP", "file": "php/clean.php", "split": "train", "expect": [] },
+    { "id": "python-format-to-execute", "language": "Python", "file": "python/vulnerable.py", "split": "train", "expect": [{ "line": 11, "kind": "sqli" }] },
+    { "id": "python-parameterised", "language": "Python", "file": "python/clean.py", "split": "train", "expect": [] },
+    { "id": "javascript-template-to-query", "language": "JavaScript", "file": "javascript/vulnerable.js", "split": "holdout", "expect": [{ "line": 8, "kind": "sqli" }] },
+    { "id": "javascript-parameterised", "language": "JavaScript", "file": "javascript/clean.js", "split": "holdout", "expect": [] },
+    { "id": "java-concat-to-execute", "language": "Java", "file": "java/Vulnerable.java", "split": "holdout", "expect": [{ "line": 9, "kind": "sqli" }] },
+    { "id": "java-prepared", "language": "Java", "file": "java/Clean.java", "split": "holdout", "expect": [] }
+  ]
+}

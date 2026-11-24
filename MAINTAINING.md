@@ -63,6 +63,12 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.25.1
+
+- `corpus/sql/`: eight labelled samples, a holdout split, `cases.json`, and the generated `report.json` from the Semgrep run.
+- `qa/sqlcorpus.ts`: the loader, the scorer (tolerance, dedupe by place, holdout split), the Semgrep runner with a private home, and the Joern parser. `scripts/joern-sql.sc` is the query template.
+- `npm run corpus:sql` measures Semgrep; Joern is measured only when it is installed, never from a claimed number.
+
 ### Added in 1.25.0
 
 - `qa/installcheck.ts`: the static catalogue rules and the live GitHub release check; `qa/crossengine.ts`: recorded output through the real parsers with precision and recall.
