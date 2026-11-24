@@ -1,3 +1,14 @@
+## 1.16.0
+
+- **More of the bug-bounty toolkit, with the same rules.** **gau** adds the URLs the internet already knows about a domain (Wayback, Common Crawl and others) to recon, passively. **wafw00f** names the firewall in front of a site during a web scan when control confirmations are on. **sqlmap** is in the toolbox for one thing only: a bounded fingerprint of one parameter under a written engagement, with `--risk=1 --level=1 --technique=BE`, one thread, no dump, no shell, no file read or write, and its requests counted against the cap.
+- **Recon hands over to the web scan.** On a recon session, "Scan this site" starts a web scan of the first live host with the pages the recon found already in the list (same host only), so discovery is not thrown away between the two.
+- **Web scan does more when you sign in and when you do not.** Inline JavaScript is crawled in Standard as well as Thorough, recon pages seed the crawl, and each hit from ffuf or wafw00f is kept with its proof.
+- **API security: load a spec from an address.** A web scan finds `openapi.json` or `swagger.json`; the API page now loads it straight from that address, reviews it, and tests it.
+- **Apps install with one click, through Homebrew.** Nmap, WPScan, radare2, Ghidra and the Google Cloud CLI show an "Install with Homebrew" button, only when you press it, with the command in the log. Nmap, WPScan and radare2 now show their installed version on the Tools page.
+- **Tests.** 555 passed, 4 skipped, including the new tool parsers, the sqlmap bounds (no dump or shell flags, request reservation, cap refusal) and the recon handoff seeds.
+
+Limits, on purpose: ordinary scans still only read. sqlmap runs only under an engagement, in its fingerprint mode. Metasploit-driven exploitation and a headless CLI for CI are the next pieces.
+
 ## 1.15.0
 
 - **ffuf is in the toolbox.** On the Web scan page, "Content discovery with ffuf" asks for 200 to 435 common paths at 20 a second, signed out, with ffuf's own calibration. Every path that answers is asked again by MacSec and reported only with a proof, and each one joins the pages the scan tests next. Your own lists in `~/MacSec/extensions/wordlists/*.txt` are used first. ffuf is free, comes from its own GitHub release and is checked against the checksum its authors publish.

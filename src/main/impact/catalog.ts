@@ -87,6 +87,19 @@ export const IMPACT_ACTIONS: ImpactActionInfo[] = [
     needs: ['url', 'expect']
   },
   {
+    id: 'sql-injection-proof',
+    name: 'Ask sqlmap if one parameter is injectable',
+    what: 'Runs sqlmap against one parameter in its careful fingerprint mode: risk 1, level 1, boolean and error techniques only. A proof is sqlmap naming the parameter and the technique. It does not extract data.',
+    impact: ['confidentiality'],
+    sends: 'One sqlmap run, at most 80 requests, one thread, 15 second timeout, no retries. GET only, and only the parameter you name.',
+    never: 'No dump, no --sql-shell, no --os-shell, no file read or write, no time-based or UNION extraction, no tamper scripts, no forms, no credential testing.',
+    maxRequests: 80,
+    writes: false,
+    cleanup: 'Nothing to undo: sqlmap only asks. MacSec deletes its session folder for the run.',
+    risk: 'Medium. sqlmap sends real injection payloads to the one parameter. A firewall will log them, and a fragile app may answer with errors. It is the standard way to prove an injection without taking data.',
+    needs: ['url', 'param']
+  },
+  {
     id: 'replay-request',
     name: 'Send the exact request you paste',
     what: 'Sends one request you wrote or copied from Burp: method, address, headers and body. A proof is a string you name appearing in the answer. This is the escape hatch for anything the built-in proofs do not cover.',

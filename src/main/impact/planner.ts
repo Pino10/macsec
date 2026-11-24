@@ -89,6 +89,7 @@ const RULES: Rule[] = [
   { re: /template injection|ssti|server-side template|engine evaluates|calculates an expression/i, action: 'ssti-marker', aims: 'integrity', why: 'The scan says the server evaluates input as a template. Show the smallest calculation it will do.' },
   { re: /upload|attachment|avatar|profile picture|media/i, action: 'upload-write', aims: 'integrity', why: 'The scan found an upload. Write one harmless text file and read it back.' },
   { re: /expensive|slow|timeout|rate limit|unbounded|export|report|generate|pdf render/i, action: 'availability-probe', aims: 'availability', why: 'The scan flagged a costly operation. Time one request against its baseline, without flooding it.' },
+  { re: /sql injection|sqli|database error|a quote in .* makes the page/i, action: 'sql-injection-proof', aims: 'confidentiality', why: 'The scan found a quote changing the answer. Ask sqlmap about that one parameter, without extracting data.' },
   { re: /hidden page|not linked|nothing links|directory listing|folder lists|exposed file|backup/i, action: 'content-discovery', aims: 'confidentiality', why: 'The scan saw content the site does not link to. Ask for the common paths around it and prove what answers.' },
   { re: /private page|needs? sign-?in|requires? (a )?login|signed out|anyone can open|missing authorization|needs no sign|idor|broken access/i, action: 'auth-bypass', aims: 'confidentiality', why: 'The scan says a private page may open without signing in. Ask for it anonymously and look for what only a signed-in person should see.' }
 ]

@@ -22,6 +22,10 @@ export interface ToolInfo {
   updateAvailable: boolean
   /** Installed through another tool (uv), or an app you install yourself (Burp, ZAP). */
   method: 'release' | 'python' | 'app'
+  /** Whether MacSec can install it with one click: its own download, or Homebrew for an app. */
+  installable: boolean
+  /** The Homebrew formula for an app tool, when it has one. */
+  formula?: string
   /** Languages or stacks it is used for; empty means all. */
   languages: string[]
 }
@@ -144,6 +148,8 @@ export interface WebScanRequest {
   confirm?: ConfirmOptions
   /** White box: the site's source folder. MacSec reads it, maps its routes and parameters, and tests them live. */
   codePath?: string
+  /** Pages a recon already found on this host, so a scan does not start from nothing. */
+  seedUrls?: string[]
   /** Walk the person's web checklist item by item (needs an AI reviewer for the items a scan cannot test). */
   checklist?: boolean
   /** The AI picks the next checks from a fixed safe menu, and MacSec runs them (needs an AI reviewer). */
@@ -572,6 +578,8 @@ export interface Channels {
 
   'tools:list': { args: []; result: ToolInfo[] }
   'tools:install': { args: [string[]]; result: ToolInfo[] }
+  /** Installs an app tool with Homebrew, only for the tool the person pressed. */
+  'tools:install-app': { args: [string]; result: ToolInfo[] }
   'tools:remove': { args: [string]; result: ToolInfo[] }
   'tools:update-data': { args: []; result: void }
   'tools:check-updates': { args: []; result: ToolInfo[] }
@@ -602,6 +610,8 @@ export interface Channels {
   'web:login': { args: [string]; result: { cookie: string; count: number } | null }
   'audit:start': { args: [AuditRequest]; result: SessionInfo }
   'api:load-spec': { args: []; result: ApiSpecInfo | null }
+  /** Loads a Postman, OpenAPI or Swagger file from an address a scan found. */
+  'api:load-url': { args: [string]; result: ApiSpecInfo }
   'api:start': { args: [ApiScanRequest]; result: SessionInfo }
   /** Picks an app's source folder or a built .apk / .ipa file. */
   'mobile:pick': { args: ['folder' | 'file']; result: string | null }
@@ -637,6 +647,8 @@ export interface Channels {
   'app:update-status': { args: []; result: UpdateStatus }
   'app:changelog': { args: []; result: ReleaseNote[] }
   'recon:start': { args: [ReconRequest]; result: SessionInfo }
+  /** Takes a finished recon straight into a web scan of its first live host. */
+  'recon:handoff': { args: [string]; result: SessionInfo }
   'recon:data': { args: [string]; result: { hosts: { host: string; ips: string[]; cname?: string; live?: { url: string; status: number; title?: string; tech: string[] }; sources: string[] }[]; js: { url: string; bytes: number; sourceMap?: { url: string; files: number; sample: string[] }; endpoints: string[]; secrets: { kind: string; masked: string }[] }[]; endpoints: string[]; params: string[]; urls: number; pages?: ReconPage[]; delta?: ReconDeltaInfo; jsmap?: JsMapInfo } | null }
   'sessions:open-sources': { args: [string]; result: boolean }
   'ai:claude-skills': { args: [boolean | null]; result: { installed: boolean } }

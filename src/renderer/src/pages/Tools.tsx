@@ -62,7 +62,7 @@ export default function Tools(): React.JSX.Element {
 
   return (
     <>
-      <PageHead title="Tools" desc="Every scanner lives in the MacSec folder, checked against its published checksum. Nothing is installed anywhere else on your Mac.">
+      <PageHead title="Tools" desc="Every scanner lives in the MacSec folder, checked against its published checksum. An app with a Homebrew formula (Nmap, WPScan, radare2, Ghidra) installs only when you press its button.">
         <button className="btn" onClick={() => void api.invoke('app:open-folder', 'tools')}>
           <FolderOpen size={14} /> Open tools folder
         </button>
@@ -325,7 +325,10 @@ export default function Tools(): React.JSX.Element {
                 <ToolRow key={t.id} t={t} icon={g.icon} onInstall={() => install([t.id], `i-${t.id}`)} onRemove={async () => {
                   const r = await act(`r-${t.id}`, () => api.invoke('tools:remove', t.id))
                   if (r) setTools(r)
-                }} busy={busy.has(`i-${t.id}`) || busy.has('all')} />
+                }} onBrew={t.method === 'app' && t.installable ? async () => {
+                  const r = await act(`b-${t.id}`, () => api.invoke('tools:install-app', t.id))
+                  if (r) setTools(r)
+                } : undefined} busy={busy.has(`i-${t.id}`) || busy.has(`b-${t.id}`) || busy.has('all')} />
               ))}
             </div>
           </div>
@@ -391,7 +394,7 @@ function OptionalList(): React.JSX.Element {
   )
 }
 
-function ToolRow({ t, icon, onInstall, onRemove, busy }: { t: ToolInfo; icon: React.ReactNode; onInstall: () => void; onRemove: () => void; busy: boolean }): React.JSX.Element {
+function ToolRow({ t, icon, onInstall, onRemove, onBrew, busy }: { t: ToolInfo; icon: React.ReactNode; onInstall: () => void; onRemove: () => void; onBrew?: () => void; busy: boolean }): React.JSX.Element {
   return (
     <div className="arsenal-row" data-on={t.installed}>
       <span className="glyph">{icon}</span>
@@ -407,7 +410,11 @@ function ToolRow({ t, icon, onInstall, onRemove, busy }: { t: ToolInfo; icon: Re
           <ExternalLink />
         </button>
         {t.method === 'app' ? (
-          t.installed ? null : (
+          t.installed ? null : onBrew ? (
+            <button className="btn btn-sm" disabled={busy} onClick={onBrew} data-tip={t.formula ? `Homebrew: ${t.formula}` : undefined}>
+              <Download size={13} /> {busy ? 'Installing…' : 'Install with Homebrew'}
+            </button>
+          ) : (
             <button className="btn btn-sm" onClick={() => void window.macsec.invoke('app:open-external', t.homepage)}>
               Get it
             </button>

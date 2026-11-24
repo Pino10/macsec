@@ -32,13 +32,16 @@ import { summarizeWithAi, summaryPrompt } from './aisummary'
 const specDir = (): string => join(dirs.config(), 'api-specs')
 
 /** Keeps a copy of the file you chose, so a scan can be run again later. */
-export function loadSpec(path: string): ApiSpecInfo {
-  const text = readFileSync(path, 'utf8')
-  const spec = parseSpec(text, path.split('/').pop())
+export function loadSpecText(text: string, name: string): ApiSpecInfo {
+  const spec = parseSpec(text, name)
   const id = randomBytes(6).toString('hex')
   mkdirSync(specDir(), { recursive: true })
-  writeFileSync(join(specDir(), `${id}.txt`), text)
+  writeFileSync(join(specDir(), `${id}.txt`), text, { mode: 0o600 })
   return { id, name: spec.name, format: spec.format, baseUrl: spec.baseUrl, endpoints: spec.endpoints.map((e) => ({ method: e.method, url: e.url, name: e.name })) }
+}
+
+export function loadSpec(path: string): ApiSpecInfo {
+  return loadSpecText(readFileSync(path, 'utf8'), path.split('/').pop() ?? 'api')
 }
 
 const SECRET_VALUE = /(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}|sk_live_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/

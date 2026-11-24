@@ -199,9 +199,17 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
   let carrier: string | undefined
   let codeNames: string[] = []
   const urlsFile = join(s.raw, 'urls.txt')
-  let urls: string[] = [url]
+  // Pages a recon already found on this host start the list, so a scan does not begin from nothing.
+  const seeds = (req.seedUrls ?? []).filter((u) => {
+    try {
+      return new URL(u).host === host
+    } catch {
+      return false
+    }
+  })
+  let urls: string[] = [...new Set([url, ...seeds])]
   let fp: Fingerprint[] = []
-  writeFileSync(urlsFile, url)
+  writeFileSync(urlsFile, urls.join('\n'))
 
   const st = {
     fp: s.step('httpx', 'Fingerprint the server and technologies'),
@@ -255,13 +263,13 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       await s.run(st.crawl, async (note, line) => {
         await ensure('katana')
         const out = join(s.raw, 'katana.jsonl')
-        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode === 'thorough' ? ['-jc'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out, ...headerArgs(headers, '-H')], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
+        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode !== 'quick' ? ['-jc'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out, ...headerArgs(headers, '-H')], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
           if (!existsSync(out)) throw e
           return ''
         })
-        urls = [url, ...parseKatana(existsSync(out) ? readFileSync(out, 'utf8') : '', host)].filter((u, i, a) => a.indexOf(u) === i).slice(0, 2000)
+        urls = [...new Set([url, ...seeds, ...parseKatana(existsSync(out) ? readFileSync(out, 'utf8') : '', host)])].slice(0, 3000)
         writeFileSync(urlsFile, urls.join('\n'))
-        note(`${urls.length} pages and endpoints`)
+        note(`${urls.length} pages and endpoints${seeds.length ? ` (${seeds.length} from recon)` : ''}`)
       })
 
     if (st.tls) await s.run(st.tls, () => checkTls(url))
@@ -418,7 +426,30 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         return found
       })
 
-    if (st.waf) await s.run(st.waf, (note) => wafControl(mk(150), note, carrier))
+    if (st.waf)
+      await s.run(st.waf, async (note, line) => {
+        const found: Finding[] = []
+        const wafw00f = toolDef('wafw00f')
+        if (wafw00f && isInstalled(wafw00f)) {
+          try {
+            const text = await runTool({ name: 'wafw00f', bin: 'wafw00f', args: ['-f', 'json', url], timeoutMs: 4 * 60_000 }, op, s.raw, line).catch((e) => {
+              throw new Error(`wafw00f: ${(e as Error).message}`)
+            })
+            const raw = /\{[\s\S]*\}/.exec(text)?.[0]
+            type WafReport = { detected?: boolean; firewall?: string; manufacturer?: string }
+            const parsed = raw ? (JSON.parse(raw) as WafReport | WafReport[]) : null
+            const j = Array.isArray(parsed) ? parsed.find((x) => x.detected) : parsed
+            if (j?.detected && j.firewall) {
+              found.push({ id: fid('wafw00f', url, j.firewall), tool: 'wafw00f', category: 'web', severity: 'info', confidence: 'confirmed', title: `Web firewall: ${j.firewall}`, url, file: url, description: `${j.firewall}${j.manufacturer && j.manufacturer !== j.firewall ? ` (${j.manufacturer})` : ''} answered the firewall probes. That is a fact about the site, not a problem by itself: it tells you which rules the harmless test strings below were judged by.`, fix: 'Nothing to fix. If you run that firewall, keep its rules current and check that it blocks what you expect.' })
+              note(`${j.firewall} in front of the site (wafw00f)`)
+            } else note('wafw00f named no firewall')
+          } catch (e) {
+            note((e as Error).message)
+          }
+        }
+        found.push(...(await wafControl(mk(150), note, carrier)))
+        return found
+      })
 
     if (st.logic) await s.run(st.logic, (note) => logicChecks(mk(400), { urls, pages: urls.filter((u) => !/\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|pdf|zip)$/i.test(u)).slice(0, 10) }, note))
 

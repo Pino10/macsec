@@ -13,6 +13,7 @@ export default function ApiSecurity(): React.JSX.Element {
   const { settings, act, busy, showSession } = useApp()
   const api = window.macsec
   const [spec, setSpec] = useState<ApiSpecInfo | null>(null)
+  const [specUrl, setSpecUrl] = useState('')
   const [base, setBase] = useState('')
   const [auth, setAuth] = useState<ApiAuth>({ kind: 'bearer', value: '' })
   const [mode, setMode] = useState<ScanMode>('standard')
@@ -43,23 +44,42 @@ export default function ApiSecurity(): React.JSX.Element {
               </div>
             </div>
           ) : (
-            <button
-              className="pick-list"
-              style={{ display: 'grid', placeItems: 'center', gap: 8, padding: '34px 20px', cursor: 'pointer', color: 'var(--ink-2)', textAlign: 'center' }}
-              onClick={async () => {
-                const s = await act('spec', () => api.invoke('api:load-spec'))
-                if (s) {
-                  setSpec(s)
-                  setBase('')
-                }
-              }}
-            >
-              <span className="glyph" style={{ ['--g' as string]: '#ff3d7f' }}>
-                <Upload size={20} />
-              </span>
-              <strong style={{ color: 'var(--ink)', fontFamily: 'var(--display)' }}>{busy.has('spec') ? 'Reading…' : 'Load a Postman collection, OpenAPI file or HAR file'}</strong>
-              <span className="hint">.json, .yaml or .har. A copy is kept in MacSec so you can test it again.</span>
-            </button>
+            <>
+              <button
+                className="pick-list"
+                style={{ display: 'grid', placeItems: 'center', gap: 8, padding: '34px 20px', cursor: 'pointer', color: 'var(--ink-2)', textAlign: 'center' }}
+                onClick={async () => {
+                  const s = await act('spec', () => api.invoke('api:load-spec'))
+                  if (s) {
+                    setSpec(s)
+                    setBase('')
+                  }
+                }}
+              >
+                <span className="glyph" style={{ ['--g' as string]: '#ff3d7f' }}>
+                  <Upload size={20} />
+                </span>
+                <strong style={{ color: 'var(--ink)', fontFamily: 'var(--display)' }}>{busy.has('spec') ? 'Reading…' : 'Load a Postman collection, OpenAPI file or HAR file'}</strong>
+                <span className="hint">.json, .yaml or .har. A copy is kept in MacSec so you can test it again.</span>
+              </button>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+                <span className="hint">Or load the file from an address, for example a spec a web scan found:</span>
+                <input className="input mono" style={{ flex: 1, minWidth: 240 }} placeholder="https://api.example.com/openapi.json" value={specUrl} onChange={(e) => setSpecUrl(e.target.value)} aria-label="Spec address" />
+                <button
+                  className="btn btn-sm"
+                  disabled={!specUrl.trim() || busy.has('spec-url')}
+                  onClick={async () => {
+                    const s = await act('spec-url', () => api.invoke('api:load-url', specUrl.trim()))
+                    if (s) {
+                      setSpec(s)
+                      setBase('')
+                    }
+                  }}
+                >
+                  <Plug size={13} /> {busy.has('spec-url') ? 'Loading…' : 'Load from address'}
+                </button>
+              </div>
+            </>
           )}
         </FlowStep>
 
