@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.26.1
+
+- `parsePsalm` accepts both Psalm 6 (`{issues}`) and Psalm 7 (bare array) output.
+- `corpus/sql/measurements.md`: the engine table, versions and the commands to repeat it.
+
 ### Added in 1.26.0
 
 - The corpus grew to 33 cases across eight languages, with marker lines and a language-level holdout split; `corpus/sql/report.json` holds the measured run.

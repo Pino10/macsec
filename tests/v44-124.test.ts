@@ -79,3 +79,13 @@ describe('the second opinion', () => {
     expect(() => parseOpinion('Looks fine to me.')).toThrow(/did not give a verdict/)
   })
 })
+
+describe('Psalm output shapes', () => {
+  it('reads both the bare list Psalm 7 writes and the older object', async () => {
+    const { parsePsalm } = await import('../src/main/scanners/parse')
+    const row = { type: 'TaintedSql', file_name: '/p/app/Search.php', line_from: 6, message: 'Detected tainted SQL' }
+    expect(parsePsalm(JSON.stringify([row]), '/p')).toHaveLength(1)
+    expect(parsePsalm(JSON.stringify({ issues: [row] }), '/p')).toHaveLength(1)
+    expect(parsePsalm('[]', '/p')).toEqual([])
+  })
+})

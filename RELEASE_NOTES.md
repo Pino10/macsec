@@ -1,3 +1,52 @@
+## 1.26.1
+
+The 1.26.0 release is verified, the other engines are measured, and one of them found a parser bug
+worth fixing.
+
+### 1.26.0 verified
+
+- `releases/latest` on GitHub is **v1.26.0**, not a draft and not a prerelease.
+- Both DMGs match `SHA256SUMS.txt`, and those digests match GitHub's own asset digests.
+- The Ed25519 signature over `SHA256SUMS.txt` verifies against `build/release-signing.pub`.
+- The release body carries the 1.26.0 notes. (The earlier report of v1.21.0 as latest was stale.)
+
+### The other engines, measured
+
+Bearer, Psalm and PHPStan were run against the same corpus. The full table and commands are in
+`corpus/sql/measurements.md`.
+
+| Engine | Coverage | Precision | Recall | Note |
+| --- | --- | --- | --- | --- |
+| Semgrep `p/sql-injection` | all 33 | 1.0 | 0.647 | Misses Laravel, JS concatenation, Prisma/TypeORM, Hibernate |
+| Bearer 2.1.3 | all 33 | 0.8 | 0.235 | Finds Go, Ruby, JavaScript; one false positive on a safe JS query |
+| Psalm 7.17 taint | PHP (8) | 1.0 | 0.5 | Catches PDO insert and raw; misses Laravel |
+| PHPStan 2.3.7 | PHP (8) | 0.5 | 0.25 | Not a security scanner |
+| Joern | not run | | | No Java runtime on this Mac |
+
+The interesting result is Bearer's false positive: a JavaScript query that uses a bound parameter
+(`pool.query('... = ?', [req.query.user])`) is reported as SQL injection. Precision matters more
+than recall when a person has to act on the report.
+
+### Psalm's output shape, fixed
+
+Psalm 7 writes a bare JSON array. The parser expected the older `{issues: [...]}` wrapper, so the
+project's own Psalm would have produced no findings in a review. Both shapes are accepted now, and
+a test covers them.
+
+### Joern
+
+Still not run: `/usr/bin/java` exists as the macOS stub, but there is no runtime
+(`Unable to locate a Java Runtime`). Any number for Joern here would be invented. The query
+template, parser and scoring are ready; the decision rule stays as written.
+
+### Roadmap
+
+Reconciled: the install harness and its weekly live check, the cross-engine runner, the 33-case
+corpus and the Semgrep, Bearer, Psalm and PHPStan measurements are marked done. Mobile fixtures,
+Joern, Amass, vhost discovery and patch generation remain open, in that order.
+
+---
+
 ## 1.26.0
 
 The corpus is now big enough to judge an engine with. This release is the labelled set, the measured

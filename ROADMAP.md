@@ -1,68 +1,57 @@
 # Roadmap
 
-## Done in 1.24.0
+Status after 1.26.1, verified against the release itself.
 
-- PHPStan and Psalm, from the project's own `vendor/bin` and config, with Psalm's taint analysis
-  and PHPStan's security messages only.
-- The independent AI verifier, on demand, with a masked excerpt and a fixed two-line answer.
-- The attack-surface graph in the Surface tab.
-- Burp XML import, with no stored credentials.
-- The full ledger in RELEASE_NOTES.md, so what is not done is named with its blocker.
+## Done
 
-## 1.24.1: consistency
+- 1.24.0: PHPStan and Psalm (project-local), the independent AI verifier, the surface graph, Burp
+  XML import, and the full ledger of what was not done.
+- 1.24.1: every release page carries its notes; the tag workflow sets the body.
+- 1.25.0: the install harness (static rules plus a weekly live GitHub check) and the cross-engine
+  runner over recorded engine output.
+- 1.26.0: the corpus grew to 33 cases across eight languages, 17 vulnerable and 16 clean, with a
+  language-level holdout split.
+- 1.26.1: Semgrep, Bearer, Psalm and PHPStan measured on the corpus; Psalm 7's bare-array output
+  fixed. Semgrep 1.0/0.647, Bearer 0.8/0.235, Psalm (PHP) 1.0/0.5, PHPStan (PHP) 0.5/0.25.
 
-- Every release page from 1.0 to 1.24 now carries its notes (they were empty: the tag path attached
-  the files but never set the body).
-- The release workflow now sets the body from RELEASE_NOTES.md on every tag, so this cannot drift
-  again.
-- This roadmap is the agreed next order, not a wish list.
+## Open, in order
 
-## 1.25 priorities
-
-1. **QA harness before any new dependency.**
-   - [ ] Scanner install and update tests: every tool's pinned address, checksum and version,
-         checked in CI on a schedule, so a rotted URL fails the harness and not a user's review.
-   - [ ] Cross-engine fixture runner: the same labelled file through Semgrep, Bearer, Psalm,
-         PHPStan and Joern, comparing finding keys, duplicates and precision. This is the
-         measuring stick the next three items use.
-2. **SQL corpus and Joern evaluation.**
-   - [x] A labelled corpus of SQL injection across eight languages: 33 cases, 17 vulnerable and 16 clean, with a holdout split.
-   - [ ] Hold out at least a third of the samples from anyone writing rules, or the measurement
-         only proves the rules match their own examples.
-   - [x] Measure `p/sql-injection` on the corpus: precision 1.0, recall 0.647 (holdout 0.5).
-   - [ ] Measure Bearer, Psalm taint, PHPStan and Joern on the same corpus.
-   - [ ] Decide Joern on the numbers: it replaces something, or it adds coverage worth 400 MB, or
-         it does not ship.
-3. **Real, redistributable mobile fixtures and install tests.**
-   - [ ] A small open-source APK with a pinned checksum (an F-Droid build is the obvious source),
-         used for the manifest and decompiler tests.
-   - [ ] An IPA is different: an unsigned build from an open-source project can test static
-         parsing, but dynamic testing needs a signing identity and a device. The fixture says so.
-   - [ ] The install tests from 1 are extended to the mobile tools once they exist.
-4. **Amass against subfinder, passive only.**
-   - [ ] Run both on a fixed domain list, compare unique subdomains, false positives, runtime and
-         the dependency footprint (Amass is a Go tool with its own config and database).
-   - [ ] Add Amass only if it finds something subfinder does not, often enough to justify it.
-5. **Bounded virtual-host discovery.**
-   - [ ] A fixed candidate list of Host headers against one address, each compared with a name
-         that cannot exist, at a slow rate, for hosts the person owns.
-   - [ ] Report a discovered vhost with the answer that proves it, and nothing on a wildcard.
-6. **Patch generation, last and isolated.**
-   - [ ] Generate a patch into a scratch copy, never into the project.
-   - [ ] Run the project's own test command, capped in time, then the scanners again on the patched
-         copy, so a "fix" that adds a vulnerability fails.
-   - [ ] Show the diff, require a typed confirmation, and keep a one-click rollback.
-   - [ ] Refuse when there is no test command, and say why.
+1. **Real mobile fixtures and install tests.**
+   - [ ] A small open-source APK with a pinned checksum (F-Droid is the source), used for the
+         manifest and decompiler tests.
+   - [ ] An unsigned iOS build for static parsing, with the dynamic limit stated: an IPA needs
+         Xcode, a signing identity and a device, and cannot be redistributed.
+   - [ ] Extend the install harness to the mobile tools once they exist.
+2. **Joern, measured or not at all.**
+   - [ ] Install a Java runtime and Joern, after approval for the download and the disk.
+   - [ ] Measure it on the same 33 cases, starting with the six misses: Laravel `DB::select` and
+         `DB::raw`, JavaScript concatenation, Prisma `$queryRawUnsafe`, TypeORM `query`, Hibernate
+         `createQuery`.
+   - [ ] Ship only if it beats 0.5 holdout recall, stays under one false positive in ten clean
+         files, and justifies its runtime and disk. Otherwise the number is the deliverable.
+3. **Amass against subfinder, passive only.**
+   - [ ] Run both on a fixed domain list; compare unique subdomains, false positives, runtime and
+         the dependency footprint.
+   - [ ] Add Amass only if it finds something subfinder does not, often enough.
+4. **Bounded virtual-host discovery.**
+   - [ ] A fixed Host-header list against one address, compared with a name that cannot exist, at
+         a slow rate, for hosts the person owns.
+   - [ ] Report only an answer that proves a vhost, and nothing on a wildcard.
+5. **Patch generation, last and isolated.**
+   - [ ] Generate into a scratch copy, never the project.
+   - [ ] Run the project's own tests with a time cap, then the scanners again on the patched copy.
+   - [ ] Show the diff, require a typed confirmation, keep a one-click rollback, and refuse when
+         there is no test command.
 
 ## Later
 
-- Notarisation: needs an Apple Developer account. The app stays ad-hoc signed and the Ed25519
-  release signature is what protects updates; notarising is a workflow change once an account exists.
+- Notarisation: needs an Apple Developer account. The app stays ad-hoc signed; the Ed25519 release
+  signature and the verified DMG digests are what protect updates.
 - Windows and Linux: MacSec is a macOS workbench.
 
 ## How each item stays inside the rules
 
 Free tools only, everything on this Mac, read-only unless a person turns on a controlled proof, and
-no external account unless they connect it themselves. A new engine is added only after it is
-measured against the existing ones on the same labelled data, and a new fixture only when it can be
-redistributed legally.
+no external account unless they connect it themselves. A new engine ships only after it is measured
+against the existing ones on the same labelled data, and a fixture only when it can be redistributed
+legally.

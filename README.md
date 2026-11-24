@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.26.1 | Bearer, Psalm and PHPStan measured on the corpus; Psalm's JSON shape fixed | [1.26.1](RELEASE_NOTES.md#1261) |
 | 1.26.0 | A 33-case SQL corpus across eight languages, the holdout split, and the measured gaps | [1.26.0](RELEASE_NOTES.md#1260) |
 | 1.25.1 | The labelled SQL corpus, the holdout split, and the first measured numbers | [1.25.1](RELEASE_NOTES.md#1251) |
 | 1.25.0 | The install and cross-engine harnesses, and a weekly check that every install address still works | [1.25.0](RELEASE_NOTES.md#1250) |
