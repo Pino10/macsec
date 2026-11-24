@@ -63,6 +63,12 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.24.1
+
+- `.github/workflows/release.yml`: the tag path now sets the release body from the top section of `RELEASE_NOTES.md`, after attaching the files.
+- `ROADMAP.md`: reconciled to the 1.25 order.
+- Every existing release page was backfilled from `RELEASE_NOTES.md` (1.0 to 1.24); the 0.x pages have no sections in the file.
+
 ### Added in 1.24
 
 - `scanners/parse.ts`: `parsePhpstan` (security messages only) and `parsePsalm` (taint issues); `plan.ts` runs them only from the project's own `vendor/bin` and config, through `review.ts`'s absolute-path spawn.

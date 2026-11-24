@@ -1,3 +1,20 @@
+## 1.24.1
+
+A consistency patch. No check changed.
+
+- **Every release page now has its notes.** The release pages from 1.0 to 1.24 had an empty body:
+  the tag workflow attached the DMGs and the signature but never set the text, so the Updates page
+  in the app showed a version with no notes. All of them now carry the same notes as
+  RELEASE_NOTES.md.
+- **The workflow sets the body on every tag**, with a step that reads the top section of
+  RELEASE_NOTES.md and edits the release. This cannot drift again.
+- **The roadmap is reconciled.** It lists what shipped in 1.24.0, then the 1.25 order: QA harness
+  first, the SQL corpus and Joern measured on it, real redistributable fixtures, Amass against
+  subfinder, bounded vhost discovery, and patch generation last and isolated.
+- Nothing in the app changed.
+
+---
+
 ## 1.24.0
 
 The 1.24 set, in one release. Everything that can be built and tested here is in; the few items that
