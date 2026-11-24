@@ -1,3 +1,59 @@
+## 1.27.0
+
+The interface gets the modern pass, and bounded virtual-host discovery is in. Joern and the mobile
+fixtures are **not** in this release, and the reasons are concrete rather than a deferral.
+
+### Interface
+
+- **Window controls aligned.** The traffic lights sit at a fixed position with the rail's top area
+  cleared, so close, minimise and zoom no longer crowd the brand. The rail header has its own space
+  and the drag region is no longer shared with controls.
+- **A cleaner surface everywhere.** Smaller, consistent corner radii (18px panels, 10px controls),
+  a calmer rail, 34px controls, 36px inputs, thinner scrollbars, and one visible focus ring. The
+  changes are in the shared stylesheet, so every page inherits them rather than drifting apart.
+- The Start page, result cards, flow steps and the command palette keep their layout; only the
+  proportions and chrome changed.
+
+### Virtual-host discovery
+
+- **Bounded by design.** Ten common names (`www`, `admin`, `api` and so on) are sent as `Host`
+  headers to the result's own address, one at a time with a 300ms pause and an 8s timeout, and every
+  answer is compared with a random name that cannot exist (`.invalid`). Nothing is reported when the
+  answers match the baseline, which is what a wildcard does.
+- A hit carries the name, status, title and the comparison that proves it. It is read-only: GET, no
+  body, no redirects beyond what the pinned client allows, at most 250 KB an answer.
+- Available in the Surface tab of a web or recon result, with its own button and an explained empty
+  state. Eleven requests at most.
+- Tests run against a local server that answers by `Host`: the admin name is found, the default name
+  is not, odd names are refused, and a wildcard returns nothing.
+
+### Joern: why it is not here
+
+- The Mac has **Java 8** (`java version "1.8.0_513"`). Joern 4 needs Java 11 or newer.
+- The macOS arm64 Joern release is **1.76 GB**, not 400 MB. At the speed available here that is
+  over an hour of downloading before any analysis starts, and the app's install path does not
+  support that layout yet.
+- I extracted a JRE 21 to verify the runtime itself works, but stopped the 1.76 GB download. No
+  Joern number is claimed.
+- The corpus, query template, parser and decision rule are ready. Joern ships only if it beats 0.5
+  holdout recall, stays under one false positive in ten clean files, and justifies that download.
+
+### Xcode: installed, not selected
+
+- `xcodebuild -version` says the active developer directory is **Command Line Tools**, not
+  `/Applications/Xcode.app`. Selecting Xcode needs `sudo xcode-select -s /Applications/Xcode.app`.
+- Even then, dynamic iOS testing needs a signing identity and a device, and an IPA cannot be
+  redistributed. A static unsigned fixture is the honest limit.
+
+### Still open
+
+- A real APK fixture with attribution and a decode test.
+- Amass against subfinder, passive only.
+- Automated patch generation in a scratch copy, with tests and a rescan.
+- Joern once a Java 11+ runtime and the download are in place.
+
+---
+
 ## 1.26.1
 
 The 1.26.0 release is verified, the other engines are measured, and one of them found a parser bug

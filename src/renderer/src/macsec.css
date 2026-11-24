@@ -3160,3 +3160,98 @@ details.advanced[open] > summary {
 .graph-legend i[data-sev='high'] { background: var(--high, #ff9d4d); }
 .graph-legend i[data-sev='medium'] { background: var(--med, #ffd34d); }
 .graph-legend i[data-sev='low'] { background: var(--low, #4dc3ff); }
+
+/* ------------------------------------------------------------------ 1.27: cleaner, modern chrome */
+
+:root {
+  --r-shell: 24px;
+  --r-panel: 18px;
+  --r-ctl: 10px;
+}
+.rail {
+  padding: 56px 10px 10px;
+}
+.brand {
+  padding: 0 10px 16px;
+}
+.rail nav {
+  gap: 12px;
+}
+.rail-item {
+  height: 36px;
+  border-radius: 10px;
+  font-weight: 450;
+}
+.rail-item[aria-current='page']::before {
+  top: 8px;
+  bottom: 8px;
+  border-radius: 3px;
+}
+.rail-item .count {
+  font-size: 11px;
+  letter-spacing: 0.01em;
+}
+.enginebar {
+  height: 54px;
+  padding: 0 12px 0 6px;
+}
+.btn {
+  height: 34px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.btn-lg {
+  height: 40px;
+  padding: 0 18px;
+}
+.input {
+  min-height: 36px;
+  border-radius: 10px;
+}
+.panel {
+  border-radius: 16px;
+}
+.flow-step {
+  border-radius: 18px;
+}
+.choice {
+  border-radius: 14px;
+  padding: 16px;
+}
+.page-title {
+  font-size: 30px;
+}
+.page-head {
+  margin: 14px 0 22px;
+}
+.tabs {
+  border-radius: 11px;
+}
+.tabs button {
+  border-radius: 8px;
+}
+.f-list .f-row {
+  border-radius: 9px;
+}
+h2 {
+  letter-spacing: -0.015em;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 165, 200, 0.18);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 165, 200, 0.3);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ion) 55%, transparent);
+  outline-offset: 2px;
+}

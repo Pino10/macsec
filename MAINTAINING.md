@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.27.0
+
+- `vhosts.ts`: bounded Host-header probing with a cannot-exist baseline; `recon:vhosts` and the Surface card; tests against a local server.
+- Interface pass in the shared stylesheet: radii, controls, rail spacing, scrollbars, focus ring, and the traffic-light position.
+
 ### Added in 1.26.1
 
 - `parsePsalm` accepts both Psalm 6 (`{issues}`) and Psalm 7 (bare array) output.
