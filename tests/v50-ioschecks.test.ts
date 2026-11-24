@@ -55,7 +55,7 @@ describe('Info.plist and bundle facts', () => {
 
 // Run the same checks against the real IPA when it has been unpacked (manual verification).
 const real = process.env.OMNI_IPA_DIR
-describe.runIf(!!real)('the real OmniBisic IPA', () => {
+describe.runIf(!!real)('the real the app IPA', () => {
   it('matches the manual assessment', () => {
     const dir = real as string
     const prof = readFileSync(join(dir, 'profile.plist'), 'utf8')
