@@ -1,3 +1,24 @@
+## 1.27.1
+
+A crash fix. No feature changed.
+
+### The Results page could not be drawn
+
+React error #300 means the number of hooks changed between renders. In `Sessions`, the component
+returned `<SessionView>` for a selected result **before** its search `useEffect`. Opening a result
+from the list therefore rendered one hook fewer, and the whole page fell back to the error card.
+
+The early return now sits after every hook, so the count cannot change. This affected every result,
+not one kind, and it is the reason 1.27.0 was hard to use.
+
+### Still true
+
+- 618 tests pass; typecheck and build are clean.
+- The 1.27.0 interface pass and virtual-host discovery are unchanged.
+- Joern, the APK fixture, Amass and patch generation remain open, in that order.
+
+---
+
 ## 1.27.0
 
 The interface gets the modern pass, and bounded virtual-host discovery is in. Joern and the mobile

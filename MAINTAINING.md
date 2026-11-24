@@ -63,6 +63,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.27.1
+
+- `Sessions.tsx`: the early return for an open result is after the search effect, restoring a constant hook count. When adding a hook to that component, keep it above the return.
+
 ### Added in 1.27.0
 
 - `vhosts.ts`: bounded Host-header probing with a cannot-exist baseline; `recon:vhosts` and the Surface card; tests against a local server.
