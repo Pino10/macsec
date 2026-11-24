@@ -27,9 +27,10 @@ import { checkUpdates, checkUpdatesDaily, installApp, installTool, listTools, re
 import { dockerPath, localSites, startWebScan } from './webscan'
 import { ciWorkflow, compareFindings, preCommitHook, previousSession, toDefectDojo, toSarif } from './exports'
 import { topFindings } from '../shared/insights'
+import { label } from './risk'
 import { runCheckup } from './checkup'
 import { startTray } from './tray'
-import { parseTrivy } from './scanners/parse'
+import { countBySeverity, parseTrivy } from './scanners/parse'
 import { checkPackUpdates, installPack, packState, packUpdates, removePack, SKILL_PACKS } from './seckit/skillpacks'
 import { deepHandoffPrompt } from './seckit/deepaudit'
 import { deepPlanFor } from './deepreview'
@@ -52,10 +53,11 @@ import { optionalTools } from './optional'
 import { startAudit } from './audit'
 import { beginOp, cancelOp, endOp, finishEvents, isPaused, pauseOp } from './engine'
 import { askAi } from './aisummary'
-import { currentEngagement, engagementById, engagementProblem, hostKey, listEngagements, revokeEngagement, saveEngagement } from './engagement'
+import { currentEngagement, engagementById, engagementProblem, engagementRef, hostKey, listEngagements, revokeEngagement, saveEngagement } from './engagement'
 import { IMPACT_ACTIONS } from './impact/catalog'
 import { aiPlanCost, aiPlannerPrompt, checkStep, parseAiPlan, planFromRules } from './impact/planner'
-import { listRuns, loadPlan, runCampaign, runProblem, savePlan } from './impact/campaign'
+import { listRuns, loadPlan, runCampaign, runProblem, savePlan, saveRun } from './impact/campaign'
+import { attachProof } from './impact/link'
 import { requestStop } from './impact/client'
 import { ValidationError, pick, validHost, validImpacts, validUrl } from './validate'
 export { validHost } from './validate'
@@ -1327,6 +1329,29 @@ function registerIpc(): void {
         onStep: (step) => send('impact:progress', { runId, step: step.step, line: `${step.status}: ${step.title}` }),
         onLine: (line) => send('impact:progress', { runId, step: '', line })
       })
+      // The proof goes back to the finding that started it, and the finding becomes Proven.
+      const linked: string[] = []
+      const ref = engagementRef(engagement)
+      for (const info of listSessions().slice(0, 30)) {
+        try {
+          const d = sessionDetail(info.id)
+          const { findings, linked: got } = attachProof(d.findings, run, plan, ref)
+          if (!got.length) continue
+          const labelled = label(findings)
+          saveFindings(info.id, labelled)
+          info.counts = countBySeverity(labelled.filter((f) => f.verdict !== 'false-positive'))
+          saveSession(info)
+          linked.push(...got)
+        } catch {
+          // A session that cannot be read is skipped, not fatal.
+        }
+      }
+      if (linked.length) {
+        run.linked = [...new Set(linked)]
+        saveRun(run)
+        log('info', `Controlled proof linked to ${run.linked.length} finding${run.linked.length === 1 ? '' : 's'}: ${run.linked.join(', ')}`)
+        send('sessions:changed', listSessions())
+      }
       log('info', `Controlled proof on ${run.target}: ${run.stopped} ${run.requests} requests, ${run.proven.join(', ') || 'nothing proven'}`)
       return run
     })
@@ -1338,6 +1363,23 @@ function registerIpc(): void {
   logEvents.on('line', (l) => send('logs:line', l))
   jobs.on('changed', (list) => send('jobs:changed', list))
 }
+
+// A crash in the main process must not be a silent quit: it is logged, and the window is told.
+process.on('uncaughtException', (e) => {
+  try {
+    log('error', `Uncaught: ${(e as Error)?.stack ?? String(e)}`)
+    send('notice', { kind: 'error', title: 'MacSec hit an error', body: `${(e as Error)?.message ?? String(e)}. The app is still running; the log has the details.` })
+  } catch {
+    // Nothing left to do if even the log is unavailable.
+  }
+})
+process.on('unhandledRejection', (e) => {
+  try {
+    log('warn', `Unhandled: ${(e as Error)?.message ?? String(e)}`)
+  } catch {
+    /* ignore */
+  }
+})
 
 app.setName('MacSec')
 if (!app.requestSingleInstanceLock()) app.quit()

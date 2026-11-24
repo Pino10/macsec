@@ -125,7 +125,8 @@ async function probe(endpoints: Endpoint[], base: string, auth: ApiAuth, cancell
           const anon = await fetch(url, { headers: anonHeaders, redirect: 'manual', signal: AbortSignal.timeout(15000) })
           const anonBody = (await anon.text()).slice(0, 200_000)
           const keys = /json/.test(anon.headers.get('content-type') ?? '') ? [...sensitiveKeys((() => { try { return JSON.parse(anonBody) } catch { return {} } })())] : []
-          if (anon.status < 300 && (keys.length || anonBody.length > 120)) {
+          const loginPage = /<input[^>]+type=["']?password/i.test(anonBody) || /sign in|log in|login/i.test((anonBody.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '').slice(0, 200))
+          if (anon.status < 300 && !loginPage && (keys.length || anonBody.length > 120)) {
             out.push(f('high', `${e.method} ${e.path} answers without signing in`, { ...where, cwe: 'CWE-306', confidence: 'possible', description: `The description marks this endpoint as one that needs a sign-in, but the same request with no token answered HTTP ${anon.status} and ${anonBody.length.toLocaleString()} bytes${keys.length ? `, including the fields ${keys.slice(0, 5).join(', ')}` : ''}. Either the description is out of date or the endpoint really is open.` }))
           }
         } catch {

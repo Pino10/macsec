@@ -35,7 +35,7 @@ export default function FixPlan({ detail }: { detail: SessionDetail }): React.JS
           <div style={{ display: 'grid', gap: 8 }}>
             {p.chains.map((c) => (
               <div key={c.id}>
-                <Sev s={c.severity} /> <strong>{c.name}</strong>
+                <Sev s={c.severity} /> <strong>{c.name}</strong> <span className="tag">{c.confidence}</span>
                 <div className="hint">{c.story}</div>
                 {c.impact ? <div className="hint">If it is used: {c.impact}</div> : null}
                 {c.breakAt ? (

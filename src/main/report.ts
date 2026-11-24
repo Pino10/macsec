@@ -90,6 +90,7 @@ function findingHtml(f: Finding): string {
   <div class="meta">${f.file ? `<code>${esc(f.file)}${f.line ? `:${f.line}` : ''}</code>` : ''}<span>${esc(f.tool)}</span>${f.cwe ? `<span>${esc(f.cwe)}</span>` : ''}${f.advisory ? `<span>${esc(f.advisory)}</span>` : ''}</div>
   ${f.description ? `<p>${esc(f.description).slice(0, 1500)}</p>` : ''}
   ${contextHtml(f)}
+  ${f.controlled ? `<div class="fix"><b>Proven by a controlled proof</b> under engagement ${esc(f.controlled.engagementRef)} (run ${esc(f.controlled.runId)}, ${esc(f.controlled.at.slice(0, 10))}).<ul>${f.controlled.shows.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''}
   ${f.proof ? `<div class="fix" style="background:#f1f5f9"><b>${f.confidence === 'possible' ? 'The evidence (not proof)' : 'The proof'}</b><ul>${f.proof.shows.map((s) => `<li>${esc(s)}</li>`).join('')}</ul><p><code>${esc(f.proof.request)}</code> answered HTTP ${f.proof.status}, ${f.proof.bytes} bytes, SHA-256 <code>${esc(f.proof.sha256.slice(0, 16))}…</code>, seen ${esc(f.proof.at)}.</p><p><code>${esc(f.proof.reproduce)}</code></p></div>` : ''}
   ${f.why || f.aiNote ? `<p><b>Why it is rated ${f.severity}:</b> ${esc(f.why ?? f.aiNote)}</p>` : ''}
   ${f.impact ? `<p><b>Impact:</b> ${esc(f.impact)}</p>` : ''}
@@ -99,7 +100,7 @@ function findingHtml(f: Finding): string {
 }
 
 /** One or two pages for someone who will not read the findings: how it stands, what to fix first, and how it connects. */
-export function executiveHtml(s: SessionDetail, plan: { actions: { title: string; fix: string; count: number; worst: string; drop: number }[]; before: number; after: number }, chains: { name: string; story: string; impact?: string; severity: string; members: { title: string }[]; breakAt?: { title: string; fix: string } }[]): string {
+export function executiveHtml(s: SessionDetail, plan: { actions: { title: string; fix: string; count: number; worst: string; drop: number }[]; before: number; after: number }, chains: { name: string; story: string; impact?: string; severity: string; confidence?: string; members: { title: string }[]; breakAt?: { title: string; fix: string } }[]): string {
   const open = s.findings.filter((f) => f.verdict !== 'false-positive' && !f.triage && f.severity !== 'info')
   const n = (state: string): number => open.filter((f) => f.exploit?.state === state).length
   const sc = score(s.counts)
@@ -133,7 +134,7 @@ export function executiveHtml(s: SessionDetail, plan: { actions: { title: string
 </div>
 <h2>Fix these first</h2>
 ${plan.actions.length ? `<p>Doing the ${plan.actions.length} actions below takes the risk score from <b>${plan.before}</b> to <b>${plan.after}</b> (out of 100, lower is better).</p>${plan.actions.map((a, i) => `<div class="act"><b>${i + 1}. ${esc(a.title)}</b><br><small>${esc(a.worst)} · ${a.count} finding${a.count === 1 ? '' : 's'} · removes ${a.drop} point${a.drop === 1 ? '' : 's'}</small>${a.fix ? `<br>${esc(a.fix.slice(0, 300))}` : ''}</div>`).join('')}` : '<p>Nothing open needs fixing.</p>'}
-${chains.length ? `<h2>How the problems connect</h2>${chains.map((c) => `<div class="chain"><b>${esc(c.name)}</b> (${esc(c.severity)})<br>${esc(c.story)}${c.impact ? `<br><i>${esc(c.impact)}</i>` : ''}${c.breakAt ? `<br><b>Break it here: ${esc(c.breakAt.title)}.</b> ${esc(c.breakAt.fix)}` : ''}<br><small>${c.members.map((m) => esc(m.title)).join(' + ')}</small></div>`).join('')}` : ''}
+${chains.length ? `<h2>How the problems connect</h2>${chains.map((c) => `<div class="chain"><b>${esc(c.name)}</b> (${esc(c.severity)}${c.confidence ? `, ${esc(c.confidence)}` : ''})<br>${esc(c.story)}${c.impact ? `<br><i>${esc(c.impact)}</i>` : ''}${c.breakAt ? `<br><b>Break it here: ${esc(c.breakAt.title)}.</b> ${esc(c.breakAt.fix)}` : ''}<br><small>${c.members.map((m) => esc(m.title)).join(' + ')}</small></div>`).join('')}` : ''}
 <h2>What was checked</h2>
 <p>${s.steps.filter((x) => x.status === 'done').length} of ${s.steps.length} steps finished${s.steps.some((x) => x.status === 'failed') ? ` (${s.steps.filter((x) => x.status === 'failed').length} could not run)` : ''}.</p>
 <div class="foot">"Proven" means a harmless request showed the problem and the proof can be repeated. Nothing was exploited and no data was changed. Findings marked "not proven" are leads for a person to test. Session ${esc(s.id)}.</div>

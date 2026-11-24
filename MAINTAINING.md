@@ -63,6 +63,13 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.19
+
+- `netclient.ts`: a request that connects to the approved address (lookup pinned), used by `ConfirmClient`. `NetGuard.addressFor()` keeps it. Tools get no session credentials; `webscan.ts` has its own signed-in walk.
+- `releasekey.ts` + `releasesign.ts`: the release public key and `verifyChecksums()`. `.github/workflows/release.yml` signs `SHA256SUMS.txt` with the `MACSEC_SIGNING_KEY` secret and fails without it. To rotate: generate a new Ed25519 pair, replace `build/release-signing.pub` and `releasekey.ts`, set the secret, and remember that old releases can no longer be verified by new apps.
+- `impact/link.ts`: `attachProof()` puts the proof on the finding; `index.ts` links proven steps to the session that holds the finding.
+- `SECURITY.md` and `THREAT_MODEL.md`.
+
 ### Added in 1.18
 
 - `chains.ts`: 16 path rules, `impact` and `breakAt` on every chain; rendered in the Attack paths tab, the fix plan, the executive PDF and Assets.

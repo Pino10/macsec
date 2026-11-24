@@ -171,6 +171,7 @@ function RunResult({ run }: { run: ImpactRun }): React.JSX.Element {
         <strong>{run.stopped}</strong>
         <span className="hint">
           {run.requests} requests, {run.writes} writes, {run.steps.length} step{run.steps.length === 1 ? '' : 's'}
+          {run.linked?.length ? `, ${run.linked.length} finding${run.linked.length === 1 ? '' : 's'} marked Proven` : ''}
         </span>
       </div>
       <div className="chips" style={{ marginTop: 10 }}>

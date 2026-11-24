@@ -33,6 +33,35 @@ export function cancelSession(id: string): void {
   cancelOp(id)
 }
 
+/**
+ * A settings file for this review only: the reviewer may read the project, but not the person's
+ * credentials. Claude Code reads this next to its own settings, and the deny list wins.
+ */
+function writeClaudeSettings(dir: string): string {
+  const file = join(dir, 'claude-settings.json')
+  const deny = [
+    'Read(//**/.ssh/**)',
+    'Read(//**/.aws/**)',
+    'Read(//**/.gnupg/**)',
+    'Read(//**/.kube/**)',
+    'Read(//**/.docker/**)',
+    'Read(//**/.config/gcloud/**)',
+    'Read(//**/Library/Keychains/**)',
+    'Read(//**/Library/Application Support/Claude/**)',
+    'Read(//**/.netrc)',
+    'Read(//**/.npmrc)',
+    'Read(//**/.git-credentials)',
+    'Read(//**/id_rsa)',
+    'Read(//**/id_ed25519)'
+  ]
+  try {
+    writeFileSync(file, JSON.stringify({ permissions: { deny } }, null, 2))
+    return file
+  } catch {
+    return ''
+  }
+}
+
 function sourceLabel(req: ReviewRequest): { title: string; target: string } {
   const s = req.source
   if (s.kind === 'local') return { title: s.path.split('/').pop() ?? s.path, target: s.path }
@@ -243,7 +272,8 @@ async function runReview(id: string, req: ReviewRequest): Promise<void> {
           const chosen = chosenPluginArgs(req.skills ?? [], skillDir, root)
           info.skills = chosen.names
           saveSession(info)
-          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) }, req.reviewer === 'claude-local' ? chosenLocal() : req.reviewer === 'claude-free' ? freeServer() : undefined, req.reviewer === 'claude-free', chosen.args)
+          const settingsPath = writeClaudeSettings(dir)
+          res = await reviewWithClaude(root, prompt, req.depth, (c) => r.children.add(c), beat, { id: info.claudeSession, name: `MacSec review: ${info.title}`.slice(0, 80) }, req.reviewer === 'claude-local' ? chosenLocal() : req.reviewer === 'claude-free' ? freeServer() : undefined, req.reviewer === 'claude-free', chosen.args, settingsPath)
         }
         else if (req.reviewer === 'gemini') res = await reviewWithGemini(root, prompt, req.depth, (c) => r.children.add(c), beat)
         else if (req.reviewer === 'codex') res = await reviewWithCodex(root, prompt, req.depth, join(raw, 'codex-last.md'), (c) => r.children.add(c), beat)

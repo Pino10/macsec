@@ -108,7 +108,6 @@ export function parseHeaders(raw: string | undefined): Record<string, string> {
   }
   return out
 }
-const headerArgs = (h: Record<string, string>, flag: string): string[] => Object.entries(h).flatMap(([k, v]) => [flag, `${k}: ${v}`])
 
 const templatesFresh = (): boolean => {
   const d = nucleiTemplatesDir()
@@ -219,13 +218,14 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     crawl: m.depth ? s.step('katana', `Map the site, ${m.depth} levels deep`) : null,
     files: s.step('exposed', `Look for files that should not be public (${m.paths})`),
     discover: req.confirm?.discover ? s.step('ffuf', 'Content discovery with ffuf, then each hit proved') : null,
-    deception: s.step('deception', 'Check whether the site is a WAF honeypot'),
+    deception: req.mode === 'quick' ? null : s.step('deception', 'Check whether the site is a WAF honeypot'),
     js: m.depth ? s.step('js', 'Look for keys in the site’s public JavaScript') : null,
     infra: s.step('infra', 'Firewall, CDN, hosting, DNS and mail settings'),
     devops: s.step('devops', 'DevOps and infrastructure left open (Jenkins, Grafana, registries, clusters, state files, Git)'),
     jsdeep: m.depth ? s.step('jsdeep', 'JavaScript analysis: routes, hidden chunks, source maps, risks') : null,
     cves: s.step('cves', 'Known flaws for the versions found (live count from NVD, CISA and EPSS)'),
     access: m.depth && Object.keys(headers).length ? s.step('access', 'Compare private pages signed in and signed out') : null,
+    walk: m.depth && Object.keys(headers).length ? s.step('walk', 'Walk the pages only a signed-in member sees') : null,
     fuzz: req.confirm?.fuzz ? s.step('fuzz', 'Control confirmation: hidden pages and parameters') : null,
     waf: req.confirm?.waf ? s.step('waf', 'Control confirmation: web firewall tests') : null,
     logic: req.confirm?.logic ? s.step('logic', 'Control confirmation: business logic (redirects, host header, code limits, skipped steps)') : null,
@@ -245,7 +245,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
   try {
     await s.run(st.fp, async (note, line) => {
       await ensure('httpx')
-      const out = await runTool({ name: 'httpx', bin: 'httpx', args: ['-u', url, '-json', '-silent', '-tech-detect', '-title', '-status-code', '-web-server', '-follow-redirects', '-no-color', ...headerArgs(headers, '-H')], timeoutMs: 120_000 }, op, s.raw, line)
+      const out = await runTool({ name: 'httpx', bin: 'httpx', args: ['-u', url, '-json', '-silent', '-tech-detect', '-title', '-status-code', '-web-server', '-follow-redirects', '-no-color'], timeoutMs: 120_000 }, op, s.raw, line)
       fp = parseHttpx(out)
       const f = fp[0]
       if (!f) throw new Error('The site did not answer.')
@@ -253,11 +253,27 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       note([f.status && `Status ${f.status}`, f.server, ...f.tech.slice(0, 5)].filter(Boolean).join(', '))
     })
 
-    await s.run(st.headers, async () => {
-      const res = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'MacSec header check', ...headers }, signal: AbortSignal.timeout(20000) })
-      await res.body?.cancel()
-      const found = checkHeaders(res.url || url, res.headers, res.headers.getSetCookie())
-      if (url.startsWith('http://') && !isLocalTarget(url) && !res.url.startsWith('https://')) found.push({ id: fid('nohttps', host), tool: 'MacSec', category: 'web', severity: 'high', title: 'Visitors are not moved to HTTPS', url, file: url, cwe: 'CWE-319', fix: 'Redirect every http:// request to https:// and send Strict-Transport-Security.' })
+    await s.run(st.headers, async (note) => {
+      // Manual redirects, and only ever to the same host: a session cookie never travels to a
+      // redirect target, and a site that redirects gets its headers checked where it answers.
+      const agent = mk(6)
+      let r = await agent.get('/')
+      let moved = ''
+      if (r.status >= 300 && r.status < 400) {
+        const loc = r.headers.get('location') ?? ''
+        try {
+          const next = new URL(loc, url)
+          if (next.host === host) {
+            moved = next.href
+            r = await agent.get(next.href)
+          }
+        } catch {
+          // A location that is not an address: nothing to follow.
+        }
+      }
+      const found = checkHeaders(moved || r.url || url, r.headers, r.headers.getSetCookie?.() ?? [])
+      if (url.startsWith('http://') && !isLocalTarget(url) && !(moved ? moved.startsWith('https://') : r.url.startsWith('https://'))) found.push({ id: fid('nohttps', host), tool: 'MacSec', category: 'web', severity: 'high', title: 'Visitors are not moved to HTTPS', url, file: url, cwe: 'CWE-319', fix: 'Redirect every http:// request to https:// and send Strict-Transport-Security.' })
+      if (moved) note(`Redirected to ${moved.startsWith('https://') ? 'HTTPS' : 'another address'} on the same host`)
       return found
     })
 
@@ -265,13 +281,46 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       await s.run(st.crawl, async (note, line) => {
         await ensure('katana')
         const out = join(s.raw, 'katana.jsonl')
-        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode !== 'quick' ? ['-jc'] : []), ...(req.mode !== 'quick' ? ['-jsluice'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out, ...headerArgs(headers, '-H')], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
+        await runTool({ name: 'katana', bin: 'katana', args: ['-u', url, '-jsonl', '-silent', '-nc', '-d', String(m.depth), ...(req.mode !== 'quick' ? ['-jc'] : []), ...(req.mode !== 'quick' ? ['-jsluice'] : []), '-ct', `${m.crawlSecs}s`, '-rl', String(m.rate), '-c', '5', '-fs', 'rdn', '-o', out], timeoutMs: (m.crawlSecs + 120) * 1000, output: out }, op, s.raw, line).catch((e) => {
           if (!existsSync(out)) throw e
           return ''
         })
         urls = [...new Set([url, ...seeds, ...parseKatana(existsSync(out) ? readFileSync(out, 'utf8') : '', host)])].slice(0, 3000)
         writeFileSync(urlsFile, urls.join('\n'))
         note(`${urls.length} pages and endpoints${seeds.length ? ` (${seeds.length} from recon)` : ''}`)
+      })
+
+    // The signed-in surface, walked by MacSec itself: the tools get no cookie, so this is the one
+    // place a session is used for discovery, with its own cap and pause, and only on this host.
+    if (st.walk)
+      await s.run(st.walk, async (note) => {
+        const agent = mk(120)
+        const known = new Set(urls)
+        const queue = urls.filter((u) => !u.includes('?')).slice(0, 12)
+        let added = 0
+        while (queue.length && known.size < 400 && agent.left() > 4 && !s.cancelled) {
+          const page = queue.shift() as string
+          const r = await agent.get(page).catch(() => null)
+          if (!r || r.status !== 200 || !/html/i.test(r.headers.get('content-type') ?? '')) continue
+          for (const m of r.body.matchAll(/\b(?:href|src|action)=["']([^"'#]+)["']/gi)) {
+            try {
+              const next = new URL(m[1], r.url)
+              if (next.host !== host || /\.(png|jpe?g|gif|svg|ico|webp|css|js|map|woff2?|ttf|eot|pdf|zip|mp4|mp3)$/i.test(next.pathname)) continue
+              const key = `${next.origin}${next.pathname}`
+              if (known.has(key)) continue
+              known.add(key)
+              queue.push(key)
+              urls.push(key)
+              added++
+            } catch {
+              // Not an address.
+            }
+          }
+        }
+        urls = [...new Set(urls)].slice(0, 3000)
+        writeFileSync(urlsFile, urls.join('\n'))
+        note(`${added} member-only pages added to the list (${urls.length} in all)`)
+        return []
       })
 
     if (st.tls) await s.run(st.tls, () => checkTls(url))
@@ -328,7 +377,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         return found
       })
 
-    await s.run(st.deception, async (note) => {
+    if (st.deception) await s.run(st.deception, async (note) => {
       const c = mk(20)
       const home = await c.get('/').catch(() => null)
       if (!home) return []
@@ -605,7 +654,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
       if (!bin) return note('Nuclei’s WordPress checks run below. Install WPScan for plugin and theme versions.')
       const out = join(s.raw, 'wpscan.json')
       // Passive plugin detection and read-only checks: no password guessing, no user lists.
-      await runTool({ name: 'wpscan', bin, absolute: true, args: ['--url', url, '--format', 'json', '--output', out, '--no-banner', '--random-user-agent', '--plugins-detection', 'passive', '--enumerate', 'vp,vt,cb,dbe', '--throttle', '150', ...(Object.keys(headers).length ? ['--headers', Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('; ')] : [])], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
+      await runTool({ name: 'wpscan', bin, absolute: true, args: ['--url', url, '--format', 'json', '--output', out, '--no-banner', '--random-user-agent', '--plugins-detection', 'passive', '--enumerate', 'vp,vt,cb,dbe', '--throttle', '150'], timeoutMs: 30 * 60_000, output: out }, op, s.raw, line).catch((e) => {
         if (!existsSync(out)) throw e
         return ''
       })
@@ -634,7 +683,6 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
         ...(req.mode === 'quick' ? ['-severity', 'critical,high,medium'] : []),
         '-duc', '-nc', '-silent', '-jsonl', '-o', out, '-stats', '-sj', '-si', '5',
         '-rl', String(m.rate), '-c', '10', '-timeout', '10', '-retries', '1',
-        ...headerArgs(headers, '-H')
       ]
       await runTool({ name: 'nuclei', bin: 'nuclei', args, timeoutMs: (req.mode === 'thorough' ? 120 : 45) * 60_000, output: out }, op, s.raw, line).catch((e) => {
         if (!existsSync(out)) throw e

@@ -125,6 +125,8 @@ export interface Finding {
   alsoFoundBy?: string[]
   /** Marked "not a problem" by a rule you saved earlier, not by hand in this session. */
   remembered?: boolean
+  /** Proven by a controlled proof: which run, under which engagement, and what it showed. */
+  controlled?: { runId: string; engagementRef: string; at: string; shows: string[] }
 }
 
 export type Reviewer = 'none' | 'claude' | 'claude-local' | 'claude-free' | 'codex' | 'gemini' | 'model'
@@ -859,6 +861,8 @@ export interface Chain {
   members: { id: string; title: string; severity: Severity; fix?: string }[]
   /** One level above the worst part, because together they are worse than any one alone. */
   severity: Severity
+  /** likely: every part is confirmed or proven. possible: at least one part is only a lead. */
+  confidence: 'likely' | 'possible'
   /** The cheapest single fix that breaks the whole path. */
   breakAt?: { id: string; title: string; fix: string }
 }

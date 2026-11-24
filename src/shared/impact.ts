@@ -193,6 +193,8 @@ export interface ImpactRun {
   steps: ImpactStepResult[]
   leftover: ImpactLeftover[]
   stopped: string
+  /** The finding ids this run proved, when a step was planned from one. */
+  linked?: string[]
   requests: number
   writes: number
 }

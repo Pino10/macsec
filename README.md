@@ -66,10 +66,11 @@ The AI reviewer works through 48 security skills, including attack chains, API a
 
 ## Privacy and safety
 
+- Releases are signed with a key that lives only in the release workflow, and the app refuses an unsigned update.
 - Your projects are read in place and never changed. Repositories are cloned into the session's own folder and **deleted when the review ends** unless you choose to keep them.
 - Tokens (GitHub, Azure DevOps) are stored with the macOS Keychain and only ever sent to the service they belong to. They are hidden from the logs.
 - TruffleHog runs without verification, so keys it finds are never sent to their providers.
-- Scanners run with telemetry off.
+- Scanners run with telemetry off, and they never receive your session cookie: a signed-in crawl is MacSec's own, and its requests connect to the address the guard approved, not a fresh DNS answer.
 - Claude Code and Codex run read-only (Claude Code in plan mode with only Read, Grep and Glob; Codex in its read-only sandbox), and Claude Code's review session is not saved.
 
 - Mobile checks read the app, including its compiled code and signing, without running it. The optional online check asks once, read only, about the Firebase, S3 and Google Storage addresses inside it. Every web and API scan also saves a test plan built from your checklist, reads the site's JavaScript (hidden chunks, source maps, routes), checks the firewall, DNS and DevOps tools around it, and counts known flaws for the versions it finds from NVD, CISA and EPSS. Findings are labelled Proven, Known exploited, Likely or Not proven.  The optional live phone test (Android `.apk` only) runs the app on an emulator or a phone you confirm, only watches it with Frida (no taps, no typing, no bypass scripts), never saves a secret's value, and removes the app again if MacSec installed it. A built app is unpacked inside its session (with macOS's own tar, which refuses paths that escape the folder) and deleted when the check ends.

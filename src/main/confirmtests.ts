@@ -12,6 +12,7 @@
  * harmless markers are sent. Nothing is reported until a second request has repeated it.
  */
 import { NetGuard } from './netguard'
+import { pinnedRequest } from './netclient'
 import { createHash, randomBytes } from 'crypto'
 import type { Finding, Severity } from '../shared/types'
 import { fid } from './scanners/parse'
@@ -100,8 +101,12 @@ export class ConfirmClient {
     }
     const t = Date.now()
     try {
-      const r = await (this.o.fetchImpl ?? fetch)(url, { method, redirect: 'manual', headers, body, signal: AbortSignal.timeout(15000) })
-      const text = r.status >= 300 && r.status < 400 ? '' : (await r.text()).slice(0, 200000)
+      // No redirects (manual), and the address is the one the guard approved, never a fresh lookup.
+      const address = this.guard?.addressFor(new URL(url).hostname) ?? null
+      const r = this.o.fetchImpl
+        ? await this.o.fetchImpl(url, { method, redirect: 'manual', headers, body, signal: AbortSignal.timeout(15000) })
+        : await pinnedRequest(url, { method, headers, body, timeoutMs: 15000, address, maxBytes: 200_000 })
+      const text = r.status >= 300 && r.status < 400 ? '' : ('text' in r && typeof (r as { text?: unknown }).text === 'function' ? (await (r as Response).text()).slice(0, 200000) : (r as { body: string }).body.slice(0, 200000))
       this.bad = r.status >= 500 ? this.bad + 1 : 0
       if (this.bad >= 5) this.stopped = 'The server started to struggle (several errors in a row), so the checks stopped to avoid harming it.'
       return { status: r.status, headers: r.headers, body: text, url, method, ms: Date.now() - t }

@@ -12,16 +12,18 @@ import { postureOf, postureScore } from '../src/renderer/src/components/ThreatCo
 const rel = (tag: string, assets: string[], extra: Partial<Release> = {}): Release => ({ tag_name: tag, draft: false, body: `Notes ${tag}`, published_at: '2026-11-04T12:00:00Z', html_url: `https://github.com/Pino10/macsec/releases/tag/${tag}`, assets: assets.map((name) => ({ name, browser_download_url: `https://example.invalid/${name}` })), ...extra })
 
 describe('MacSec updates itself', () => {
-  it('offers the newest release that has this Mac’s DMG and checksums', () => {
-    const list = [rel('v0.4.0', ['MacSec-0.4.0-arm64.dmg', 'SHA256SUMS.txt']), rel('v0.6.0', ['MacSec-0.6.0-arm64.dmg', 'MacSec-0.6.0-x64.dmg', 'SHA256SUMS.txt']), rel('v0.7.0', ['MacSec-0.7.0-arm64.dmg', 'SHA256SUMS.txt'], { draft: true })]
+  it('offers the newest release that has this Mac’s DMG, its checksums and their signature', () => {
+    const list = [rel('v0.4.0', ['MacSec-0.4.0-arm64.dmg', 'SHA256SUMS.txt', 'SHA256SUMS.txt.sig']), rel('v0.6.0', ['MacSec-0.6.0-arm64.dmg', 'MacSec-0.6.0-x64.dmg', 'SHA256SUMS.txt', 'SHA256SUMS.txt.sig']), rel('v0.7.0', ['MacSec-0.7.0-arm64.dmg', 'SHA256SUMS.txt', 'SHA256SUMS.txt.sig'], { draft: true })]
     const u = pickUpdate(list, '0.5.0', 'arm64')!
     expect(u.info).toMatchObject({ version: '0.6.0', current: '0.5.0' })
     expect(u.dmg).toContain('MacSec-0.6.0-arm64.dmg')
   })
   it('never offers a release it cannot verify, or an older one', () => {
     expect(pickUpdate([rel('v0.6.0', ['MacSec-0.6.0-arm64.dmg'])], '0.5.0', 'arm64')).toBeNull()
-    expect(pickUpdate([rel('v0.5.0', ['MacSec-0.5.0-arm64.dmg', 'SHA256SUMS.txt'])], '0.5.0', 'arm64')).toBeNull()
-    expect(pickUpdate([rel('v0.6.0', ['MacSec-0.6.0-x64.dmg', 'SHA256SUMS.txt'])], '0.5.0', 'arm64')).toBeNull()
+    expect(pickUpdate([rel('v0.5.0', ['MacSec-0.5.0-arm64.dmg', 'SHA256SUMS.txt', 'SHA256SUMS.txt.sig'])], '0.5.0', 'arm64')).toBeNull()
+    expect(pickUpdate([rel('v0.6.0', ['MacSec-0.6.0-x64.dmg', 'SHA256SUMS.txt', 'SHA256SUMS.txt.sig'])], '0.5.0', 'arm64')).toBeNull()
+    // A release without a signature is never offered.
+    expect(pickUpdate([rel('v0.6.0', ['MacSec-0.6.0-arm64.dmg', 'SHA256SUMS.txt'])], '0.5.0', 'arm64')).toBeNull()
   })
 })
 
