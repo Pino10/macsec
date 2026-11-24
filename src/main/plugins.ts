@@ -10,6 +10,7 @@ import type { Finding, PluginDef, PluginRun, SessionInfo, Severity } from '../sh
 import { dirs } from './paths'
 import { readSession, saveFindings, sessionDetail, sessionDir } from './sessions'
 import { currentEngagement, engagementProblem } from './engagement'
+import { getSettings } from './settings'
 import { startMeteredProxy } from './pluginproxy'
 import { fid } from './scanners/parse'
 import { log } from './logs'
@@ -53,6 +54,11 @@ export function savePlugin(input: unknown): PluginDef[] {
   const plugin: PluginDef = { id: `pl-${randomBytes(4).toString('hex')}`, name, bin, args, parser, ...(pattern ? { pattern } : {}), severity, metering, ...(containerImage ? { containerImage } : {}), ...(typeof p.description === 'string' ? { description: p.description.slice(0, 500) } : {}) }
   write([plugin, ...list])
   return listPlugins()
+}
+
+export function clearPlugins(): PluginDef[] {
+  write([])
+  return []
 }
 
 export function deletePlugin(id: string): PluginDef[] {
@@ -150,11 +156,16 @@ export function parsePluginOutput(text: string, plugin: PluginDef, fallbackLocat
   return out
 }
 
-const dockerPath = (): string => process.env.MACSEC_DOCKER || [join(dirs.root(), 'tools', 'bin', 'docker'), '/opt/homebrew/bin/docker', '/usr/local/bin/docker', '/usr/bin/docker'].find((p) => existsSync(p)) || 'docker'
+const dockerPath = (): string => getSettings().container?.dockerPath || process.env.MACSEC_DOCKER || [join(dirs.root(), 'tools', 'bin', 'docker'), '/opt/homebrew/bin/docker', '/usr/local/bin/docker', '/usr/bin/docker'].find((p) => existsSync(p)) || 'docker'
+
+const dockerEnv = (): NodeJS.ProcessEnv => {
+  const c = getSettings().container ?? {}
+  return { ...process.env, ...(c.dockerHost ? { DOCKER_HOST: c.dockerHost } : {}), ...(c.home ? { HOME: c.home } : {}), ...(c.colimaHome ? { COLIMA_HOME: c.colimaHome } : {}), ...(c.limaHome ? { LIMA_HOME: c.limaHome } : {}), ...(c.dockerPath ? { MACSEC_DOCKER: c.dockerPath } : {}) }
+}
 
 const execDocker = (args: string[], timeout = 30_000): Promise<{ out: string; err: string }> =>
   new Promise((resolve) => {
-    execFile(dockerPath(), args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (e, stdout, stderr) => resolve({ out: String(stdout ?? ''), err: e ? String(stderr ?? e.message) : '' }))
+    execFile(dockerPath(), args, { timeout, maxBuffer: 4 * 1024 * 1024, env: dockerEnv() }, (e, stdout, stderr) => resolve({ out: String(stdout ?? ''), err: e ? String(stderr ?? e.message) : '' }))
   })
 
 export function containerArgs(p: PluginDef, name: string, network: string, proxy: string, target: string, host: string): string[] {
@@ -201,7 +212,7 @@ async function runContainerPlugin(sessionId: string, p: PluginDef, confirmed: bo
     const proxyUrl = `http://host.docker.internal:${new URL(proxy.url).port}`
     const args = containerArgs(p, name, net, proxyUrl, target, host)
     const out = await new Promise<string>((resolve, reject) => {
-      execFile(dockerPath(), args, { cwd: sessionDir(sessionId), timeout: 10 * 60_000, maxBuffer: 8 * 1024 * 1024, env: process.env }, (err, stdout, stderr) => {
+      execFile(dockerPath(), args, { cwd: sessionDir(sessionId), timeout: 10 * 60_000, maxBuffer: 8 * 1024 * 1024, env: dockerEnv() }, (err, stdout, stderr) => {
         if (err && !stdout) return reject(new Error(`${p.name} failed: ${String(stderr).trim().split('\n').slice(-2).join(' ')}`))
         resolve(String(stdout))
       })

@@ -1,3 +1,38 @@
+## 1.41.0
+
+The container runtime is now managed from MacSec, and what MacSec installs can be removed from
+MacSec.
+
+### Container runtime
+
+- **Tools → Container runtime** shows whether Docker and Colima are reachable, the Docker version,
+  and the runtime path.
+- Set the Docker binary and Docker host, start and stop Colima, and see the status without a
+  terminal.
+- The runtime on this Mac is already configured: the app reads the Docker binary and socket from
+  its own settings.
+- **Uninstall runtime** stops Colima, clears the MacSec link, and deletes the runtime folder when it
+  is the managed folder. An external Homebrew install is stopped and unlinked, never deleted behind
+  your back; the page says which happened.
+- The uninstall removes only the container runtime link and a validated runtime bundle. It does not
+  delete your own images or arbitrary folders.
+
+### Plugin cleanup
+
+- **Plugins → Remove all definitions** clears the plugin configuration. It does not delete binaries
+  or images; those are shown where they live.
+
+### Honest limit
+
+- MacSec manages what it can prove it owns: the configured runtime folder and its own plugin
+  definitions. Android Studio, Homebrew and Docker Desktop are external applications; MacSec will
+  not silently uninstall a system package. If the runtime was installed outside MacSec, use its own
+  uninstaller.
+
+660 tests (655 passed, 5 skipped).
+
+---
+
 ## 1.40.0
 
 The AD review module: read a BloodHound export and report what it actually shows.

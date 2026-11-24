@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.41.0
+
+- `containerruntime.ts` + Container runtime Tools card: status, configure, start/stop, uninstall (managed folder only); `container:*` IPC.
+- `plugins:clear` for plugin definitions.
+
 ### Added in 1.40.0
 
 - `adreview.ts`: BloodHound JSON/ZIP/JSONL parsing and AD findings; `ad-audit` session kind; `ad:pick`/`ad:start`; AD review page.
