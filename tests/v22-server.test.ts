@@ -84,8 +84,11 @@ describe('Metasploit stays check-only', () => {
   })
   it('every module in the list is a plain module path and none reads files or memory', () => {
     for (const m of MODULES) {
-      expect(m.module).toMatch(/^(auxiliary\/scanner|exploit)\/[a-z0-9_/]+$/)
+      // Only scanner modules. An exploit module's check may run code, so it is never on this list.
+      expect(m.module).toMatch(/^auxiliary\/scanner\/[a-z0-9_/]+$/)
+      expect(m.module).not.toMatch(/exploit/)
       expect(m.module).not.toMatch(/heartbleed|file_disclosure|ghostcat|gather|dump|read/)
+      expect(moduleFor('CVE-2017-5638')).toBeNull()
     }
     expect(moduleFor('cve-2017-0144')?.module).toContain('ms17_010')
     expect(moduleFor('CVE-1999-0001')).toBeNull()
@@ -105,7 +108,7 @@ describe('Metasploit stays check-only', () => {
       seen.push(args)
       return args[3].includes('smb_ms17_010') ? '[+] 10.0.0.5:445 - The target is vulnerable.' : '[*] x - The target is not exploitable.'
     }
-    const out = await msfChecks([{ cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }, { cve: 'CVE-2022-22965', host: '10.0.0.5', port: 8080 }, { cve: 'CVE-2000-0001', host: '10.0.0.5', port: 80 }, { cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }], { bin: '/x/msfconsole', run, approved: ['auxiliary/scanner/smb/smb_ms17_010', 'exploit/multi/http/spring_framework_rce_spring4shell'] })
+    const out = await msfChecks([{ cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }, { cve: 'CVE-2021-41773', host: '10.0.0.5', port: 80 }, { cve: 'CVE-2000-0001', host: '10.0.0.5', port: 80 }, { cve: 'CVE-2017-5638', host: '10.0.0.5', port: 8080 }, { cve: 'CVE-2017-0144', host: '10.0.0.5', port: 445 }], { bin: '/x/msfconsole', run, approved: ['auxiliary/scanner/smb/smb_ms17_010', 'auxiliary/scanner/http/apache_normalize_path'] })
     expect(out).toHaveLength(1)
     expect(out[0]).toMatchObject({ confidence: 'confirmed', tool: 'Metasploit (check only)' })
     expect(out[0].proof?.reproduce).toContain('check; exit -y')

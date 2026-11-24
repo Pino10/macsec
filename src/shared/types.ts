@@ -1,4 +1,5 @@
 /** Everything the window and the main process say to each other. */
+import type { Engagement, EngagementDraft, ImpactActionInfo, ImpactPlan, ImpactPlanRequest, ImpactProgress, ImpactRun, ImpactRunRequest } from './impact'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 export const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
@@ -687,6 +688,17 @@ export interface Channels {
 
   'logs:list': { args: []; result: LogLine[] }
   'logs:clear': { args: []; result: void }
+
+  // ---- Controlled proofs: proving impact under a written engagement
+  'impact:engagements': { args: []; result: Engagement[] }
+  'impact:current': { args: []; result: Engagement | null }
+  'impact:save-engagement': { args: [EngagementDraft]; result: Engagement }
+  'impact:revoke': { args: [string]; result: Engagement }
+  'impact:catalog': { args: []; result: ImpactActionInfo[] }
+  'impact:plan': { args: [ImpactPlanRequest]; result: { plan: ImpactPlan; cost: { chars: number; tokens: number; calls: number } | null } }
+  'impact:run': { args: [ImpactRunRequest]; result: ImpactRun }
+  'impact:stop': { args: []; result: boolean }
+  'impact:runs': { args: []; result: ImpactRun[] }
 }
 
 export interface Events {
@@ -701,6 +713,8 @@ export interface Events {
   'watch:alert': { title: string; body: string }
   /** A message for the notification toasts and history. */
   notice: { kind: 'info' | 'success' | 'error'; title: string; body?: string }
+  /** A line from a controlled proof that is running. */
+  'impact:progress': ImpactProgress
 }
 
 export interface MacSecApi {

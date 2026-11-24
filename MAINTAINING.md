@@ -50,14 +50,23 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 | `components/LiveRun.tsx` | The live progress panel. Tools' output reaches it through `SessionRun.line()` (redacted, then `friendly()`), and `percentOf()` reads percentages. |
 | `src/main/aisummary.ts` | The AI summary for web and API scans (it reads the findings only). |
 | `src/renderer/src/macsec.css` | The whole design: colours, glass, controls. `components/ThreatCore.tsx` is the posture orb. |
+| `src/main/validate.ts` | Every input rule as a pure function: hosts, scope hosts, windows, caps, impacts, the `EXPLOIT host` phrase. No Electron import, so it is unit tested. |
+| `src/main/engagement.ts` | The written authority a controlled proof stands on, and the one function that says why a run may not happen. |
+| `src/main/impact/` | Controlled proofs: `catalog.ts` (what each proof sends and never does), `client.ts` (the only client that can send a real request), `actions.ts` (the bounded runners), `planner.ts` (rules first, one optional AI call), `campaign.ts` (the gate, the run, the cleanup, the record). |
 | `src/shared/types.ts` | Every message between the window and the main process (`Channels`). |
-| `src/renderer/src/pages/` | One file per page. Styles are in `theme.css`. |
+| `src/renderer/src/pages/` | One file per page. Styles are in `macsec.css`. |
 
 **Adding a scanner:** add it to `CATALOG` in `toolbox.ts`, add a parser in `parse.ts` (with a test using real output), and add it to `planScanners` in `plan.ts`. If its release files are named oddly, add a case to the "picking the right download" tests.
 
 **Adding a Semgrep rule set:** add its `p/...` name in `plan.ts`. If a pack ever disappears, Semgrep falls back to `p/default` on its own.
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
+
+### Added in 1.14 (controlled proofs)
+
+- `src/main/impact/` and `src/main/engagement.ts`: the engagement gate, the catalogue, the bounded runners, the planner and the campaign. The rules that must not be broken are in CLAUDE.md under "Controlled proofs".
+- `src/main/validate.ts`: the input rules, extracted from `index.ts` so they can be tested without Electron.
+- `tests/v31-impact.test.ts`: the refusals first (no engagement, revoked, outside the window, wrong phrase, no approval, a write without integrity, a write without the leftover acknowledgement, off-site steps, the kill switch), then the proofs with injected fetch.
 
 ### Added in 0.11
 

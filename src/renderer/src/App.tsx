@@ -3,6 +3,7 @@ import { Download, Plus } from 'lucide-react'
 import type { UpdateInfo } from '@shared/types'
 import { AppProvider, useApp } from './store'
 import { NotificationLayer } from './components/Notifications'
+import ErrorBoundary from './components/ErrorBoundary'
 import Rail, { PAGE_ORDER } from './components/Rail'
 import ThisMac from './pages/ThisMac'
 import JobsBar from './components/JobsBar'
@@ -13,6 +14,7 @@ import CodeReview from './pages/CodeReview'
 import WebScan from './pages/WebScan'
 import ApiSecurity from './pages/ApiSecurity'
 import Audits from './pages/Audits'
+import Impact from './pages/Impact'
 import Mobile from './pages/Mobile'
 import Recon from './pages/Recon'
 import Assets from './pages/Assets'
@@ -137,6 +139,7 @@ function Shell(): React.JSX.Element {
               {page === 'mobile' && <Mobile />}
               {page === 'recon' && <Recon />}
               {page === 'audit' && <Audits />}
+              {page === 'impact' && <Impact />}
               {page === 'mac' && <ThisMac />}
               {page === 'sessions' && <Sessions />}
               {page === 'assets' && <Assets />}
@@ -156,7 +159,9 @@ function Shell(): React.JSX.Element {
 export default function App(): React.JSX.Element {
   return (
     <AppProvider>
-      <Shell />
+      <ErrorBoundary>
+        <Shell />
+      </ErrorBoundary>
     </AppProvider>
   )
 }
