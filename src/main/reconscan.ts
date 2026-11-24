@@ -17,6 +17,7 @@ import { runTool } from './engine'
 import { installTool, isInstalled, toolDef, toolPath } from './toolbox'
 import { log } from './logs'
 import { fid } from './scanners/parse'
+import { WAF_DECEPTION_NOTE } from './wafdeception'
 
 const CATEGORY: Record<ReconFinding['kind'], FindingCategory> = { secret: 'secret', exposure: 'web', sourcemap: 'web', headers: 'web', takeover: 'network', subdomain: 'recon', endpoint: 'recon', tech: 'recon', listing: 'web', errorpage: 'web', cors: 'web', methods: 'web', cdn: 'recon', version: 'recon' }
 
@@ -129,7 +130,7 @@ async function run(id: string, req: ReconRequest): Promise<void> {
     if (req.reviewer !== 'none' && !s.cancelled) {
       const ai = s.step('ai', 'AI: the attack surface and where to look first')
       await s.run(ai, async () => {
-        const r = await summarizeWithAi(req.reviewer, reconPrompt(result), op, s.raw)
+        const r = await summarizeWithAi(req.reviewer, `${reconPrompt(result)}\n\n${WAF_DECEPTION_NOTE}`, op, s.raw)
         for (const f of s.findings) {
           const d = r.details.get(f.id)
           if (d) {

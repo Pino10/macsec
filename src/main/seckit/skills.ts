@@ -658,6 +658,28 @@ A short list only, one GET each: \`.git/HEAD\`, \`.env\`, server-status, phpinfo
 ## 6. Prioritise
 Rank leads by: reachable without sign-in > admin or internal function > handles money or personal data > old or unmaintained. Use attack-surface-report for the write-up.`
   },
+  'waf-deception': {
+    description: 'Tell a WAF honeypot, port mimic or decoy file from a real finding, and say which results are noise. Use whenever a scan shows every port open, hundreds of pages that look the same, or suspicious files that answer too easily.',
+    body: `# WAF honeypots, port mimics and decoy files
+
+Shields and honeypots do not only block. Many waste a scanner's time, and a report that repeats their noise is worse than no report.
+
+## The tricks, and what each looks like in results
+
+- **Every port open.** A shield, a port mimic or a tarpit accepts every connection. A port scan shows dozens of ports, often the same banner everywhere, including database and remote-access ports a real server would not expose all at once. Treat a full port list on one address as deception until a connection says otherwise.
+- **Dynamic path spoofing.** Random paths answer 200 with a page that has the same structure as the home page. Response lengths are nudged a few bytes so a length filter stops working. Compare structure, not size: strip scripts, numbers and whitespace, then compare words.
+- **Decoy files.** Sensitive names (.env, .git/config, dumps, .sql, backups, phpinfo) answer on purpose, often with the same page or with values that look like placeholders. The shield records the scanner's address and user agent and may block it after this.
+- **Tarpit.** Answers are deliberately slow to hold the scanner open. A median response of several seconds on pages that should be instant is a sign.
+- **Block and challenge pages.** A normal-looking 200 whose text is "Just a moment", "Attention Required", an incident reference or a support id is a block, not a finding.
+- **Vendor fingerprints.** Cloudflare (cf-ray), Imperva (X-CDN, incap_ses cookie), Akamai (akamai-grn, Reference #), F5 (BIGipServer, support id), AWS CloudFront/WAF (Request blocked), Sucuri, Wordfence, ModSecurity. Their edge answers on many ports; those ports belong to the edge, not the origin.
+
+## What to do
+
+1. Do not report the decoy results one by one. Say plainly that the site shows deception, say which signs you saw, and keep the raw results as an appendix.
+2. Look for the pages that do **not** fit the pattern: a different document structure, a different script set, a different certificate, a different response time. Those are the real ones.
+3. Never try to get around the shield. MacSec's job is to test the site its owner gave you, not to evade their defence.
+4. If the shield is the person's own, say it is working, and give them the evidence they need (ports, paths, timings) without turning it into vulnerability findings.`
+  },
   'js-recon': {
     description: 'Reading a site’s public JavaScript for what it reveals: source maps, API endpoints, internal hosts, feature flags and keys. Use whenever JavaScript files or source maps are part of a recon.',
     body: `# JavaScript recon

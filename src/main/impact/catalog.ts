@@ -100,6 +100,19 @@ export const IMPACT_ACTIONS: ImpactActionInfo[] = [
     needs: ['url', 'param']
   },
   {
+    id: 'msf-run',
+    name: 'Run one approved Metasploit module, and prove it worked',
+    what: 'Runs one exploit module from MacSec\'s short run-only list with a command payload that calls back to this Mac. The callback is the proof: it carries this Mac\'s address, the module and a one-off marker, and it means the command really ran on the target.',
+    impact: ['confidentiality', 'integrity', 'availability'],
+    sends: 'One Metasploit run of the module you pick, with cmd/unix/generic and a single curl or wget back to this Mac. No other payload, no handler, no session.',
+    never: 'No meterpreter, no shell session, no persistence, no lateral movement, no login or brute force, no module outside the run-only list. It does not run against a target this Mac cannot reach.',
+    maxRequests: 12,
+    writes: false,
+    cleanup: 'The command runs once and ends. No session or handler is left, and the callback listener closes when the run ends. GitLab may keep the image it uploaded, and that is listed as a leftover.',
+    risk: 'High. This is real exploitation. It runs one command as the web user on the server, which is what a person would do by hand after finding the flaw, and it is never run without an engagement, a typed phrase and the module ticked.',
+    needs: ['url', 'module']
+  },
+  {
     id: 'replay-request',
     name: 'Send the exact request you paste',
     what: 'Sends one request you wrote or copied from Burp: method, address, headers and body. A proof is a string you name appearing in the answer. This is the escape hatch for anything the built-in proofs do not cover.',

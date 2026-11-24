@@ -3,7 +3,7 @@
  * checks it against the release's SHA256SUMS.txt and its code signature, swaps it in place of the
  * running copy and restarts. Sessions, tools and settings live in ~/MacSec and are untouched.
  */
-import { ownNotes, releasesWithFallback } from './seckit/ghapi'
+import { assetUrl, latestTagFromWeb, ownNotes, releasesWithFallback } from './seckit/ghapi'
 import { app } from 'electron'
 import { execFile } from 'child_process'
 import { existsSync, mkdtempSync, renameSync, rmSync } from 'fs'
@@ -71,14 +71,34 @@ export async function releaseNotes(): Promise<ReleaseNote[]> {
 }
 
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
-  // Through the shared GitHub client: your sign-in when there is one, answers kept for a while, and
-  // GitHub's release feed when its hourly limit is used up.
+  // Three ways in, so the button always answers: the API (with your sign-in when there is one),
+  // the releases feed when the hourly limit is used up, and github.com's own redirect as a last
+  // resort. A failure is reported on the page, never thrown at the button.
+  let problem: string | null = null
   try {
     lastReleases = (await releasesWithFallback(REPO, (v) => [`MacSec-${v}-arm64.dmg`, `MacSec-${v}-x64.dmg`, 'SHA256SUMS.txt'])) as Release[]
     lastError = null
   } catch (e) {
-    lastError = (e as Error).message
-    throw e
+    problem = (e as Error).message
+    try {
+      const tag = (await latestTagFromWeb(REPO)).replace(/^v/, '')
+      const files = [`MacSec-${tag}-arm64.dmg`, `MacSec-${tag}-x64.dmg`, 'SHA256SUMS.txt']
+      lastReleases = [
+        {
+          tag_name: `v${tag}`,
+          draft: false,
+          body: '',
+          published_at: new Date().toISOString(),
+          html_url: `https://github.com/${REPO}/releases/tag/v${tag}`,
+          assets: files.map((name) => ({ name, browser_download_url: assetUrl(REPO, `v${tag}`, name) }))
+        }
+      ]
+      lastError = `GitHub's API and release feed did not answer (${problem}), so the newest tag came from github.com itself. Release notes are missing for this check; open the release page to read them.`
+    } catch (e2) {
+      lastError = `${problem}. The fallback did not answer either (${(e2 as Error).message}).`
+      checkedAt = Date.now()
+      return pending?.info ?? null
+    }
   } finally {
     checkedAt = Date.now()
   }

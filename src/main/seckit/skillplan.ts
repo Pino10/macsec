@@ -28,7 +28,7 @@ export interface SkillItem {
 }
 
 /** The app's own skills that are about recon or internal, not a code review. */
-const NOT_FOR_REVIEWS = new Set(['recon-methodology', 'js-recon', 'attack-surface-report', 'local-model-review'])
+const NOT_FOR_REVIEWS = new Set(['recon-methodology', 'js-recon', 'attack-surface-report', 'local-model-review', 'waf-deception'])
 
 const firstSentence = (s: string): string => (s.split(/(?<=\.)\s/)[0] ?? s).trim().slice(0, 220)
 

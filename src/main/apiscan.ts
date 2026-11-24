@@ -28,6 +28,7 @@ import { isLocalTarget, NOT_READ_ONLY } from './webscan'
 import { dirs } from './paths'
 import { log } from './logs'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
+import { WAF_DECEPTION_NOTE } from './wafdeception'
 
 const specDir = (): string => join(dirs.config(), 'api-specs')
 
@@ -94,6 +95,9 @@ async function probe(endpoints: Endpoint[], base: string, auth: ApiAuth, cancell
   const out: Finding[] = []
   const hostIssues = new Map<string, Finding>()
   const headers = { 'User-Agent': 'MacSec API review', Accept: 'application/json', Origin: 'https://macsec-origin-check.example', ...authHeaders(auth) }
+  const anonHeaders = { 'User-Agent': 'MacSec API review', Accept: 'application/json' }
+  const signedIn = Object.keys(authHeaders(auth)).length > 0
+  let anonChecks = 0
   for (const [i, e] of endpoints.entries()) {
     if (cancelled()) break
     note(`${i + 1} of ${endpoints.length}: ${e.method} ${e.path}`)
@@ -113,6 +117,21 @@ async function probe(endpoints: Endpoint[], base: string, auth: ApiAuth, cancell
       else if (acao === '*' && Object.keys(authHeaders(auth)).length) hostIssues.set('cors-any', f('low', 'Cross-origin access is open to every site', { ...where, cwe: 'CWE-942', fix: 'List the origins that may call the API instead of *.' }))
       if (STACK.test(body)) out.push(f(r.status >= 500 ? 'medium' : 'low', `${e.method} ${e.path} shows internal error details`, { ...where, cwe: 'CWE-209', description: `Status ${r.status}. The response includes a stack trace or database error.`, fix: 'Turn off debug output in production and return a plain error message.' }))
       else if (r.status >= 500) out.push(f('low', `${e.method} ${e.path} fails with ${r.status}`, { ...where, description: 'An ordinary request makes the server fail.', fix: 'Check the server log for this endpoint.' }))
+      // A description that says "needs sign-in" while the live API answers without one is a real
+      // mismatch, and it is worth one extra request per endpoint to find it.
+      if (signedIn && e.secured !== false && anonChecks < 20 && r.status < 300) {
+        anonChecks++
+        try {
+          const anon = await fetch(url, { headers: anonHeaders, redirect: 'manual', signal: AbortSignal.timeout(15000) })
+          const anonBody = (await anon.text()).slice(0, 200_000)
+          const keys = /json/.test(anon.headers.get('content-type') ?? '') ? [...sensitiveKeys((() => { try { return JSON.parse(anonBody) } catch { return {} } })())] : []
+          if (anon.status < 300 && (keys.length || anonBody.length > 120)) {
+            out.push(f('high', `${e.method} ${e.path} answers without signing in`, { ...where, cwe: 'CWE-306', confidence: 'possible', description: `The description marks this endpoint as one that needs a sign-in, but the same request with no token answered HTTP ${anon.status} and ${anonBody.length.toLocaleString()} bytes${keys.length ? `, including the fields ${keys.slice(0, 5).join(', ')}` : ''}. Either the description is out of date or the endpoint really is open.` }))
+          }
+        } catch {
+          // No answer without a token: that is the expected case.
+        }
+      }
       if (/json/.test(r.headers.get('content-type') ?? '') && r.status < 300) {
         try {
           const keys = [...sensitiveKeys(JSON.parse(body))]

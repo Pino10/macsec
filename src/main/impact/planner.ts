@@ -9,6 +9,7 @@
 import type { Finding } from '../../shared/types'
 import type { EngagementCaps, ImpactActionId, ImpactClass, ImpactMethod, PlannedStep } from '../../shared/impact'
 import { actionInfo, actionIds } from './catalog'
+import { validRunModule } from '../msf'
 import { previewOf } from './actions'
 import { validUrl } from '../validate'
 
@@ -89,6 +90,7 @@ const RULES: Rule[] = [
   { re: /template injection|ssti|server-side template|engine evaluates|calculates an expression/i, action: 'ssti-marker', aims: 'integrity', why: 'The scan says the server evaluates input as a template. Show the smallest calculation it will do.' },
   { re: /upload|attachment|avatar|profile picture|media/i, action: 'upload-write', aims: 'integrity', why: 'The scan found an upload. Write one harmless text file and read it back.' },
   { re: /expensive|slow|timeout|rate limit|unbounded|export|report|generate|pdf render/i, action: 'availability-probe', aims: 'availability', why: 'The scan flagged a costly operation. Time one request against its baseline, without flooding it.' },
+  { re: /remote code execution|\brce\b|command injection|code execution|shell injection/i, action: 'msf-run', aims: 'integrity', why: 'The scan says input reaches code execution. Only a real command that calls back proves it, and only on a staging target this Mac can reach.' },
   { re: /sql injection|sqli|database error|a quote in .* makes the page/i, action: 'sql-injection-proof', aims: 'confidentiality', why: 'The scan found a quote changing the answer. Ask sqlmap about that one parameter, without extracting data.' },
   { re: /hidden page|not linked|nothing links|directory listing|folder lists|exposed file|backup/i, action: 'content-discovery', aims: 'confidentiality', why: 'The scan saw content the site does not link to. Ask for the common paths around it and prove what answers.' },
   { re: /private page|needs? sign-?in|requires? (a )?login|signed out|anyone can open|missing authorization|needs no sign|idor|broken access/i, action: 'auth-bypass', aims: 'confidentiality', why: 'The scan says a private page may open without signing in. Ask for it anonymously and look for what only a signed-in person should see.' }
@@ -145,6 +147,11 @@ export function planFromRules(input: PlanRulesInput): PlanDraft {
     }
     if (rule.action === 'auth-bypass') {
       push({ action: 'auth-bypass', aims: 'confidentiality', url: pageOf(url), expect: '', from: f.id, why: rule.why, write: false, after: [] })
+      continue
+    }
+    if (rule.action === 'msf-run') {
+      push({ action: 'msf-run', aims: 'integrity', url: pageOf(url), module: '', from: f.id, why: rule.why, write: false, after: [] })
+      notes.push('For the code-execution proof, pick the Metasploit module for this software, and remember the target must be able to reach this Mac (a staging server the engagement covers).')
       continue
     }
     if (!param) continue
@@ -254,6 +261,8 @@ export function checkStep(raw: unknown, target: string): { step: PlannedStep } |
       return { reason: 'the read-back address is not a full http(s) address' }
     }
   }
+  const module = typeof o.module === 'string' && o.module ? o.module.slice(0, 120) : undefined
+  if (action === 'msf-run' && module && !validRunModule(module)) return { reason: 'that Metasploit module is not on the run-only list' }
   const expect = typeof o.expect === 'string' ? o.expect.trim().slice(0, 200) : undefined
   if (action === 'replay-request' && !expect) return { reason: 'replay-request needs the string the answer must contain' }
   const step: PlannedStep = {
@@ -266,6 +275,7 @@ export function checkStep(raw: unknown, target: string): { step: PlannedStep } |
     ...(o.headers && typeof o.headers === 'object' && !Array.isArray(o.headers) ? { headers: Object.fromEntries(Object.entries(o.headers as Record<string, unknown>).filter(([, v]) => typeof v === 'string').slice(0, 24).map(([k, v]) => [k, String(v).slice(0, 4000)])) } : {}),
     ...(typeof o.body === 'string' ? { body: o.body.slice(0, 20000) } : {}),
     ...(typeof o.verifyUrl === 'string' && o.verifyUrl.includes('{name}') ? { verifyUrl: o.verifyUrl.slice(0, 500) } : {}),
+    ...(module ? { module } : {}),
     ...(expect ? { expect } : {}),
     ...(typeof o.from === 'string' ? { from: o.from.slice(0, 64) } : {}),
     why: typeof o.why === 'string' ? o.why.slice(0, 300) : info.what,
