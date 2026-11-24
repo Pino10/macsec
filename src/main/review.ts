@@ -105,7 +105,7 @@ export function sourceFiles(root: string, limit = 20000): string[] {
 function runScanner(run: ScannerRun, root: string, rawDir: string, r: Running, args = run.args, onLine?: (l: string) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     mkdirSync(join(toolEnv().TMPDIR as string), { recursive: true })
-    const child = spawn(toolPath(run.bin), args, { cwd: run.cwd ?? root, env: toolEnv(), stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(run.bin.includes('/') ? run.bin : toolPath(run.bin), args, { cwd: run.cwd ?? root, env: toolEnv(), stdio: ['ignore', 'pipe', 'pipe'] })
     r.children.add(child)
     let out = ''
     let err = ''

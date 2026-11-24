@@ -28,6 +28,7 @@ import { dockerPath, localSites, startWebScan } from './webscan'
 import { ciWorkflow, compareFindings, preCommitHook, previousSession, sessionCsv, toDefectDojo, toSarif } from './exports'
 import { topFindings } from '../shared/insights'
 import { searchFindings } from './search'
+import { secondOpinion } from './secondopinion'
 import { pruneSessions, storageInfo } from './storage'
 import { label } from './risk'
 import { runCheckup } from './checkup'
@@ -491,6 +492,7 @@ function registerIpc(): void {
     }
     return out.filter(Boolean)
   })
+  handle('findings:second-opinion', (id, findingId) => secondOpinion(String(id), String(findingId)))
   handle('findings:triage-bulk', (id, ids, triage, patch) => triageBulk(String(id), Array.isArray(ids) ? ids : [], triage === null ? null : triage, (patch ?? {}) as { owner?: string; due?: string }))
   handle('profiles:list', () => listProfiles())
   handle('profiles:save', (input) => saveProfile(input))
@@ -922,7 +924,7 @@ function registerIpc(): void {
   })
   handle('api:load-spec', async () => {
     if (!mainWindow) return null
-    const r = await dialog.showOpenDialog(mainWindow, { title: 'Load an API description', buttonLabel: 'Load', properties: ['openFile'], filters: [{ name: 'Postman, OpenAPI, Swagger or HAR', extensions: ['json', 'yaml', 'yml', 'har'] }] })
+    const r = await dialog.showOpenDialog(mainWindow, { title: 'Load an API description', buttonLabel: 'Load', properties: ['openFile'], filters: [{ name: 'Postman, OpenAPI, Swagger, HAR or Burp XML', extensions: ['json', 'yaml', 'yml', 'har', 'xml'] }] })
     if (r.canceled || !r.filePaths[0]) return null
     try {
       return loadSpec(r.filePaths[0])

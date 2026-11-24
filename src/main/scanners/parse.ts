@@ -480,3 +480,37 @@ export function countBySeverity(list: Finding[]): Record<Severity, number> {
   for (const f of list) if (!f.triage) c[f.severity]++
   return c
 }
+
+// ---------------------------------------------------------------- PHP
+
+/** PHPStan's JSON, kept to the messages that are about security rather than every type warning. */
+export function parsePhpstan(text: string, root: string): Finding[] {
+  type M = { message: string; line?: number; identifier?: string; severity?: string }
+  const d = json<{ files?: Record<string, { messages?: M[] }> }>(text)
+  const SECURITY = /sql|inject|eval|exec|shell|command|deserial|unserialize|weak|hash|password|secret|escap|sanit|htmlspecialchars|dangerous|file_get_contents|include|require|untrusted/i
+  const out: Finding[] = []
+  for (const [file, v] of Object.entries(d?.files ?? {})) {
+    for (const m of v.messages ?? []) {
+      if (!SECURITY.test(m.message) && !SECURITY.test(m.identifier ?? '')) continue
+      out.push(mk('PHPStan', 'code', { severity: 'medium', title: m.message.split('.')[0].slice(0, 140), file: rel(root, file), line: m.line, description: m.message, snippet: m.identifier ? `PHPStan rule: ${m.identifier}` : undefined }))
+    }
+  }
+  return out
+}
+
+/** Psalm's taint analysis: every issue here is about untrusted data reaching a dangerous sink. */
+export function parsePsalm(text: string, root: string): Finding[] {
+  type I = { type: string; severity?: string; file_name: string; line_from?: number; message: string }
+  const d = json<{ issues?: I[] }>(text)
+  return (d?.issues ?? []).map((i) =>
+    mk('Psalm', 'code', {
+      severity: /sql|rce|shell|command|exec|include|deserial|ssrf|xxe|ldap/i.test(i.type) ? 'high' : 'medium',
+      title: `${i.type.replace(/([a-z])([A-Z])/g, '$1 $2')}: ${i.message.split('.')[0]}`.slice(0, 160),
+      file: rel(root, i.file_name),
+      line: i.line_from,
+      cwe: /sql/i.test(i.type) ? 'CWE-89' : /xss|escape/i.test(i.type) ? 'CWE-79' : undefined,
+      description: i.message,
+      snippet: `Psalm taint type: ${i.type}`
+    })
+  )
+}

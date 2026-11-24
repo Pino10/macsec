@@ -173,7 +173,7 @@ async function runApiScan(id: string, spec: ParsedSpec, base: string, req: ApiSc
   s.info.files = spec.endpoints.length
   const gets = spec.endpoints.filter((e) => e.method === 'GET').slice(0, LIMIT[req.mode])
   const st = {
-    spec: s.step('spec', `Review the ${spec.format === 'har' ? 'recorded traffic' : spec.format === 'postman' ? 'Postman collection' : 'API description'}: ${spec.endpoints.length} endpoints`),
+    spec: s.step('spec', `Review the ${spec.format === 'har' ? 'recorded traffic' : spec.format === 'burp' ? 'Burp export' : spec.format === 'postman' ? 'Postman collection' : 'API description'}: ${spec.endpoints.length} endpoints`),
     probe: s.step('probe', `Ordinary GET requests to ${gets.length} endpoints, signed in as you`),
     nuclei: req.mode !== 'quick' ? s.step('nuclei', 'Nuclei read-only checks for exposed docs, panels and settings') : null,
     infra: s.step('infra', 'Firewall, CDN, DNS and DevOps exposure around the API'),

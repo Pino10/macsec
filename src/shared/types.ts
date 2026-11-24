@@ -128,6 +128,8 @@ export interface Finding {
   alsoFoundBy?: string[]
   /** Marked "not a problem" by a rule you saved earlier, not by hand in this session. */
   remembered?: boolean
+  /** A second, independent AI tried to disprove it. Never changes the confidence by itself. */
+  secondOpinion?: { verdict: 'seconded' | 'refuted' | 'uncertain'; reason: string; by: string; at: string }
   /** Proven by a controlled proof: which run, under which engagement, and what it showed. */
   controlled?: { runId: string; engagementRef: string; at: string; shows: string[] }
 }
@@ -196,7 +198,7 @@ export interface ConfirmOptions {
 export interface ApiSpecInfo {
   id: string
   name: string
-  format: 'postman' | 'openapi' | 'swagger' | 'har'
+  format: 'postman' | 'openapi' | 'swagger' | 'har' | 'burp'
   baseUrl: string
   endpoints: { method: string; url: string; name?: string }[]
 }
@@ -654,6 +656,7 @@ export interface Channels {
   'ignored:remove': { args: [string]; result: { key: string; scope: 'site' | 'everywhere'; title: string; place?: string; at: string }[] }
   'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null, ('site' | 'everywhere')?]; result: SessionDetail }
   /** Mark several findings at once, with an optional owner and due date. */
+  'findings:second-opinion': { args: [string, string]; result: SessionDetail }
   'findings:triage-bulk': { args: [string, string[], 'fixed' | 'accepted' | 'not-a-problem' | null, { owner?: string; due?: string }?]; result: SessionDetail }
   'profiles:list': { args: []; result: SavedProfile[] }
   'profiles:save': { args: [{ name: string; kind: 'web' | 'review'; options: Record<string, unknown> }]; result: SavedProfile[] }

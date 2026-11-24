@@ -3084,3 +3084,79 @@ details.advanced[open] > summary {
 .chip-x:hover {
   color: var(--danger, #ff6b8a);
 }
+
+/* Attack-surface graph */
+.graph {
+  position: relative;
+  height: 420px;
+  overflow: hidden;
+}
+.graph svg {
+  display: block;
+}
+.graph-hub {
+  fill: var(--well-2, rgba(56, 225, 255, 0.08));
+  stroke: color-mix(in srgb, var(--ion) 55%, transparent);
+  stroke-width: 1.5;
+}
+.graph-hub-label {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+.graph-page {
+  fill: var(--well);
+  stroke: var(--line-2);
+}
+.graph-page-label {
+  fill: var(--ink-2);
+  font-size: 9.5px;
+}
+.graph-edge {
+  stroke: var(--line-2);
+  stroke-width: 1;
+}
+.graph-finding[data-sev='critical'] {
+  fill: var(--crit, #ff4d6d);
+}
+.graph-finding[data-sev='high'] {
+  fill: var(--high, #ff9d4d);
+}
+.graph-finding[data-sev='medium'] {
+  fill: var(--med, #ffd34d);
+}
+.graph-finding[data-sev='low'] {
+  fill: var(--low, #4dc3ff);
+}
+.graph-leaf {
+  cursor: pointer;
+}
+.graph-leaf:focus-visible {
+  outline: none;
+}
+.graph-leaf:focus-visible circle {
+  stroke: var(--ion);
+  stroke-width: 2;
+}
+.graph-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.graph-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+.graph-legend i[data-sev='critical'] { background: var(--crit, #ff4d6d); }
+.graph-legend i[data-sev='high'] { background: var(--high, #ff9d4d); }
+.graph-legend i[data-sev='medium'] { background: var(--med, #ffd34d); }
+.graph-legend i[data-sev='low'] { background: var(--low, #4dc3ff); }

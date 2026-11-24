@@ -1,5 +1,7 @@
 # Roadmap
 
+Status after 1.24.0: PHPStan and Psalm, the independent verifier, the surface graph and Burp import shipped. The ledger in RELEASE_NOTES.md says which of the rest need a download, an SDK or an Apple account.
+
 This is the agreed 1.24 work, in the order it was set. Each item says how it fits MacSec's rules: free
 tools only, everything on this Mac, read-only unless a person turns on a controlled proof, and no
 external account unless the person connects one themselves.
