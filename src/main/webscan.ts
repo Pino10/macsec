@@ -18,7 +18,7 @@ import { beginOp, endOp, runTool, SessionRun } from './engine'
 import { createSession, saveAiReport, saveChecklist, savePlan } from './sessions'
 import { proofOf } from './seckit/confirm'
 import { planContext, planMarkdown, profileSite } from './testplan'
-import { checkHeaders, parseHttpx, parseKatana, parseNuclei, pathSeverity, SENSITIVE_PATHS, type Fingerprint } from './scanners/web'
+import { checkHeaders, parseFfuf, parseHttpx, parseKatana, parseNuclei, pathSeverity, SENSITIVE_PATHS, type Fingerprint } from './scanners/web'
 import { fid, parseZap } from './scanners/parse'
 import { execFileSync } from 'child_process'
 import { appPath, installTool, isInstalled, nucleiTemplatesDir, toolDef } from './toolbox'
@@ -38,6 +38,7 @@ import { applyAnswers, autoMark, BATCH, parseAnswers, walkPrompt } from './check
 import { PARAM_WORDS } from './wordlists'
 import { injectionChecks, inputsFrom, postFormLead } from './injection'
 import { getPaths, mapCode, paramNames, unguardedPrivate, fillPath } from './routemap'
+import { discoveryWords, writeWordlist } from './wordlistfiles'
 import { calibrate, isCatchAll, visibleText } from './confirmtests'
 import { oauthChecks } from './oauth'
 import { jwtChecks } from './jwt'
@@ -208,6 +209,7 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     tls: url.startsWith('https://') ? s.step('tls', 'Check the certificate and TLS versions') : null,
     crawl: m.depth ? s.step('katana', `Map the site, ${m.depth} levels deep`) : null,
     files: s.step('exposed', `Look for files that should not be public (${m.paths})`),
+    discover: req.confirm?.discover ? s.step('ffuf', 'Content discovery with ffuf, then each hit proved') : null,
     js: m.depth ? s.step('js', 'Look for keys in the site’s public JavaScript') : null,
     infra: s.step('infra', 'Firewall, CDN, hosting, DNS and mail settings'),
     devops: s.step('devops', 'DevOps and infrastructure left open (Jenkins, Grafana, registries, clusters, state files, Git)'),
@@ -265,6 +267,56 @@ async function runWebScan(id: string, url: string, req: WebScanRequest): Promise
     if (st.tls) await s.run(st.tls, () => checkTls(url))
 
     await s.run(st.files, async (note) => groupDecoyFiles(await exposedFiles(url, SENSITIVE_PATHS.slice(0, m.paths), headers, () => s.cancelled, note)))
+
+    if (st.discover)
+      await s.run(st.discover, async (note, line) => {
+        await ensure('ffuf')
+        const words = discoveryWords(req.mode === 'thorough' ? 435 : 200)
+        const wl = writeWordlist(words, join(s.raw, 'ffuf-words.txt'))
+        const out = join(s.raw, 'ffuf.json')
+        const base = url.replace(/\/+$/, '')
+        await runTool({ name: 'ffuf', bin: 'ffuf', args: ['-u', `${base}/FUZZ`, '-w', wl, '-of', 'json', '-o', out, '-mc', '200,204,301,302,401,403,405', '-t', '5', '-rate', '20', '-timeout', '10', '-s', '-ac', '-noninteractive'], timeoutMs: 10 * 60_000, output: out }, op, s.raw, line).catch((e) => {
+          if (!existsSync(out)) throw e
+          return ''
+        })
+        const hits = existsSync(out) ? parseFfuf(readFileSync(out, 'utf8'), host) : []
+        note(`${words.length} paths asked at 20 a second, ${hits.length} answered`)
+        if (!hits.length) return []
+        const c = mk(60)
+        const cal = await calibrate(c).catch(() => [])
+        const found: Finding[] = []
+        const plain: string[] = []
+        for (const h of hits.slice(0, 25)) {
+          if (s.cancelled) break
+          const p2 = h.path.replace(/^\//, '')
+          if (!p2 || risky(p2)) continue
+          const r = await c.get(h.path, { headers: 'none' }).catch(() => null)
+          if (!r) continue
+          if (cal.length && isCatchAll(p2, r, cal)) continue
+          if (r.status !== h.status) continue
+          const sev = pathSeverity(p2, r.status)
+          if (sev === 'info') {
+            plain.push(`${p2} (${r.status})`)
+            continue
+          }
+          urls.push(r.url)
+          found.push({
+            id: fid('ffuf', url, p2),
+            tool: 'ffuf',
+            category: 'web',
+            severity: sev,
+            confidence: 'confirmed',
+            title: r.status >= 200 && r.status < 300 ? `Reachable and not linked: /${p2}` : `Exists but protected: /${p2}`,
+            url: r.url,
+            file: r.url,
+            description: 'It is not linked from the site, but it answers. ffuf found it and MacSec asked again to be sure.',
+            proof: proofOf({ url: r.url, status: r.status, headers: r.headers, body: r.body, shows: [`ffuf found /${p2} (HTTP ${h.status})`, `asking again answered HTTP ${r.status}, the same way`, 'it is not one of the answers a page that does not exist gives'] })
+          })
+        }
+        if (plain.length) found.push({ id: fid('ffuf-plain', url), tool: 'ffuf', category: 'web', severity: 'info', confidence: 'possible', title: `${plain.length} more paths answer and look low-risk`, description: `Not linked from the site: ${plain.slice(0, 40).join(', ')}${plain.length > 40 ? ', and more' : ''}. Listed for a look, not reported one by one.` })
+        note(`${found.length} worth reporting, ${urls.length} pages in the list now`)
+        return found
+      })
 
     if (st.js) await s.run(st.js, (note) => keysInJavaScript(urls, host, s.raw, op, headers, note))
     // Versions found anywhere in this scan are matched against the live vulnerability databases at the end of these steps.

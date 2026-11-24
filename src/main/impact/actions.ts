@@ -4,8 +4,15 @@
  * makes a request that is not described in the plan the person approved.
  */
 import { createHash, randomBytes } from 'crypto'
+import { execFile } from 'child_process'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
+import { join } from 'path'
 import type { ImpactEvidence, ImpactStepResult, PlannedStep } from '../../shared/impact'
 import { maskSecrets } from '../evidence'
+import { parseFfuf, pathSeverity } from '../scanners/web'
+import { dirs } from '../paths'
+import { toolPath } from '../toolbox'
+import { discoveryWords, writeWordlist } from '../wordlistfiles'
 import { ImpactRefused, type ImpactClient, type ImpactReply } from './client'
 
 const sha = (s: string): string => createHash('sha256').update(s).digest('hex')
@@ -282,12 +289,113 @@ async function replayRequest(c: ActionContext): Promise<ActionResult> {
   }
 }
 
+// ---------------------------------------------------------------- Confidentiality: hidden pages, with ffuf
+
+export type FfufRun = (bin: string, args: string[]) => Promise<string>
+
+let ffufRunner: FfufRun | null = null
+
+/** Tests and the campaign can bring their own ffuf. The real one only ever writes its report file. */
+export function setFfufRunner(r: FfufRun | null): void {
+  ffufRunner = r
+}
+
+const defaultFfuf: FfufRun = (bin, args) =>
+  new Promise((resolve, reject) => {
+    const out = args[args.indexOf('-o') + 1]
+    execFile(bin, args, { timeout: 8 * 60_000, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, NO_COLOR: '1' } }, (e, _o, err) => {
+      if (!e || (out && existsSync(out))) resolve('')
+      else reject(new Error(String(err).trim().split('\n').pop() || 'ffuf did not run.'))
+    })
+  })
+
+const FFUF_STATUS = '200,204,301,302,401,403,405'
+
+async function contentDiscovery(c: ActionContext): Promise<ActionResult> {
+  const { client, step } = c
+  const bin = process.env.MACSEC_FFUF || toolPath('ffuf')
+  const words = discoveryWords(435)
+  if (!client.left().requests) return { status: 'not-proven', title: 'Find the pages nothing links to', detail: 'The cap left no requests for discovery.' }
+  const usable = words.slice(0, Math.min(words.length, Math.max(0, client.left().requests - 20)))
+  if (usable.length < 50) return { status: 'not-proven', title: 'Find the pages nothing links to', detail: `The engagement has ${client.left().requests} requests left, which is too few for a discovery list worth running (50 at least). Raise the cap in writing, or prove something else.` }
+  const work = join(dirs.root(), 'impact-work')
+  mkdirSync(work, { recursive: true, mode: 0o700 })
+  const wl = writeWordlist(usable, join(work, `words-${rand()}.txt`))
+  const out = join(work, `ffuf-${rand()}.json`)
+  const base = step.url.replace(/\/+$/, '')
+  client.reserve(usable.length, `content discovery with ffuf (${usable.length} paths)`)
+  const args = ['-u', `${base}/FUZZ`, '-w', wl, '-of', 'json', '-o', out, '-mc', FFUF_STATUS, '-t', '5', '-rate', '20', '-timeout', '10', '-s', '-ac', '-noninteractive']
+  c.line(`ffuf: ${usable.length} paths at 20 a second`)
+  try {
+    await (ffufRunner ?? defaultFfuf)(bin, args)
+  } catch (e) {
+    rmSync(out, { force: true })
+    return { status: 'failed', title: 'Find the pages nothing links to', detail: `ffuf did not run: ${(e as Error).message}. Install it on Tools, or use the exposed-file check instead.` }
+  }
+  const hits = existsSync(out) ? parseFfuf(readFileSync(out, 'utf8'), new URL(base).host) : []
+  rmSync(out, { force: true })
+  rmSync(wl, { force: true })
+  if (!hits.length) return { status: 'not-proven', title: 'Find the pages nothing links to', detail: `ffuf asked for ${usable.length} paths and none answered with a status worth a look.` }
+  // Calibrate against a path that cannot exist, then prove the best hits one by one.
+  const cal = await client.get(`${base}/macsec-${rand()}.html`, { note: 'discovery calibration' }).catch(() => null)
+  const catchAll = !!cal && cal.status === 200
+  const confirmed: { path: string; status: number; reply: ImpactReply }[] = []
+  for (const h of hits.slice(0, 15)) {
+    if (client.left().requests < 2) break
+    const r = await client.get(`${new URL(base).origin}${h.path}`, { note: `verify /${h.path.replace(/^\//, '')}` }).catch(() => null)
+    if (!r) continue
+    if (catchAll && cal && r.status === cal.status && Math.abs(r.body.length - cal.body.length) < 60) continue
+    if (r.status !== h.status) continue
+    confirmed.push({ path: h.path, status: r.status, reply: r })
+  }
+  if (!confirmed.length) {
+    return { status: 'not-proven', title: 'Find the pages nothing links to', detail: `ffuf found ${hits.length} path${hits.length === 1 ? '' : 's'}, but none answered the same way twice in a way that is not the site's "not found" page.` }
+  }
+  const worst = confirmed.map((x) => ({ ...x, sev: pathSeverity(x.path.replace(/^\//, ''), x.status) })).sort((a, b) => severityRank(b.sev) - severityRank(a.sev))[0]
+  const best = worst.sev === 'info' ? confirmed[0] : worst.reply ? worst : confirmed[0]
+  const reply = 'reply' in best ? best.reply : confirmed[0].reply
+  return {
+    status: 'proven',
+    title: `${confirmed.length} page${confirmed.length === 1 ? ' is' : 's are'} reachable and not linked from the site`,
+    detail: `ffuf asked for ${usable.length} paths and ${hits.length} answered. ${confirmed.length} of those were asked again and answered the same way. Most interesting: ${confirmed.slice(0, 8).map((x) => `${x.path} (HTTP ${x.status})`).join(', ')}${confirmed.length > 8 ? ', and more' : ''}. ${worst.sev !== 'info' ? `One of them looks sensitive by name (${worst.sev}).` : ''} This is confidentiality exposure: content the site does not link to, but anyone can ask for.`,
+    evidence: evidence(reply, [`${confirmed.length} paths answered the same way twice`, ...confirmed.slice(0, 8).map((x) => `${x.path} answered HTTP ${x.status}`), `ffuf asked for ${usable.length} paths, at 20 a second, signed out`])
+  }
+}
+
+const severityRank = (s: string): number => ({ critical: 5, high: 4, medium: 3, low: 2, info: 1 } as Record<string, number>)[s] ?? 0
+
+// ---------------------------------------------------------------- Confidentiality: the page needs no sign-in
+
+async function authBypass(c: ActionContext): Promise<ActionResult> {
+  const { client, step } = c
+  const expect = String(step.expect ?? '').trim()
+  if (!expect) return { status: 'failed', title: 'Read a private page with no credentials', detail: 'Name the string that proves it: your own email, an order number, a name only a signed-in person sees.' }
+  c.line('asking for the page with no cookie and no token')
+  const r = await client.get(step.url, { headers: {}, note: 'anonymous request' })
+  const hit = r.status < 400 && r.body.toLowerCase().includes(expect.toLowerCase())
+  if (!hit) {
+    return { status: 'not-proven', title: 'Read a private page with no credentials', detail: `Signed out, the page answered HTTP ${r.status} and does not contain "${note(expect)}". It still asks for a sign-in, which is good news.`, evidence: evidence(r, [`HTTP ${r.status} with no cookie and no token`, 'the expected string is not in the answer']) }
+  }
+  const again = await client.get(step.url, { headers: {}, note: 'anonymous request, repeat' })
+  if (!(again.status < 400 && again.body.toLowerCase().includes(expect.toLowerCase()))) {
+    return { status: 'not-proven', title: 'Read a private page with no credentials', detail: 'The first answer had the string but the second did not, so it is not repeated here.', evidence: evidence(r, ['the first answer had the string', 'the second did not']) }
+  }
+  return {
+    status: 'proven',
+    title: `The page needs no sign-in: ${pathOf(step.url)}`,
+    detail: `With no cookie and no token, the page answered HTTP ${again.status} and still contained "${note(expect)}". Whatever this page shows a signed-in person is readable by anyone with the address. That is confidentiality loss and a missing authorization check.`,
+    evidence: evidence(again, [`HTTP ${again.status} with no cookie and no token`, `the answer contains "${note(expect)}"`, 'the same string came back on a second anonymous request', 'nothing was sent that identifies a person'])
+  }
+}
+
 export const RUNNERS: Record<PlannedStep['action'], (c: ActionContext) => Promise<ActionResult>> = {
   'traversal-read': traversalRead,
   'ssti-marker': sstiMarker,
   'upload-write': uploadWrite,
   'availability-probe': availabilityProbe,
-  'replay-request': replayRequest
+  'replay-request': replayRequest,
+  'content-discovery': contentDiscovery,
+  'auth-bypass': authBypass
 }
 
 /** The requests a step will send, in plain words, for the approval screen. */
@@ -311,6 +419,10 @@ export function previewOf(step: PlannedStep): string[] {
       return [`GET ${page} twice, then three more times one at a time, 2 seconds apart (5 requests in all)`]
     case 'replay-request':
       return [`${step.method ?? 'GET'} ${page} once, with the headers and body you pasted${step.body ? ' (a body is sent)' : ''}`]
+    case 'content-discovery':
+      return [`GET ${page} with hundreds of common paths in place of the last segment (up to 435 requests at 20 a second, signed out)`, 'then ask again for the first 15 paths that answered, to prove each one']
+    case 'auth-bypass':
+      return [`GET ${page} twice with no cookie and no token, looking for "${step.expect ? note(step.expect) : 'the string you will name'}"`]
     default:
       return []
   }

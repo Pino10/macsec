@@ -28,6 +28,20 @@ describe('picking the right download', () => {
       expect(pickAsset(A(...assets), 'x64')?.name).toBe(x64)
     })
   }
+  it('picks the ffuf archive for this Mac and its checksum list', () => {
+    const ffuf = [
+      { name: 'ffuf_2.3.0_checksums.txt', url: '' },
+      { name: 'ffuf_2.3.0_linux_amd64.tar.gz', url: '' },
+      { name: 'ffuf_2.3.0_macOS_amd64.tar.gz', url: '' },
+      { name: 'ffuf_2.3.0_macOS_arm64.tar.gz', url: '' }
+    ]
+    const arch = pickAsset(ffuf, 'arm64')
+    expect(arch?.name).toBe('ffuf_2.3.0_macOS_arm64.tar.gz')
+    expect(pickAsset(ffuf, 'x64')?.name).toBe('ffuf_2.3.0_macOS_amd64.tar.gz')
+    expect(pickChecksum(ffuf, { name: 'ffuf_2.3.0_macOS_arm64.tar.gz', url: '' })?.name).toBe('ffuf_2.3.0_checksums.txt')
+    const h = 'c'.repeat(64)
+    expect(hashFor(`${h}  ffuf_2.3.0_macOS_arm64.tar.gz\n`, 'ffuf_2.3.0_macOS_arm64.tar.gz')).toBe(h)
+  })
   it('finds the checksum list or the per-file checksum', () => {
     expect(pickChecksum(A('a_darwin_arm64.tar.gz', 'a_checksums.txt', 'a_checksums.txt.sig'), { name: 'a_darwin_arm64.tar.gz', url: '' })?.name).toBe('a_checksums.txt')
     expect(pickChecksum(A('uv-aarch64-apple-darwin.tar.gz', 'uv-aarch64-apple-darwin.tar.gz.sha256', 'sha256.sum'), { name: 'uv-aarch64-apple-darwin.tar.gz', url: '' })?.name).toBe('uv-aarch64-apple-darwin.tar.gz.sha256')

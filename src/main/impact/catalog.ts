@@ -61,6 +61,32 @@ export const IMPACT_ACTIONS: ImpactActionInfo[] = [
     needs: ['url']
   },
   {
+    id: 'content-discovery',
+    name: 'Find the pages nothing links to',
+    what: 'Asks the site for hundreds of common paths with ffuf (signed out, no redirects, its own calibration), then asks again for each path that answered, so a hit is confirmed and not a page that answers 200 for everything.',
+    impact: ['confidentiality'],
+    sends: 'Up to 435 GET requests at 20 a second, then one GET for each of the first 15 paths that answered. No redirects are followed and no cookie or token is sent.',
+    never: 'No fuzzing of parameters, no POST, no bypass of the firewall, no recursion into other hosts, and no request after the cap.',
+    maxRequests: 450,
+    writes: false,
+    cleanup: 'Nothing to undo: only reads.',
+    risk: 'Medium. It is several hundred ordinary GETs in under half a minute, from this Mac. A firewall will log it; a small host may feel it. Run it in a quiet moment.',
+    needs: ['url']
+  },
+  {
+    id: 'auth-bypass',
+    name: 'Read a private page with no credentials',
+    what: 'Asks for a page that normally needs a sign-in with no cookie and no token, and looks for the string you name (your own email, an order number, a name only a signed-in person sees). This is the step from "the page is private" to "anyone can read it".',
+    impact: ['confidentiality'],
+    sends: 'Two GET requests with no credentials, then the run stops.',
+    never: 'No cookie, no token, no session of yours, no guessing of passwords.',
+    maxRequests: 2,
+    writes: false,
+    cleanup: 'Nothing to undo: only reads.',
+    risk: 'Very low. Two ordinary anonymous requests.',
+    needs: ['url', 'expect']
+  },
+  {
     id: 'replay-request',
     name: 'Send the exact request you paste',
     what: 'Sends one request you wrote or copied from Burp: method, address, headers and body. A proof is a string you name appearing in the answer. This is the escape hatch for anything the built-in proofs do not cover.',

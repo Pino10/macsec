@@ -52,6 +52,7 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 | `src/renderer/src/macsec.css` | The whole design: colours, glass, controls. `components/ThreatCore.tsx` is the posture orb. |
 | `src/main/validate.ts` | Every input rule as a pure function: hosts, scope hosts, windows, caps, impacts, the `EXPLOIT host` phrase. No Electron import, so it is unit tested. |
 | `src/main/engagement.ts` | The written authority a controlled proof stands on, and the one function that says why a run may not happen. |
+| `src/main/wordlistfiles.ts` | The discovery word list: yours from `extensions/wordlists/*.txt` first, then MacSec's, validated to plain paths and written where ffuf can read it. |
 | `src/main/impact/` | Controlled proofs: `catalog.ts` (what each proof sends and never does), `client.ts` (the only client that can send a real request), `actions.ts` (the bounded runners), `planner.ts` (rules first, one optional AI call), `campaign.ts` (the gate, the run, the cleanup, the record). |
 | `src/shared/types.ts` | Every message between the window and the main process (`Channels`). |
 | `src/renderer/src/pages/` | One file per page. Styles are in `macsec.css`. |
@@ -61,6 +62,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 **Adding a Semgrep rule set:** add its `p/...` name in `plan.ts`. If a pack ever disappears, Semgrep falls back to `p/default` on its own.
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
+
+### Added in 1.15
+
+- ffuf in `CATALOG` (release asset plus published checksums), `parseFfuf` in `scanners/web.ts`, the optional `discover` step in `webscan.ts`, and the engagement-gated `content-discovery` and `auth-bypass` runners.
+- `impact:update-step`: a plan step can be filled in by the person and is re-checked by `checkStep()` before it is saved.
 
 ### Added in 1.14 (controlled proofs)
 

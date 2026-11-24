@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Crosshair, FlaskConical, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react'
-import type { Engagement, ImpactActionInfo, ImpactClass, ImpactPlan, ImpactRun } from '@shared/impact'
+import type { Engagement, ImpactActionInfo, ImpactClass, ImpactPlan, ImpactRun, PlannedStep } from '@shared/impact'
 import { IMPACT_CLASSES, IMPACT_LETTER } from '@shared/impact'
 import { useApp } from '../store'
 import { Empty, PageHead } from '../ui'
@@ -211,6 +211,102 @@ function RunResult({ run }: { run: ImpactRun }): React.JSX.Element {
   )
 }
 
+/** The fields a plan cannot know, filled in by the person before the run. */
+function missingFields(s: PlannedStep): string[] {
+  const out: string[] = []
+  if ((s.action === 'replay-request' || s.action === 'auth-bypass') && !s.expect) out.push('the string that proves it')
+  if (s.action === 'replay-request' && !s.url.includes('?')) out.push('the address and method you mean')
+  if (s.action === 'upload-write' && !s.verifyUrl) out.push('where the file can be read back')
+  if (s.write && !s.undo) out.push('how to undo it')
+  return out
+}
+
+const parseHeaderLines = (text: string): Record<string, string> => {
+  const out: Record<string, string> = {}
+  for (const line of text.split('\n')) {
+    const i = line.indexOf(':')
+    if (i < 1) continue
+    const k = line.slice(0, i).trim()
+    const v = line.slice(i + 1).trim()
+    if (/^[A-Za-z0-9-]{2,64}$/.test(k) && v) out[k] = v
+  }
+  return out
+}
+
+function StepEditor({ s, plan, onSaved, onCancel }: { s: PlannedStep; plan: ImpactPlan; onSaved: (p: ImpactPlan) => void; onCancel: () => void }): React.JSX.Element {
+  const { act } = useApp()
+  const api = window.macsec
+  const [expect, setExpect] = useState(s.expect ?? '')
+  const [undo, setUndo] = useState(s.undo ?? '')
+  const [verifyUrl, setVerifyUrl] = useState(s.verifyUrl ?? '')
+  const [method, setMethod] = useState<NonNullable<PlannedStep['method']>>(s.method ?? 'GET')
+  const [headers, setHeaders] = useState(Object.entries(s.headers ?? {}).map(([k, v]) => `${k}: ${v}`).join('\n'))
+  const [body, setBody] = useState(s.body ?? '')
+  const replay = s.action === 'replay-request'
+  const upload = s.action === 'upload-write'
+  const needExpect = replay || s.action === 'auth-bypass'
+  const save = async (): Promise<void> => {
+    const patch: Record<string, unknown> = {}
+    if (needExpect) patch.expect = expect.trim()
+    if (upload) patch.verifyUrl = verifyUrl.trim()
+    if (s.write) patch.undo = undo.trim()
+    if (replay) {
+      patch.method = method
+      patch.body = body
+      patch.headers = parseHeaderLines(headers)
+    }
+    const p = await act('impact-step', () => api.invoke('impact:update-step', { planId: plan.id, stepId: s.id, patch }))
+    if (p) onSaved(p)
+  }
+  return (
+    <div style={{ display: 'grid', gap: 8, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--line)' }}>
+      {needExpect && (
+        <label className="hint" style={{ display: 'grid', gap: 4 }}>
+          The string the answer must contain, which only a signed-in person (or the right account) should see
+          <input className="input mono" value={expect} onChange={(e) => setExpect(e.target.value)} placeholder="your own email, an order number, a name" />
+        </label>
+      )}
+      {upload && (
+        <label className="hint" style={{ display: 'grid', gap: 4 }}>
+          Where the uploaded file can be read back, with {'{name}'} for the file name
+          <input className="input mono" value={verifyUrl} onChange={(e) => setVerifyUrl(e.target.value)} placeholder="https://shop.example/uploads/{name}" />
+        </label>
+      )}
+      {replay && (
+        <>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className="hint">Method</span>
+            <select className="input" style={{ width: 110 }} value={method} onChange={(e) => setMethod(e.target.value as NonNullable<PlannedStep['method']>)} aria-label="Method">
+              {(['GET', 'POST', 'PUT', 'PATCH'] as const).map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <span className="hint">Headers, one Name: value per line (only what this request needs)</span>
+          </div>
+          <textarea className="input mono" rows={3} value={headers} onChange={(e) => setHeaders(e.target.value)} placeholder={'Accept: application/json\nContent-Type: application/json'} aria-label="Headers" />
+          <textarea className="input mono" rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Request body, if the request sends one" aria-label="Body" />
+        </>
+      )}
+      {s.write && (
+        <label className="hint" style={{ display: 'grid', gap: 4 }}>
+          How to undo it, in one sentence
+          <input className="input" value={undo} onChange={(e) => setUndo(e.target.value)} placeholder="Delete the row I made, or the file in the uploads folder" />
+        </label>
+      )}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn btn-sm btn-primary" onClick={() => void save()}>
+          Save the step
+        </button>
+        <button className="btn btn-sm" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Impact(): React.JSX.Element {
   const { act, busy, sessions, settings, notify } = useApp()
   const api = window.macsec
@@ -229,6 +325,7 @@ export default function Impact(): React.JSX.Element {
   const [lines, setLines] = useState<string[]>([])
   const [result, setResult] = useState<ImpactRun | null>(null)
   const [running, setRunning] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
 
   useEffect(() => {
     void api.invoke('impact:engagements').then((l) => {
@@ -261,12 +358,14 @@ export default function Impact(): React.JSX.Element {
   }, [target])
   const wanted = useMemo(() => `EXPLOIT ${host}`, [host])
   const writeSteps = plan ? plan.steps.filter((s) => s.write) : []
+  const incomplete = plan ? plan.steps.filter((s) => approved.has(s.id) && missingFields(s).length > 0) : []
   const ready =
     !!plan &&
     !!current &&
     plan.steps.length > 0 &&
     approved.size > 0 &&
     phrase === wanted &&
+    incomplete.length === 0 &&
     (!writeSteps.length || acceptLeftovers) &&
     !running
   const allowedGoals = current?.allowed ?? IMPACT_CLASSES
@@ -394,6 +493,29 @@ export default function Impact(): React.JSX.Element {
                       </div>
                       {s.undo ? <div className="hint">Undo: {s.undo}</div> : null}
                       {info ? <div className="hint">{info.cleanup}</div> : null}
+                      {missingFields(s).length > 0 ? (
+                        <div className="hint" style={{ color: 'var(--warn)' }}>
+                          Needs you: {missingFields(s).join('; ')}.{' '}
+                          <button className="link" onClick={() => setEditing(editing === s.id ? null : s.id)}>
+                            {editing === s.id ? 'Close' : 'Fill in'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="hint">
+                          Complete. <button className="link" onClick={() => setEditing(editing === s.id ? null : s.id)}>{editing === s.id ? 'Close' : 'Edit'}</button>
+                        </div>
+                      )}
+                      {editing === s.id ? (
+                        <StepEditor
+                          s={s}
+                          plan={plan}
+                          onCancel={() => setEditing(null)}
+                          onSaved={(p) => {
+                            setPlan(p)
+                            setEditing(null)
+                          }}
+                        />
+                      ) : null}
                     </div>
                   </div>
                 )

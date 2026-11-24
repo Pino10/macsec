@@ -9,7 +9,7 @@ import { basename, join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
 import type { ApiScanRequest, Channels, Events, Finding, FreeLlmInfo, IntegrationsInfo, ReconRequest, ReviewRequest, Reviewer, ScanMode, SessionInfo, SkillPackInfo, WebScanRequest } from '../shared/types'
-import type { ImpactPlan, ImpactPlanRequest, ImpactRunRequest } from '../shared/impact'
+import type { ImpactPlan, ImpactPlanRequest, ImpactRunRequest, PlannedStep } from '../shared/impact'
 import { dirs, ensureDirs } from './paths'
 import { getSettings, setSettings } from './settings'
 import { getSecret, setSecret, setSecretsCrypto } from './secrets'
@@ -54,7 +54,7 @@ import { beginOp, cancelOp, endOp, finishEvents, isPaused, pauseOp } from './eng
 import { askAi } from './aisummary'
 import { currentEngagement, engagementById, engagementProblem, hostKey, listEngagements, revokeEngagement, saveEngagement } from './engagement'
 import { IMPACT_ACTIONS } from './impact/catalog'
-import { aiPlanCost, aiPlannerPrompt, parseAiPlan, planFromRules } from './impact/planner'
+import { aiPlanCost, aiPlannerPrompt, checkStep, parseAiPlan, planFromRules } from './impact/planner'
 import { listRuns, loadPlan, runCampaign, runProblem, savePlan } from './impact/campaign'
 import { requestStop } from './impact/client'
 import { ValidationError, pick, validHost, validImpacts, validUrl } from './validate'
@@ -237,8 +237,8 @@ function validConfirm(v: unknown): WebScanRequest['confirm'] {
   const c = (v ?? null) as Record<string, unknown> | null
   if (!c || typeof c !== 'object') return undefined
   const text = (x: unknown, max: number): string | undefined => (typeof x === 'string' && x.trim() ? x.replace(/[\r\n\t]+/g, ' ').trim().slice(0, max) : undefined)
-  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, logic: c.logic === true, inject: c.inject === true, proto: c.proto === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
-  return out.fuzz || out.auth || out.authz || out.waf || out.logic || out.inject || out.proto ? out : undefined
+  const out = { fuzz: c.fuzz === true, auth: c.auth === true, authz: c.authz === true, waf: c.waf === true, logic: c.logic === true, inject: c.inject === true, proto: c.proto === true, discover: c.discover === true, loginUrl: text(c.loginUrl, 300), knownUser: text(c.knownUser, 200), allowReset: c.allowReset === true, identityA: text(c.identityA, 200), headersB: typeof c.headersB === 'string' ? c.headersB.slice(0, 4000) : undefined }
+  return out.fuzz || out.auth || out.authz || out.waf || out.logic || out.inject || out.proto || out.discover ? out : undefined
 }
 
 
@@ -1225,6 +1225,33 @@ function registerIpc(): void {
     savePlan(plan)
     log('info', `Controlled proof plan for ${hostKey(target)}: ${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'} (${source})`)
     return { plan, cost }
+  })
+  handle('impact:update-step', (req) => {
+    const r = (req ?? {}) as { planId?: unknown; stepId?: unknown; patch?: unknown }
+    const plan = loadPlan(String(r.planId ?? ''))
+    if (!engagementById(plan.engagementId)) throw new ValidationError('The engagement for that plan is gone. Make a new plan.')
+    const stepId = String(r.stepId ?? '')
+    const at = plan.steps.findIndex((s) => s.id === stepId)
+    if (at < 0) throw new ValidationError('That step is not in this plan.')
+    const patch = (r.patch ?? {}) as Partial<PlannedStep>
+    const clean: Record<string, unknown> = {}
+    for (const k of ['url', 'param', 'method', 'headers', 'body', 'verifyUrl', 'expect', 'undo', 'why'] as const) {
+      if (patch[k] !== undefined) clean[k] = patch[k]
+    }
+    const merged = { ...plan.steps[at], ...clean }
+    const checked = checkStep(merged, plan.target)
+    if ('reason' in checked) throw new ValidationError(`That step cannot be saved: ${checked.reason}.`)
+    const previous = plan.steps[at]
+    plan.steps[at] = {
+      ...checked.step,
+      id: stepId,
+      action: previous.action,
+      aims: previous.aims,
+      ...(previous.after ? { after: previous.after } : {}),
+      ...(previous.from ? { from: previous.from } : {})
+    }
+    savePlan(plan)
+    return plan
   })
   handle('impact:run', async (req) => {
     const r = (req ?? {}) as Partial<ImpactRunRequest>

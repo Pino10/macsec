@@ -3,7 +3,7 @@
  * proofs, because a run that cannot happen is the point of an engagement.
  */
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'fs'
+import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { setRoot } from '../src/main/paths'
@@ -20,6 +20,8 @@ import { IMPACT_ACTIONS, actionInfo } from '../src/main/impact/catalog'
 import { aiPlanCost, aiPlannerPrompt, checkStep, parseAiPlan, planFromRules } from '../src/main/impact/planner'
 import { runCampaign, runProblem } from '../src/main/impact/campaign'
 import { maskUrl, requestStop, clearStop, safeHeaders } from '../src/main/impact/client'
+import { setFfufRunner } from '../src/main/impact/actions'
+import { parseFfuf } from '../src/main/scanners/web'
 import { previewOf } from '../src/main/impact/actions'
 import type { Engagement, ImpactPlan, PlannedStep } from '../src/shared/impact'
 import type { Finding } from '../src/shared/types'
@@ -473,5 +475,140 @@ describe('the record', () => {
     expect(d.client).toBe('Acme')
     expect(d.hosts).toEqual(['shop.example.test'])
     expect(new Date(d.endsAt).getTime()).toBeGreaterThan(Date.now())
+  })
+})
+
+describe('discovery with ffuf', () => {
+  it('parses what ffuf writes, keeps the target host and drops duplicates', () => {
+    const json = JSON.stringify({
+      results: [
+        { input: { FUZZ: 'admin' }, status: 200, length: 1234, 'content-type': 'text/html', url: `${TARGET}/admin` },
+        { input: { FUZZ: 'x' }, status: 200, length: 12, url: 'http://other.test/x' },
+        { input: { FUZZ: 'admin' }, status: 200, length: 1234, url: `${TARGET}/admin` },
+        { input: { FUZZ: 'backup.zip' }, status: 403, length: 0, url: `${TARGET}/backup.zip` }
+      ]
+    })
+    const hits = parseFfuf(json, HOST)
+    expect(hits).toHaveLength(2)
+    expect(hits[0]).toMatchObject({ path: '/admin', status: 200, length: 1234 })
+    expect(parseFfuf('not json', HOST)).toEqual([])
+  })
+
+  it('plans discovery and an anonymous read, then chains the write rung after the read', () => {
+    const findings = [
+      finding({ id: 'f1', title: 'Hidden page found: /backup.zip', url: `${TARGET}/backup.zip` }),
+      finding({ id: 'f2', title: 'A private page opens without signing in: /admin', url: `${TARGET}/admin` }),
+      finding({ id: 'f3', title: 'File upload leaves files readable', url: `${TARGET}/avatar/upload?user=1` })
+    ]
+    const p = planFromRules({ target: TARGET, goal: ['confidentiality', 'integrity'], findings, caps: { requests: 900, writes: 5, minutes: 20 } })
+    const kinds = p.steps.map((s) => s.action)
+    expect(kinds).toContain('content-discovery')
+    expect(kinds).toContain('auth-bypass')
+    expect(kinds).toContain('upload-write')
+    const read = p.steps.find((s) => s.action === 'content-discovery')!
+    const write = p.steps.find((s) => s.action === 'upload-write')!
+    expect(write.after).toEqual([read.id])
+    expect(p.notes.join(' ')).toMatch(/Escalation/)
+    expect(p.notes.join(' ')).toMatch(/fill them in|Needs|need/i)
+  })
+
+  it('accepts the new steps at plan time, and still refuses an off-site one', () => {
+    expect('step' in checkStep({ action: 'content-discovery', url: `${TARGET}/` }, TARGET)).toBe(true)
+    expect('step' in checkStep({ action: 'auth-bypass', url: `${TARGET}/admin` }, TARGET)).toBe(true)
+    expect('reason' in checkStep({ action: 'content-discovery', url: `http://other.test/` }, TARGET)).toBe(true)
+  })
+
+  it('runs ffuf, counts its requests against the engagement, and proves the page it finds', async () => {
+    const e = engagement({ caps: { requests: 900, writes: 5, minutes: 10 } })
+    const seen: string[][] = []
+    setFfufRunner(async (_bin, args) => {
+      seen.push(args)
+      const out = args[args.indexOf('-o') + 1]
+      writeFileSync(
+        out,
+        JSON.stringify({
+          results: [
+            { status: 200, length: 500, url: `${TARGET}/admin` },
+            { status: 403, length: 0, url: `${TARGET}/backup.zip` }
+          ]
+        })
+      )
+      return ''
+    })
+    try {
+      const run = await runCampaign({
+        plan: plan([step({ action: 'content-discovery', aims: 'confidentiality', url: `${TARGET}/`, param: undefined })], { goal: ['confidentiality'] }),
+        engagement: e,
+        approved: ['s1'],
+        phrase: PHRASE,
+        acceptLeftovers: false,
+        delayMs: 0,
+        guard: false,
+        fetchImpl: fetchOf(async (url) => {
+          if (url.includes('macsec-')) return new Response('no such page', { status: 200 })
+          if (url.endsWith('/admin')) return new Response('x'.repeat(500), { status: 200 })
+          return new Response('', { status: 403 })
+        })
+      })
+      expect(seen).toHaveLength(1)
+      expect(seen[0]).toContain('-rate')
+      expect(seen[0]).toContain('20')
+      expect(run.steps[0].status).toBe('proven')
+      expect(run.requests).toBeGreaterThan(400)
+      expect(run.steps[0].detail).toMatch(/admin/)
+      expect(engagementUsage(e.id).requests).toBe(run.requests)
+    } finally {
+      setFfufRunner(null)
+    }
+  })
+
+  it('refuses discovery when the cap cannot pay for the list', async () => {
+    const e = engagement({ caps: { requests: 40, writes: 0, minutes: 10 } })
+    const run = await runCampaign({
+      plan: plan([step({ action: 'content-discovery', aims: 'confidentiality', url: `${TARGET}/`, param: undefined })]),
+      engagement: e,
+      approved: ['s1'],
+      phrase: PHRASE,
+      acceptLeftovers: false,
+      delayMs: 0,
+      guard: false,
+      fetchImpl: fetchOf(async () => new Response('x', { status: 200 }))
+    })
+    expect(['failed', 'not-proven']).toContain(run.steps[0].status)
+    expect(run.requests).toBe(0)
+  })
+})
+
+describe('the anonymous read', () => {
+  it('proves a private page opens signed out, and only when the string repeats', async () => {
+    const e = engagement()
+    const run = await runCampaign({
+      plan: plan([step({ action: 'auth-bypass', aims: 'confidentiality', url: `${TARGET}/admin`, expect: 'ada@example.test', param: undefined })]),
+      engagement: e,
+      approved: ['s1'],
+      phrase: PHRASE,
+      acceptLeftovers: false,
+      delayMs: 0,
+      guard: false,
+      fetchImpl: fetchOf(async () => new Response('<p>Signed in as ada@example.test</p>', { status: 200 }))
+    })
+    expect(run.proven).toEqual(['confidentiality'])
+    expect(run.steps[0].title).toMatch(/needs no sign-in/)
+  })
+
+  it('reports nothing when the page really does ask for a sign-in', async () => {
+    const e = engagement()
+    const run = await runCampaign({
+      plan: plan([step({ action: 'auth-bypass', aims: 'confidentiality', url: `${TARGET}/admin`, expect: 'ada@example.test', param: undefined })]),
+      engagement: e,
+      approved: ['s1'],
+      phrase: PHRASE,
+      acceptLeftovers: false,
+      delayMs: 0,
+      guard: false,
+      fetchImpl: fetchOf(async () => new Response('<form><input type="password"></form>', { status: 302 }))
+    })
+    expect(run.steps[0].status).toBe('not-proven')
+    expect(run.proven).toEqual([])
   })
 })

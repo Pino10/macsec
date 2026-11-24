@@ -78,6 +78,47 @@ export function parseKatana(jsonl: string, host: string): string[] {
   return [...out]
 }
 
+/** The paths ffuf found, same host only, with what each answer looked like. */
+export interface FfufHit {
+  path: string
+  url: string
+  status: number
+  length: number
+  contentType?: string
+  redirect?: string
+}
+
+export function parseFfuf(text: string, host: string, cap = 400): FfufHit[] {
+  type R = { input?: Record<string, string>; status?: number; length?: number; 'content-type'?: string; contentType?: string; redirectlocation?: string; url?: string }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return []
+  }
+  const list = Array.isArray(parsed) ? parsed : (parsed as { results?: unknown }).results
+  if (!Array.isArray(list)) return []
+  const out: FfufHit[] = []
+  const seen = new Set<string>()
+  for (const item of list as R[]) {
+    const url = item.url
+    if (!url) continue
+    let u: URL
+    try {
+      u = new URL(url)
+    } catch {
+      continue
+    }
+    if (u.host !== host) continue
+    const path = u.pathname + (u.search || '')
+    if (seen.has(path)) continue
+    seen.add(path)
+    out.push({ path, url: u.href, status: Number(item.status) || 0, length: Number(item.length) || 0, contentType: item['content-type'] ?? item.contentType, redirect: item.redirectlocation || undefined })
+    if (out.length >= cap) break
+  }
+  return out
+}
+
 // ---------------------------------------------------------------- Exposed files
 
 /** How much a reachable path matters, from its name. */

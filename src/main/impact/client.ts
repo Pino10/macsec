@@ -122,6 +122,19 @@ export class ImpactClient {
     if (inside.length) throw new ImpactRefused(`${host} resolves to ${inside[0]}, which is not a public address. Mark the engagement as a staging server if that is right.`)
   }
 
+  /**
+   * Counts requests that an external tool (ffuf) will send, in one line of the audit log.
+   * The engagement cap is about the target, not about which program holds the socket.
+   */
+  reserve(n: number, what: string): void {
+    if (this.stopped) throw new ImpactRefused(this.stopped)
+    if (stopRequested || this.o.cancelled?.()) throw new ImpactRefused('Stopped by you.')
+    const left = this.left().requests
+    if (n > left) throw new ImpactRefused(`The cap leaves ${left} requests and ${what} needs ${n}. Raise the cap in writing, or use a smaller list.`)
+    this.requests += n
+    this.audit.push({ at: new Date().toISOString(), method: 'GET', url: `(external tool) ${what}`, requestBytes: 0, status: 0, responseBytes: 0, responseSha: '', note: `${n} requests counted once` })
+  }
+
   /** A plain read. Anything with a body goes through send() with a write flag. */
   get(url: string, o: { headers?: Record<string, string>; note?: string; allowCrossOrigin?: boolean } = {}): Promise<ImpactReply> {
     return this.send('GET', url, o)
