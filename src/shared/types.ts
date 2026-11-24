@@ -1,5 +1,5 @@
 /** Everything the window and the main process say to each other. */
-import type { Engagement, EngagementDraft, ImpactActionInfo, ImpactPlan, ImpactPlanRequest, ImpactProgress, ImpactRun, ImpactRunRequest } from './impact'
+import type { Engagement, EngagementDraft, ImpactActionInfo, ImpactPlan, ImpactPlanRequest, ImpactProgress, ImpactRun, ImpactRunRequest, PlannedStep } from './impact'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 export const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
@@ -162,6 +162,8 @@ export interface ConfirmOptions {
   waf: boolean
   /** Injection tests on every parameter and every GET form, with harmless markers. */
   inject?: boolean
+  /** Read-only content discovery with ffuf: hundreds of common paths, then each hit is proved. */
+  discover?: boolean
   /** OAuth, tokens, GraphQL, CORS, CSRF and session id checks. */
   proto?: boolean
   /** Business logic: open redirects, host header poisoning, code limits, trusted fields, skipped steps. */
@@ -699,6 +701,8 @@ export interface Channels {
   'impact:run': { args: [ImpactRunRequest]; result: ImpactRun }
   'impact:stop': { args: []; result: boolean }
   'impact:runs': { args: []; result: ImpactRun[] }
+  /** Fill in the fields a plan step cannot know (the expected string, a read-back address, an undo note). */
+  'impact:update-step': { args: [{ planId: string; stepId: string; patch: Partial<PlannedStep> }]; result: ImpactPlan }
 }
 
 export interface Events {

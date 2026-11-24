@@ -36,6 +36,14 @@ const paramOf = (url: string): string | null => {
   }
 }
 
+const dirOf = (url: string): string => {
+  try {
+    return `${new URL(url).origin}/`
+  } catch {
+    return url
+  }
+}
+
 const pageOf = (url: string): string => {
   try {
     const u = new URL(url)
@@ -80,7 +88,9 @@ const RULES: Rule[] = [
   { re: /path traversal|directory traversal|lfi|local file inclusion|file read|arbitrary file/i, action: 'traversal-read', aims: 'confidentiality', why: 'The scan found a parameter that looks like it reaches the file system. Ask it for a system file.' },
   { re: /template injection|ssti|server-side template|engine evaluates|calculates an expression/i, action: 'ssti-marker', aims: 'integrity', why: 'The scan says the server evaluates input as a template. Show the smallest calculation it will do.' },
   { re: /upload|attachment|avatar|profile picture|media/i, action: 'upload-write', aims: 'integrity', why: 'The scan found an upload. Write one harmless text file and read it back.' },
-  { re: /expensive|slow|timeout|rate limit|unbounded|export|report|generate|pdf render/i, action: 'availability-probe', aims: 'availability', why: 'The scan flagged a costly operation. Time one request against its baseline, without flooding it.' }
+  { re: /expensive|slow|timeout|rate limit|unbounded|export|report|generate|pdf render/i, action: 'availability-probe', aims: 'availability', why: 'The scan flagged a costly operation. Time one request against its baseline, without flooding it.' },
+  { re: /hidden page|not linked|nothing links|directory listing|folder lists|exposed file|backup/i, action: 'content-discovery', aims: 'confidentiality', why: 'The scan saw content the site does not link to. Ask for the common paths around it and prove what answers.' },
+  { re: /private page|needs? sign-?in|requires? (a )?login|signed out|anyone can open|missing authorization|needs no sign|idor|broken access/i, action: 'auth-bypass', aims: 'confidentiality', why: 'The scan says a private page may open without signing in. Ask for it anonymously and look for what only a signed-in person should see.' }
 ]
 
 export function planFromRules(input: PlanRulesInput): PlanDraft {
@@ -128,17 +138,33 @@ export function planFromRules(input: PlanRulesInput): PlanDraft {
       push({ action: rule.action, aims: rule.aims, url: pageOf(url), from: f.id, why: rule.why, write: false, after: [] })
       continue
     }
+    if (rule.action === 'content-discovery') {
+      push({ action: 'content-discovery', aims: 'confidentiality', url: dirOf(url), from: f.id, why: rule.why, write: false, after: [] })
+      continue
+    }
+    if (rule.action === 'auth-bypass') {
+      push({ action: 'auth-bypass', aims: 'confidentiality', url: pageOf(url), expect: '', from: f.id, why: rule.why, write: false, after: [] })
+      continue
+    }
     if (!param) continue
     const page = pageOf(url)
     push({ action: rule.action, aims: rule.aims, url: page, param, from: f.id, why: rule.why, write: false, after: [] })
   }
 
-  // Escalation: after a read proof on a page, the next rung is a write, and only the person can
-  // paste that request. The plan says so instead of inventing one.
+  // Escalation: a write on the same site runs only after a read there is proven, so the plan is a
+  // ladder and not a pile of independent requests. The run stops at the first proof of each goal.
   const readStep = steps.find((s) => s.aims === 'confidentiality')
-  if (readStep && goal.includes('integrity')) {
-    notes.push(`After the read on ${pageOf(readStep.url)} is proven, the next rung is a write on the same page. Use the replay proof and paste the request you want to send, with the undo step written down. MacSec does not invent a write.`)
+  if (readStep) {
+    const write = steps.find((s) => s.aims === 'integrity' && (!s.after || !s.after.length))
+    if (write) {
+      write.after = [readStep.id]
+      notes.push(`Escalation: ${write.id} (${write.action}) runs only after ${readStep.id} (${readStep.action}) is proven, so the ladder is read first, then write.`)
+    } else if (goal.includes('integrity')) {
+      notes.push(`After the read on ${pageOf(readStep.url)} is proven, the next rung is a write on the same site. Use the replay proof and paste the request you want to send, with the undo step written down. MacSec does not invent a write.`)
+    }
   }
+  const needsFill = steps.filter((s) => (s.action === 'replay-request' && !s.expect) || (s.action === 'auth-bypass' && !s.expect) || (s.action === 'upload-write' && !s.verifyUrl))
+  if (needsFill.length) notes.push(`${needsFill.map((s) => s.id).join(', ')} need${needsFill.length === 1 ? 's' : ''} a field you can see best: the string that proves it, or the address to read the file back from. Fill them in below the step before running.`)
   if (!steps.length) {
     notes.push(
       'No finding on this target matches a built-in proof. That is not a failure: the replay proof takes any request you paste (from Burp, or copied from a finding), sends it once and looks for the string you name.'

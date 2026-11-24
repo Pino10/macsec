@@ -30,6 +30,8 @@ export type ImpactActionId =
   | 'upload-write'
   | 'availability-probe'
   | 'replay-request'
+  | 'content-discovery'
+  | 'auth-bypass'
 
 export type ImpactMethod = 'GET' | 'POST' | 'PUT' | 'PATCH'
 

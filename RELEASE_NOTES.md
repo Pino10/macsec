@@ -1,3 +1,13 @@
+## 1.15.0
+
+- **ffuf is in the toolbox.** On the Web scan page, "Content discovery with ffuf" asks for 200 to 435 common paths at 20 a second, signed out, with ffuf's own calibration. Every path that answers is asked again by MacSec and reported only with a proof, and each one joins the pages the scan tests next. Your own lists in `~/MacSec/extensions/wordlists/*.txt` are used first. ffuf is free, comes from its own GitHub release and is checked against the checksum its authors publish.
+- **The ladder: read, then write, then proof.** Controlled proofs now plan as a chain: a write step is marked to run only after a read on the same site is proven, and the run still stops at the first proof of each goal. Two new rungs: content discovery under an engagement, and an anonymous read that proves a private page opens with no cookie and no token.
+- **Fill in what only you know.** A plan step can be edited before it runs: the string that proves it, the address to read an uploaded file back from, the method, headers and body of a request you paste, and the undo sentence. MacSec re-validates every field on the server, so the plan a run uses is the plan you approved.
+- **Request caps stay true.** Requests ffuf sends on your behalf are counted against the engagement in one audited line, so a discovery run cannot hide inside a proof.
+- **Tests.** 35 in the controlled-proof suite now, including discovery with an injected ffuf, the anonymous read, the ladder ordering, and the refusals.
+
+Limits, on purpose: still no shells, no data dumps, no password guessing, no persistence and no evasion. Metasploit-driven exploitation and a headless CLI for CI are the next pieces.
+
 ## 1.14.0
 
 - **Controlled proofs.** A new page proves what someone could actually do on a site you are engaged to test, and stops at the first result. It needs a written engagement first: client, authority reference, who gave it, the hosts it covers, the window, and caps for requests and writes. Every step says in advance what it sends, what it aims to prove and what it will not do. You tick the steps, type `EXPLOIT <host>`, and the run sends requests one at a time, logs each one with the values hidden, and stops when the goal is proven. Four built-in proofs: read a system file through a parameter (confidentiality), template arithmetic (integrity), write one file and read it back (integrity), and time one request against three (availability). The fifth is the escape hatch: paste any request and name the string that proves it.

@@ -12,7 +12,6 @@ const brew = (bin: string): string[] => [`/opt/homebrew/bin/${bin}`, `/usr/local
 const LIST: (Omit<OptionalTool, 'installed'> & { paths: string[] })[] = [
   { name: 'Metasploit Framework', what: 'Exploitation framework. MacSec uses it only when you switch it on for a server check, and only the modules you tick one by one: the own check of Metasploit for a known flaw, or a look-only scanner that reads a version or banner. Never exploit, login or brute force. Install it yourself.', homepage: 'https://www.metasploit.com', paths: [...brew('msfconsole'), '/opt/metasploit-framework/bin/msfconsole'] },
   { name: 'sqlmap', what: 'Tests and exploits SQL injection.', homepage: 'https://sqlmap.org', paths: brew('sqlmap') },
-  { name: 'ffuf', what: 'Fast web fuzzer for hidden paths and parameters.', homepage: 'https://github.com/ffuf/ffuf', paths: brew('ffuf') },
   { name: 'Dalfox', what: 'Finds and confirms cross-site scripting (XSS) by sending payloads.', homepage: 'https://github.com/hahwul/dalfox', paths: brew('dalfox') },
   { name: 'Hydra', what: 'Password guessing against sign-in pages and services.', homepage: 'https://github.com/vanhauser-thc/thc-hydra', paths: brew('hydra') },
   { name: 'hashcat', what: 'Password hash cracking.', homepage: 'https://hashcat.net/hashcat/', paths: brew('hashcat') },

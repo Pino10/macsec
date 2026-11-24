@@ -39,10 +39,10 @@ export default function WebScan(): React.JSX.Element {
   const [autopilot, setAutopilot] = useState(false)
   const [headers, setHeaders] = useState('')
   const [captured, setCaptured] = useState<number | null>(null)
-  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false, logic: false, inject: false, proto: false })
+  const [cc, setCc] = useState<ConfirmOptions>({ fuzz: false, auth: false, authz: false, waf: false, logic: false, inject: false, proto: false, discover: false })
   const [ccOk, setCcOk] = useState(false)
   const setC = (p: Partial<ConfirmOptions>): void => setCc((x) => ({ ...x, ...p }))
-  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf || cc.logic || cc.inject || cc.proto
+  const ccOn = cc.fuzz || cc.auth || cc.authz || cc.waf || cc.logic || cc.inject || cc.proto || cc.discover
 
   useEffect(() => {
     void api.invoke('web:sites').then((s) => {
@@ -192,10 +192,10 @@ export default function WebScan(): React.JSX.Element {
               <span className="hint">Quick choices:</span>
               {(
                 [
-                  ['None', { fuzz: false, waf: false, auth: false, authz: false, logic: false, inject: false, proto: false }],
-                  ['Public site', { fuzz: true, waf: true, auth: false, authz: false, logic: true, inject: true, proto: true }],
-                  ['Login and accounts', { fuzz: false, waf: false, auth: true, authz: false, logic: true, inject: true, proto: true }],
-                  ['Shop or booking flow', { fuzz: true, waf: false, auth: true, authz: false, logic: true, inject: true, proto: true }]
+                  ['None', { fuzz: false, waf: false, auth: false, authz: false, logic: false, inject: false, proto: false, discover: false }],
+                  ['Public site', { fuzz: true, waf: true, auth: false, authz: false, logic: true, inject: true, proto: true, discover: true }],
+                  ['Login and accounts', { fuzz: false, waf: false, auth: true, authz: false, logic: true, inject: true, proto: true, discover: false }],
+                  ['Shop or booking flow', { fuzz: true, waf: false, auth: true, authz: false, logic: true, inject: true, proto: true, discover: true }]
                 ] as const
               ).map(([name, set]) => (
                 <button key={name} className="btn btn-sm" onClick={() => setC(set)}>
@@ -205,6 +205,7 @@ export default function WebScan(): React.JSX.Element {
             </div>
             {(
               [
+                ['discover', 'Content discovery with ffuf', 'Asks the site for up to 435 common paths at 20 a second, signed out, with its own calibration. Every path that answers is asked again and proved, and each one joins the pages tested below. Read-only: no redirects, no parameters fuzzed, no cookie sent.'],
                 ['fuzz', 'Hidden pages and parameters', 'Looks for pages and settings that are not linked, and tells you which are real. Sites that answer yes to everything are detected and ignored.'],
                 ['waf', 'Web firewall tests', 'Finds which firewall answers, what it blocks, and whether a harmless marker gets past it. A way through is reported at once so the owner can tighten the rule.'],
                 ['inject', 'Injection tests on every page and form', 'Sends harmless markers into every parameter and every search-style form it finds (signed in too, if you signed in above) and reads what comes back: unescaped output, database errors, a calculated expression, a line break in a header. It only reads: forms that send data are listed, never submitted.'],

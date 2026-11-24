@@ -197,8 +197,11 @@ describe('tools', () => {
     const list = optionalTools()
     expect(list.map((t) => t.name)).toEqual(expect.arrayContaining(['Metasploit Framework', 'sqlmap', 'Hydra', 'drozer', 'Pacu']))
     expect(list.every((t) => t.homepage.startsWith('https://'))).toBe(true)
-    // None of them is in the catalog MacSec installs from.
-    expect(CATALOG.some((t) => /metasploit|sqlmap|hydra|drozer|pacu|ffuf|dalfox|hashcat|john/i.test(t.id))).toBe(false)
+    // None of them is in the catalog MacSec installs from. ffuf is the one that moved: it is a
+    // bounded, proved discovery step now (see tests/v31-impact.test.ts), not an attack tool.
+    expect(CATALOG.some((t) => /metasploit|sqlmap|hydra|drozer|pacu|dalfox|hashcat|john/i.test(t.id))).toBe(false)
+    expect(CATALOG.some((t) => t.id === 'ffuf')).toBe(true)
+    expect(optionalTools().some((t) => t.name === 'ffuf')).toBe(false)
   })
   it('writes AI prompts for the new kinds of check', () => {
     expect(summaryPrompt('mobile', 'Demo', '', [])).toContain('read-only mobile app security check')
