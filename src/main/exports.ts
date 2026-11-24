@@ -5,7 +5,7 @@
  * pre-commit hook and CI workflows MacSec suggests. Secrets never appear: findings only ever
  * hold the kind of key, its file and line.
  */
-import type { Finding, SessionInfo, Severity } from '../shared/types'
+import type { Finding, SessionDetail, SessionInfo, Severity } from '../shared/types'
 
 const SARIF_LEVEL: Record<Severity, 'error' | 'warning' | 'note'> = { critical: 'error', high: 'error', medium: 'warning', low: 'note', info: 'note' }
 const SCORE: Record<Severity, string> = { critical: '9.5', high: '8.0', medium: '5.5', low: '3.0', info: '0.0' }
@@ -201,4 +201,35 @@ export function laramacSites(settingsText: string): { name: string; url: string 
   } catch {
     return []
   }
+}
+
+/** A spreadsheet of every finding, safe from both broken quoting and formula injection. */
+export function sessionCsv(d: SessionDetail): string {
+  const cell = (v: unknown): string => {
+    let s = String(v ?? '')
+    // A cell that starts like a formula would run in a spreadsheet. Quote it as text.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const head = ['severity', 'tool', 'category', 'title', 'file', 'url', 'line', 'cwe', 'advisory', 'checkId', 'confidence', 'exploit', 'triage', 'owner', 'due', 'proven_by_controlled_proof', 'found_at']
+  const rows = d.findings.map((f) => [
+    f.severity,
+    f.tool,
+    f.category,
+    f.title,
+    f.file,
+    f.url,
+    f.line,
+    f.cwe,
+    f.advisory,
+    f.checkId,
+    f.confidence,
+    f.exploit?.label,
+    f.triage,
+    f.owner,
+    f.due,
+    f.controlled ? `yes (${f.controlled.engagementRef}, ${f.controlled.runId})` : '',
+    f.controlled?.at ?? ''
+  ])
+  return [head, ...rows].map((r) => r.map(cell).join(',')).join('\n') + '\n'
 }

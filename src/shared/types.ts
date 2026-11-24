@@ -121,6 +121,9 @@ export interface Finding {
   /** What you decided: fixed, accepted risk, or not a problem. It then stops counting. */
   triage?: 'fixed' | 'accepted' | 'not-a-problem'
   triagedAt?: string
+  /** Who owns the fix, and when it is due. Only set when the finding is triaged. */
+  owner?: string
+  due?: string
   /** Other tools that found the same thing in the same place (merged into this finding). */
   alsoFoundBy?: string[]
   /** Marked "not a problem" by a rule you saved earlier, not by hand in this session. */
@@ -352,6 +355,8 @@ export interface SessionInfo {
   codeKept?: boolean
   /** For audits: the sessions it ran. */
   children?: string[]
+  /** What the AI review is roughly expected to use, worked out when the review starts. */
+  estimate?: { tokens: number; costUsd: number | null; minutes: number }
   /** The Claude Code session that did the review, to continue it. */
   claudeSession?: string
   /** The skills a Claude Code review loaded. */
@@ -648,6 +653,11 @@ export interface Channels {
   'ignored:list': { args: []; result: { key: string; scope: 'site' | 'everywhere'; title: string; place?: string; at: string }[] }
   'ignored:remove': { args: [string]; result: { key: string; scope: 'site' | 'everywhere'; title: string; place?: string; at: string }[] }
   'findings:triage': { args: [string, string, 'fixed' | 'accepted' | 'not-a-problem' | null, ('site' | 'everywhere')?]; result: SessionDetail }
+  /** Mark several findings at once, with an optional owner and due date. */
+  'findings:triage-bulk': { args: [string, string[], 'fixed' | 'accepted' | 'not-a-problem' | null, { owner?: string; due?: string }?]; result: SessionDetail }
+  'profiles:list': { args: []; result: SavedProfile[] }
+  'profiles:save': { args: [{ name: string; kind: 'web' | 'review'; options: Record<string, unknown> }]; result: SavedProfile[] }
+  'profiles:delete': { args: [string]; result: SavedProfile[] }
   'app:check-update': { args: []; result: UpdateInfo | null }
   'app:install-update': { args: []; result: void }
   'app:update-status': { args: []; result: UpdateStatus }
@@ -664,7 +674,7 @@ export interface Channels {
   'sessions:owasp': { args: [string]; result: OwaspChecklistInfo }
   'sessions:masvs': { args: [string]; result: MasvsInfo }
   'sessions:compare': { args: [string]; result: SessionCompare }
-  'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json' | 'masvs-report']; result: string | null }
+  'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json' | 'csv' | 'masvs-report']; result: string | null }
   'projects:save-hook': { args: [string]; result: string | null }
   'projects:save-ci': { args: [string, 'github' | 'azure']; result: string | null }
   'checkup:run': { args: []; result: CheckupResult }
@@ -728,6 +738,15 @@ export interface Channels {
   'impact:runs': { args: []; result: ImpactRun[] }
   /** Fill in the fields a plan step cannot know (the expected string, a read-back address, an undo note). */
   'impact:update-step': { args: [{ planId: string; stepId: string; patch: Partial<PlannedStep> }]; result: ImpactPlan }
+}
+
+export interface SavedProfile {
+  id: string
+  name: string
+  kind: 'web' | 'review'
+  /** Choices only: no target, no cookie, no token. */
+  options: Record<string, unknown>
+  createdAt: string
 }
 
 export interface SearchHit {

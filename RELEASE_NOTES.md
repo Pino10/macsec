@@ -1,3 +1,43 @@
+## 1.23.0
+
+The workflow release. 1.22 rearranged the flows; this one closes the loop between finding something
+and doing something about it, and keeps the setup of a repeated test.
+
+### What is new
+
+- **Saved profiles.** A web scan or a code review can be saved as a named profile (for example
+  "Staging, gentle, signed in, no active tests"), and applied on the next run with one click. A
+  profile holds choices only: never a target, never a cookie, never a token, and the code refuses a
+  profile that names one. Up to 50 are kept, sorted by name, replaced when the name matches, and
+  removed with the small cross beside them.
+- **Bulk triage with an owner and a due date.** Select several findings at once and mark them
+  fixed, accepted or not a problem, with an optional owner and due date. One result, one write, and
+  the open count is recalculated the same way single triage does. Clearing the selection clears the
+  owner and the date with it.
+- **CSV export.** Every finding as a spreadsheet: severity, tool, category, title, place, CWE,
+  advisory, check id, confidence, exploit label, triage, owner, due date and the proof reference.
+  Commas and quotes are handled, and a cell that would start a formula is neutralised, because
+  opening a scan export in Excel should never run anything.
+- **The cost is on the result.** A code review records its estimate when it starts (tokens,
+  minutes, and whether it is included in a plan, free on this Mac, or roughly what an API would
+  cost), and the result shows it beside the reviewer. It is an estimate and it says so.
+
+### Under the hood
+
+- `profiles.ts` is the store, with validation and the secret-key refusal; `ProfileBar` is the same
+  control on both pages, so the two cannot drift.
+- `findings:triage-bulk` is one IPC call with an id list, validated and capped, and it writes once.
+- `sessionCsv` lives with the other exports, and the CSV is a normal Export menu entry.
+- `SessionInfo.estimate` is filled by `startReview` from `shared/estimate.ts`.
+
+### Limits
+
+- CSV only, as agreed: no Jira, no Linear, no external service. Everything stays on the Mac.
+- No pull-request creation yet. The fix plan and the CSV are the path out; a PR bot is not.
+- A profile is local to this Mac. There is no shared or team library.
+
+---
+
 ## 1.22.0
 
 The flow release. The web scan and the code review were both arranged around what the tool needed

@@ -7,6 +7,7 @@ import { estimateReview, minutesText, tokensText } from '@shared/estimate'
 import { FlowStep, PageHead, Seg } from '../ui'
 import SourcePicker, { sourceName } from '../components/SourcePicker'
 import ReviewerChoice from '../components/ReviewerChoice'
+import ProfileBar from '../components/ProfileBar'
 import SkillPicker from '../components/SkillPicker'
 import DeepAudit from '../components/DeepAudit'
 
@@ -57,6 +58,14 @@ export default function CodeReview(): React.JSX.Element {
 
   const missing = tools.filter((t) => !t.installed && ['code', 'secrets', 'deps'].includes(t.category)).length
   const remote = source && source.kind !== 'local'
+  const applyProfile = (o: Record<string, unknown>): void => {
+    if (o.depth === 'quick' || o.depth === 'standard' || o.depth === 'deep') setDepth(o.depth)
+    if (o.focus === 'security' || o.focus === 'bugs' || o.focus === 'all') setFocus(o.focus)
+    if (o.reviewer === 'none' || o.reviewer === 'claude' || o.reviewer === 'claude-local' || o.reviewer === 'claude-free' || o.reviewer === 'codex' || o.reviewer === 'gemini' || o.reviewer === 'model') setReviewer(o.reviewer)
+    if (Array.isArray(o.skip)) setSkip(o.skip.filter((x): x is string => typeof x === 'string'))
+    setSkipHistory(o.skipHistory === true)
+  }
+  const profileOptions = { depth, focus, reviewer, skip, skipHistory }
 
   return (
     <>
@@ -83,6 +92,7 @@ export default function CodeReview(): React.JSX.Element {
         </div>
       )}
 
+      <ProfileBar kind="review" current={profileOptions} onApply={applyProfile} />
       <div className="flow">
         <FlowStep n={1} title="What to review" help="A project in your www folder, a GitHub repository or an Azure DevOps repository." state={source ? 'done' : 'current'}>
           {source ? (

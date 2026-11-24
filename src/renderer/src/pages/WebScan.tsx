@@ -5,6 +5,7 @@ import { estimateWebScan, minutesText } from '@shared/estimate'
 import { useApp } from '../store'
 import { FlowStep, PageHead, Seg, SwitchLine } from '../ui'
 import ReviewerChoice from '../components/ReviewerChoice'
+import ProfileBar from '../components/ProfileBar'
 
 export const MODES: { id: ScanMode; icon: React.ReactNode; title: string; text: string }[] = [
   { id: 'quick', icon: <Zap size={18} />, title: 'Quick', text: 'The main address: headers, TLS, the most dangerous exposed files and serious known problems. A minute or two.' },
@@ -109,10 +110,24 @@ export default function WebScan(): React.JSX.Element {
             : ''
 
   const active = (set: Partial<Record<ConfirmKey, boolean>>): boolean => CONFIRM_FIELDS.every((f) => !!cc[f.key] === !!set[f.key])
+  const profileOptions = { mode, pacing, confirm: cc, white: box === 'white', reviewer, autopilot, checklist }
+  const applyProfile = (o: Record<string, unknown>): void => {
+    setOk(false)
+    setCcOk(false)
+    if (o.mode === 'quick' || o.mode === 'standard' || o.mode === 'thorough') setMode(o.mode)
+    if (o.pacing === 'gentle' || o.pacing === 'normal') setPacing(o.pacing)
+    if (o.confirm && typeof o.confirm === 'object' && !Array.isArray(o.confirm)) setCc({ ...emptyConfirm(), ...(o.confirm as ConfirmOptions) })
+    if (typeof o.white === 'boolean') setBox(o.white ? 'white' : 'black')
+    if (o.reviewer === 'none' || o.reviewer === 'claude' || o.reviewer === 'claude-local' || o.reviewer === 'claude-free' || o.reviewer === 'codex' || o.reviewer === 'gemini' || o.reviewer === 'model') setReviewer(o.reviewer)
+    setAutopilot(o.autopilot === true)
+    setChecklist(o.checklist === true)
+    notify({ kind: 'info', text: 'Profile applied. Sign in again for this host.' })
+  }
 
   return (
     <>
       <PageHead title="Web scan" desc="Looks at a site the way a careful visitor would: what it reveals, what it leaves open, and which known problems it has. Every check only reads; nothing is attacked or changed." />
+      <ProfileBar kind="web" current={profileOptions} onApply={applyProfile} />
       <div className="flow">
         <FlowStep n={1} title="Which site" state={valid ? 'done' : 'current'}>
           <Seg<'local' | 'url'>
