@@ -1,3 +1,35 @@
+## 1.28.0
+
+The first real mobile fixture, with its decode path tested, and the 1.27.1 crash fix carried in.
+
+### The APK fixture
+
+- **A real, redistributable APK**: `org.vi_server.red_screen` 1.1 (versionCode 2), MIT licensed,
+  source at github.com/vi/redscreen.apk, downloaded from F-Droid. It is **8,649 bytes**, so it can
+  live in the repository without turning it into an app store, and it is a red screen: nothing in
+  it is sensitive.
+- **Pinned by SHA-256** in the test, with the source, licence, size and download address recorded
+  next to it in `tests/fixtures/mobile/README.md`.
+- **The decode path is tested**, not just the file hash: the test walks the zip central directory,
+  inflates `AndroidManifest.xml`, checks the Android binary XML chunk header (type `0x0003`, header
+  `0x0008`) and finds the package name in the UTF-16 string pool, then reads `classes.dex` and
+  checks its `dex\n` magic. That is the same path a manifest or dex reader takes, without a
+  dependency.
+- **The IPA limit is written down**: an IPA cannot generally be redistributed, and dynamic iOS
+  testing needs Xcode, a signing identity and a device. The fixture is an APK; the mobile tests are
+  static.
+
+### Still open, explicitly
+
+- **Joern**: Java 21 is now installed and the 1.6 GB asset downloaded, but it has not been measured
+  yet. No number is claimed.
+- **Amass vs subfinder**: Amass passive did not finish inside a bounded run (it was still resolving
+  at the limit), so there is no comparison to report yet.
+- **Patch generation**: not shipped. The scratch copy, test command, rescan and typed confirmation
+  are exactly where a rushed feature becomes a dangerous one.
+
+---
+
 ## 1.27.1
 
 A crash fix. No feature changed.
