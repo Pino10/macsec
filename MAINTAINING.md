@@ -63,6 +63,14 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.16
+
+- Tools: `gau` (release), `wafw00f` and `sqlmap` (python), Homebrew installs for app tools (`installApp`, `brewPath`, `ToolInfo.formula`) and versions for app tools (`toolVersion` now runs an installed app's `versionArgs`).
+- `reconscan.ts`: a gau step and `parseGau`; `recon:handoff` starts a web scan with `seedUrls` from the recon's own `urls.txt`.
+- `apiscan.ts`: `loadSpecText(text, name)`, used by `api:load-url`.
+- `impact/actions.ts`: `sql-injection-proof`, `parseSqlmap`, `setSqlmapRunner`, and `client.reserve()` for tools that send their own requests (ffuf, sqlmap).
+- `tests/v33-tools.test.ts`: the new tool parsers and the sqlmap bounds.
+
 ### Added in 1.15
 
 - ffuf in `CATALOG` (release asset plus published checksums), `parseFfuf` in `scanners/web.ts`, the optional `discover` step in `webscan.ts`, and the engagement-gated `content-discovery` and `auth-bypass` runners.

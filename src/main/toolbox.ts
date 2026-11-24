@@ -20,7 +20,7 @@ type Base = { id: string; name: string; category: ToolCategory; purpose: string;
 export type ToolDef =
   | (Base & { method: 'release'; repo: string; binaries: string[] })
   | (Base & { method: 'python'; pkg: string; binaries: string[]; with?: string[] })
-  | (Base & { method: 'app'; apps: string[] })
+  | (Base & { method: 'app'; apps: string[]; formula?: { name: string; cask?: boolean } })
 
 export const CATALOG: ToolDef[] = [
   // Runtime for the Python tools.
@@ -49,7 +49,10 @@ export const CATALOG: ToolDef[] = [
   { id: 'nuclei', name: 'Nuclei', category: 'web', method: 'release', repo: 'projectdiscovery/nuclei', binaries: ['nuclei'], purpose: 'Runs thousands of community checks for known problems against a site.', homepage: 'https://docs.projectdiscovery.io/tools/nuclei', versionArgs: ['-version'] },
   { id: 'ffuf', name: 'ffuf', category: 'web', method: 'release', repo: 'ffuf/ffuf', binaries: ['ffuf'], purpose: 'Content discovery: asks for hundreds of common paths quickly, with its own calibration against "not found" answers, so hidden pages, backups and admin panels are found. Read-only: it never follows a redirect and never sends a cookie.', homepage: 'https://github.com/ffuf/ffuf', versionArgs: ['-V'] },
   { id: 'katana', name: 'Katana', category: 'web', method: 'release', repo: 'projectdiscovery/katana', binaries: ['katana'], purpose: 'Crawls a site to find every page, form and endpoint before scanning.', homepage: 'https://docs.projectdiscovery.io/tools/katana', versionArgs: ['-version'] },
-  { id: 'wpscan', name: 'WPScan', category: 'web', method: 'app', apps: brew('wpscan'), purpose: 'WordPress: the version, plugins and themes, and known problems in them. Used in web scans of WordPress sites when installed (brew install wpscanteam/tap/wpscan).', homepage: 'https://wpscan.com' },
+  { id: 'gau', name: 'gau', category: 'web', method: 'release', repo: 'lc/gau', binaries: ['gau'], purpose: 'Collects URLs the internet already knows for a domain, from the Wayback Machine, Common Crawl, AlienVault and urlscan. Passive: it never contacts your site. Recon adds them to the pages, parameters and endpoints it tests.', homepage: 'https://github.com/lc/gau', versionArgs: ['--version'] },
+  { id: 'wafw00f', name: 'wafw00f', category: 'web', method: 'python', pkg: 'wafw00f', binaries: ['wafw00f'], purpose: 'Names the web firewall in front of a site (Cloudflare, Akamai, F5 and about 150 others) from a short list of probes. A web scan uses it when control confirmations are on.', homepage: 'https://github.com/EnableSecurity/wafw00f' },
+  { id: 'sqlmap', name: 'sqlmap', category: 'web', method: 'python', pkg: 'sqlmap', binaries: ['sqlmap'], purpose: 'Proves a SQL injection exists on one parameter, in a bounded fingerprint mode: risk 1, level 1, boolean and error techniques only. It never dumps data, never opens a shell, and only runs under a written engagement (Controlled proofs).', homepage: 'https://sqlmap.org' },
+  { id: 'wpscan', name: 'WPScan', category: 'web', method: 'app', apps: brew('wpscan'), formula: { name: 'wpscanteam/tap/wpscan' }, versionArgs: ['--version'], purpose: 'WordPress: the version, plugins and themes, and known problems in them. Used in web scans of WordPress sites when installed (brew install wpscanteam/tap/wpscan).', homepage: 'https://wpscan.com' },
   { id: 'subfinder', name: 'subfinder', category: 'web', method: 'release', repo: 'projectdiscovery/subfinder', binaries: ['subfinder'], purpose: 'Finds subdomains from public sources, for recon. Passive: it never contacts the target.', homepage: 'https://docs.projectdiscovery.io/tools/subfinder', versionArgs: ['-version'] },
   { id: 'httpx', name: 'httpx', category: 'web', method: 'release', repo: 'projectdiscovery/httpx', binaries: ['httpx'], purpose: 'Checks which addresses answer and what they run (server, framework, title).', homepage: 'https://docs.projectdiscovery.io/tools/httpx', versionArgs: ['-version'] },
 
@@ -66,15 +69,15 @@ export const CATALOG: ToolDef[] = [
   { id: 'awscli', name: 'AWS CLI', category: 'cloud', method: 'python', pkg: 'awscli', binaries: ['aws'], purpose: 'Reads your AWS profile for the cloud audit.', homepage: 'https://aws.amazon.com/cli/' },
   { id: 'cloudfox', name: 'CloudFox', category: 'cloud', method: 'release', repo: 'BishopFox/cloudfox', binaries: ['cloudfox'], purpose: 'Maps what an account can reach: roles, public storage, endpoints and secrets stores.', homepage: 'https://github.com/BishopFox/cloudfox', versionArgs: ['--version'] },
   { id: 'pmapper', name: 'PMapper', category: 'cloud', method: 'python', pkg: 'principalmapper', binaries: ['pmapper'], purpose: 'Finds AWS users and roles that could give themselves more access.', homepage: 'https://github.com/nccgroup/PMapper' },
-  { id: 'gcloud', name: 'Google Cloud CLI', category: 'cloud', method: 'app', apps: [...brew('gcloud'), '/opt/homebrew/share/google-cloud-sdk/bin/gcloud', '/usr/local/share/google-cloud-sdk/bin/gcloud'], purpose: 'Detected when installed, for your own Google Cloud checks.', homepage: 'https://cloud.google.com/sdk/docs/install' },
+  { id: 'gcloud', name: 'Google Cloud CLI', category: 'cloud', method: 'app', apps: [...brew('gcloud'), '/opt/homebrew/share/google-cloud-sdk/bin/gcloud', '/usr/local/share/google-cloud-sdk/bin/gcloud'], formula: { name: 'google-cloud-sdk', cask: true }, purpose: 'Detected when installed, for your own Google Cloud checks.', homepage: 'https://cloud.google.com/sdk/docs/install' },
 
   // Servers and ports (your own hosts)
   { id: 'naabu', name: 'naabu', category: 'network', method: 'release', repo: 'projectdiscovery/naabu', binaries: ['naabu'], purpose: 'Lists the open ports on a server you own, with plain connection checks.', homepage: 'https://docs.projectdiscovery.io/tools/naabu', versionArgs: ['-version'] },
-  { id: 'nmap', name: 'Nmap', category: 'network', method: 'app', apps: brew('nmap'), purpose: 'Names the service and version on each open port. Used by the server audit when installed (brew install nmap). MacSec never runs its scripts.', homepage: 'https://nmap.org/download' },
+  { id: 'nmap', name: 'Nmap', category: 'network', method: 'app', apps: brew('nmap'), formula: { name: 'nmap' }, versionArgs: ['--version'], purpose: 'Names the service and version on each open port. Used by the server audit when installed (brew install nmap). MacSec never runs its scripts.', homepage: 'https://nmap.org/download' },
 
   // Deeper analysis you open yourself
-  { id: 'radare2', name: 'radare2', category: 'optional', method: 'app', apps: brew('r2'), purpose: 'Reverse engineering of app binaries, for when you want to look inside by hand.', homepage: 'https://rada.re' },
-  { id: 'ghidra', name: 'Ghidra', category: 'optional', method: 'app', apps: [...brew('ghidraRun'), '/Applications/Ghidra.app'], purpose: 'The NSA’s free decompiler, for reading compiled apps by hand.', homepage: 'https://ghidra-sre.org' },
+  { id: 'radare2', name: 'radare2', category: 'optional', method: 'app', apps: brew('r2'), formula: { name: 'radare2' }, versionArgs: ['-v'], purpose: 'Reverse engineering of app binaries, for when you want to look inside by hand.', homepage: 'https://rada.re' },
+  { id: 'ghidra', name: 'Ghidra', category: 'optional', method: 'app', apps: [...brew('ghidraRun'), '/Applications/Ghidra.app'], formula: { name: 'ghidra', cask: true }, purpose: 'The NSA’s free decompiler, for reading compiled apps by hand.', homepage: 'https://ghidra-sre.org' },
 ]
 
 /** Where Homebrew puts a command, on Apple silicon and Intel Macs. */
@@ -332,9 +335,10 @@ export function isInstalled(t: ToolDef): boolean {
 
 const versions = new Map<string, string | null>()
 export function toolVersion(t: ToolDef): Promise<string | null> {
-  if (!isInstalled(t) || t.method === 'app') return Promise.resolve(null)
+  const bin = t.method === 'app' ? appPath(t.id) : isInstalled(t) ? toolPath(t.binaries[0]) : null
+  if (!bin || !t.versionArgs) return Promise.resolve(null)
   return new Promise((resolve) =>
-    execFile(toolPath(t.binaries[0]), t.versionArgs ?? ['--version'], { env: toolEnv(), timeout: 20000 }, (_e, out, err) => {
+    execFile(bin, t.versionArgs ?? ['--version'], { env: toolEnv(), timeout: 20000 }, (_e, out, err) => {
       const v = /v?(\d+\.\d+(?:\.\d+)?)/.exec(`${out}\n${err}`)?.[1] ?? null
       versions.set(t.id, v)
       resolve(v)
@@ -356,6 +360,8 @@ export async function listTools(): Promise<ToolInfo[]> {
       purpose: t.purpose,
       homepage: t.homepage,
       method: t.method,
+      installable: t.method !== 'app' || !!t.formula,
+      ...(t.method === 'app' && t.formula ? { formula: `${t.formula.cask ? '--cask ' : ''}${t.formula.name}` } : {}),
       languages: t.languages ?? [],
       installed: isInstalled(t),
       version,
@@ -379,3 +385,30 @@ export async function updateToolData(update: (p: number | null, l?: string) => v
 }
 
 export const nucleiTemplatesDir = (): string => join(dirs.tools(), 'nuclei-templates')
+
+// ---------------------------------------------------------------- Apps installed with Homebrew
+
+/** Homebrew, when it is on this Mac. */
+export function brewPath(): string | null {
+  return ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'].find((p) => existsSync(p)) ?? null
+}
+
+/**
+ * Installs an app tool with Homebrew, only when the person pressed the button for that tool.
+ * Homebrew runs with the real environment (it needs the real HOME); everything else stays in
+ * ~/MacSec. Nothing here runs by itself.
+ */
+export async function installApp(id: string, update: (p: number | null, l?: string) => void): Promise<void> {
+  const t = toolDef(id)
+  if (!t || t.method !== 'app') throw new Error('That is not an app MacSec can install.')
+  if (!t.formula) throw new Error(`${t.name} has no Homebrew formula in MacSec. Get it from ${t.homepage}.`)
+  const brew = brewPath()
+  if (!brew) throw new Error('Homebrew is not installed on this Mac. Install it from brew.sh, or get the app from its own site.')
+  update(null, `Homebrew: installing ${t.formula.name}`)
+  log('info', `Installing ${t.name} with Homebrew: ${brew} install ${t.formula.cask ? '--cask ' : ''}${t.formula.name}`)
+  await run(brew, ['install', ...(t.formula.cask ? ['--cask'] : []), t.formula.name], { ...process.env }, 45 * 60_000)
+  versions.delete(t.id)
+  const have = await toolVersion(t)
+  log('info', `Homebrew installed ${t.name}${have ? ` ${have}` : ''}`)
+  update(100, 'Done')
+}

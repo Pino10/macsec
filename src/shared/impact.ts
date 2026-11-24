@@ -32,6 +32,7 @@ export type ImpactActionId =
   | 'replay-request'
   | 'content-discovery'
   | 'auth-bypass'
+  | 'sql-injection-proof'
 
 export type ImpactMethod = 'GET' | 'POST' | 'PUT' | 'PATCH'
 

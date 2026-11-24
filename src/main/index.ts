@@ -23,7 +23,7 @@ import { autoRunFinished, checkPackages, isAutoRun, setWatch, startWatch, watchI
 import { chosenLocal, setModelCrypto, detectLlms, testLlm, listServers, saveServer, deleteServer } from './models'
 import { jobs } from './jobs'
 import { log, logEvents, listLogs, clearLogs } from './logs'
-import { checkUpdates, checkUpdatesDaily, installTool, listTools, removeTool, toolDef, toolEnv, toolPath, updateToolData } from './toolbox'
+import { checkUpdates, checkUpdatesDaily, installApp, installTool, listTools, removeTool, toolDef, toolEnv, toolPath, updateToolData } from './toolbox'
 import { dockerPath, localSites, startWebScan } from './webscan'
 import { ciWorkflow, compareFindings, preCommitHook, previousSession, toDefectDojo, toSarif } from './exports'
 import { topFindings } from '../shared/insights'
@@ -37,7 +37,7 @@ import { connectClaudeDesktop, desktopAppInstalled, desktopAppPath, desktopConfi
 import { checkHookUrl, hookBody, raycastScripts, sendHook, type HookKind } from './webhooks'
 import { MCP_PORT, mcpToken, mcpUrl, startMcpServer } from './mcp'
 import { macsecCli, macsecTools } from './mcptools'
-import { loadSpec, startApiScan } from './apiscan'
+import { loadSpec, loadSpecText, startApiScan } from './apiscan'
 import { startMobileScan } from './mobilescan'
 import { captureStatus, sessionFromHar, startCapture, stopCapture, stopCaptureQuietly } from './trafficcapture'
 import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from './mobilelive'
@@ -223,7 +223,12 @@ function validWeb(req: unknown): WebScanRequest {
   if (t?.kind === 'local' && typeof t.name === 'string') target = { kind: 'local', name: t.name }
   else if (t?.kind === 'url' && typeof t.url === 'string' && /^https?:\/\/[^\s'"<>]+$/.test(t.url.trim())) target = { kind: 'url', url: new URL(t.url.trim()).href }
   else throw new ValidationError('Enter the address to scan, starting with http:// or https://.')
-  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, confirm: validConfirm(r.confirm), codePath: typeof r.codePath === 'string' && r.codePath ? allowedProject(r.codePath) : undefined, checklist: r.checklist === true, autopilot: r.autopilot === true, reviewer: pick(r.reviewer, REVIEWERS, 'none') }
+  const host = target.kind === 'url' ? new URL(target.url).host : null
+  // Pages a recon found: same host only, full addresses only, and never more than 300 of them.
+  const seeds = host && Array.isArray(r.seedUrls)
+    ? [...new Set(r.seedUrls.filter((x): x is string => typeof x === 'string').map((x) => { try { return new URL(x).href } catch { return '' } }).filter((x) => x && new URL(x).host === host))].slice(0, 300)
+    : []
+  return { target, mode: pick<ScanMode>(r.mode, MODES, 'standard'), authorized: r.authorized === true, headers: typeof r.headers === 'string' ? r.headers.slice(0, 4000) : undefined, confirm: validConfirm(r.confirm), codePath: typeof r.codePath === 'string' && r.codePath ? allowedProject(r.codePath) : undefined, checklist: r.checklist === true, autopilot: r.autopilot === true, reviewer: pick(r.reviewer, REVIEWERS, 'none'), ...(seeds.length ? { seedUrls: seeds } : {}) }
 }
 
 /** Control confirmation settings: switches are strict booleans, text is short and single-line. */
@@ -407,6 +412,12 @@ function registerIpc(): void {
     for (const id of list) {
       await jobs.run(`Installing ${toolDef(id)!.name}`, (u) => installTool(id, u)).catch((e) => log('error', `${toolDef(id)!.name}: ${(e as Error).message}`))
     }
+    return listTools()
+  })
+  handle('tools:install-app', async (id) => {
+    const def = toolDef(String(id))
+    if (!def || def.method !== 'app') throw new ValidationError('That is not an app MacSec can install.')
+    await jobs.run(`Installing ${def.name} with Homebrew`, (u) => installApp(def.id, u))
     return listTools()
   })
   handle('tools:remove', async (id) => {
@@ -906,6 +917,22 @@ function registerIpc(): void {
       throw new ValidationError((e as Error).message)
     }
   })
+  handle('api:load-url', async (url) => {
+    const u = validUrl(url)
+    let res: Response
+    try {
+      res = await fetch(u, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json, application/yaml, text/yaml, */*' }, redirect: 'follow', signal: AbortSignal.timeout(20_000) })
+    } catch (e) {
+      throw new ValidationError(`That address could not be read: ${(e as Error).message}`)
+    }
+    if (!res.ok) throw new ValidationError(`That address answered ${res.status}.`)
+    const text = (await res.text()).slice(0, 5_000_000)
+    try {
+      return loadSpecText(text, new URL(u).pathname.split('/').filter(Boolean).pop() ?? 'api')
+    } catch (e) {
+      throw new ValidationError((e as Error).message)
+    }
+  })
   handle('mobile:pick', async (what) => {
     if (!mainWindow) return null
     const r = await dialog.showOpenDialog(mainWindow, what === 'file'
@@ -993,6 +1020,31 @@ function registerIpc(): void {
     if (!existsSync(dir)) return false
     await shell.openPath(dir)
     return true
+  })
+  handle('recon:handoff', (id) => {
+    const s = sessionDetail(String(id))
+    if (s.kind !== 'recon') throw new ValidationError('That is not a recon session.')
+    const data = reconData(s.id) as { hosts?: { host: string; live?: { url: string } }[] } | null
+    const live = data?.hosts?.find((h) => h.live?.url)
+    if (!live?.live?.url) throw new ValidationError('This recon found no live host yet, so there is nothing to scan. Run it again with a deeper depth.')
+    const origin = new URL(live.live.url).origin
+    const urlsFile = join(sessionDir(s.id), 'raw', 'urls.txt')
+    const seeds = existsSync(urlsFile)
+      ? readFileSync(urlsFile, 'utf8').split('\n').map((x) => x.trim()).filter((u) => {
+          try {
+            const p = new URL(u)
+            return p.host === live.host && !/\/logout|\/signout|\/delete/i.test(p.pathname)
+          } catch {
+            return false
+          }
+        }).slice(0, 300)
+      : []
+    const saved = readRequest(s.id)?.req as { authorized?: boolean } | null
+    const req = { target: { kind: 'url' as const, url: origin }, mode: 'standard' as const, authorized: saved?.authorized === true, seedUrls: seeds, reviewer: s.reviewer ?? 'none', checklist: false, autopilot: false }
+    const info = startWebScan(validWeb(req))
+    saveRequest(info.id, 'web:start', stripSecrets(req))
+    log('info', `Recon ${s.id} handed to a web scan of ${origin} with ${seeds.length} pages`)
+    return info
   })
   handle('recon:data', (id) => reconData(String(id)) as never)
   handle('ai:claude-skills', (on) => {

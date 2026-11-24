@@ -13,7 +13,7 @@ import { parseFfuf, pathSeverity } from '../scanners/web'
 import { dirs } from '../paths'
 import { toolPath } from '../toolbox'
 import { discoveryWords, writeWordlist } from '../wordlistfiles'
-import { ImpactRefused, type ImpactClient, type ImpactReply } from './client'
+import { ImpactRefused, maskUrl, type ImpactClient, type ImpactReply } from './client'
 
 const sha = (s: string): string => createHash('sha256').update(s).digest('hex')
 const now = (): string => new Date().toISOString()
@@ -388,6 +388,113 @@ async function authBypass(c: ActionContext): Promise<ActionResult> {
   }
 }
 
+// ---------------------------------------------------------------- Confidentiality: sqlmap, one parameter
+
+export interface SqlProof {
+  parameter: string
+  place: string
+  technique?: string
+  title?: string
+  dbms?: string
+}
+
+/** Reads sqlmap's own answer. It names the parameter and the technique, or nothing. */
+export function parseSqlmap(text: string): SqlProof | null {
+  const p = /Parameter:\s*([^\s(]+)\s*\(([^)]+)\)/i.exec(text)
+  if (!p) return null
+  const type = /Type:\s*([^\n]+)/i.exec(text)?.[1]?.trim()
+  const title = /Title:\s*([^\n]+)/i.exec(text)?.[1]?.trim()
+  const dbms = /back-end DBMS:\s*([^\n]+)/i.exec(text)?.[1]?.trim()
+  if (!type && !/is vulnerable|injectable/i.test(text)) return null
+  return { parameter: p[1], place: p[2].trim(), ...(type ? { technique: type } : {}), ...(title ? { title } : {}), ...(dbms ? { dbms } : {}) }
+}
+
+export type SqlmapRun = (bin: string, args: string[]) => Promise<string>
+
+let sqlmapRunner: SqlmapRun | null = null
+
+/** Tests and the campaign can bring their own sqlmap. The real one only prints its answer. */
+export function setSqlmapRunner(r: SqlmapRun | null): void {
+  sqlmapRunner = r
+}
+
+const defaultSqlmap: SqlmapRun = (bin, args) =>
+  new Promise((resolve, reject) => {
+    execFile(bin, args, { timeout: 10 * 60_000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, NO_COLOR: '1' } }, (e, out, err) => {
+      const text = `${String(out ?? '')}${String(err ?? '')}`
+      if (e && !text.trim()) reject(new Error(String(err ?? e.message).trim().split('\n').pop() ?? 'sqlmap did not run.'))
+      else resolve(text)
+    })
+  })
+
+const SQLMAP_RESERVE = 80
+
+async function sqlInjectionProof(c: ActionContext): Promise<ActionResult> {
+  const { client, step } = c
+  const param = String(step.param ?? '').trim()
+  if (!param) return { status: 'failed', title: 'Ask sqlmap if one parameter is injectable', detail: 'This step names no parameter, so there is nothing to test.' }
+  if (client.left().requests < 30) return { status: 'not-proven', title: 'Ask sqlmap if one parameter is injectable', detail: `The engagement has ${client.left().requests} requests left, too few for a bounded sqlmap run (30 at least).` }
+  const bin = process.env.MACSEC_SQLMAP || toolPath('sqlmap')
+  const u = new URL(step.url)
+  if (!u.searchParams.has(param)) u.searchParams.set(param, '1')
+  const work = join(dirs.root(), 'impact-work', `sqlmap-${rand()}`)
+  mkdirSync(work, { recursive: true, mode: 0o700 })
+  const reserve = Math.min(SQLMAP_RESERVE, Math.max(0, client.left().requests - 5))
+  client.reserve(reserve, `sqlmap fingerprint on "${param}"`)
+  const args = [
+    '-u', u.href,
+    '-p', param,
+    '--batch',
+    '--smart',
+    '--risk=1',
+    '--level=1',
+    '--technique=BE',
+    '--threads=1',
+    '--timeout=15',
+    '--retries=0',
+    '--parse-errors',
+    '--flush-session',
+    '--disable-coloring',
+    '--output-dir', work
+  ]
+  c.line(`sqlmap: one parameter (${param}), boolean and error techniques only`)
+  let text = ''
+  try {
+    text = await (sqlmapRunner ?? defaultSqlmap)(bin, args)
+  } catch (e) {
+    rmSync(work, { recursive: true, force: true })
+    return { status: 'failed', title: 'Ask sqlmap if one parameter is injectable', detail: `sqlmap did not run: ${(e as Error).message}. Install it on Tools first.` }
+  } finally {
+    rmSync(work, { recursive: true, force: true })
+  }
+  const proof = parseSqlmap(text)
+  if (!proof) {
+    return { status: 'not-proven', title: 'Ask sqlmap if one parameter is injectable', detail: `sqlmap answered nothing usable for "${param}". It may have found no injection, or the page may hide it. Nothing is reported.` }
+  }
+  const shows = [
+    `sqlmap says the parameter "${proof.parameter}" (${proof.place}) is injectable`,
+    proof.technique ? `the technique is ${proof.technique}` : '',
+    proof.dbms ? `the back-end database is ${proof.dbms}` : '',
+    'it ran with risk 1 and level 1: boolean and error techniques only',
+    'no data was extracted, no shell was opened, and the run used GET only'
+  ].filter(Boolean)
+  return {
+    status: 'proven',
+    title: `SQL injection in "${proof.parameter}" on ${pathOf(step.url)}`,
+    detail: `sqlmap confirmed that "${proof.parameter}" is injectable${proof.technique ? ` (${proof.technique})` : ''}${proof.dbms ? ` on ${proof.dbms}` : ''}. That is confidentiality loss: an attacker could read the database. MacSec stopped at the proof: it did not dump a table, read a file or open a shell.`,
+    evidence: {
+      method: 'SQLMAP',
+      url: maskUrl(u.href),
+      status: 0,
+      bytes: Buffer.byteLength(text),
+      sha256: sha(text),
+      at: now(),
+      shows: shows.slice(0, 12)
+    },
+    cleanup: { done: true, how: 'nothing was changed: sqlmap only asked, and its session folder was deleted' }
+  }
+}
+
 export const RUNNERS: Record<PlannedStep['action'], (c: ActionContext) => Promise<ActionResult>> = {
   'traversal-read': traversalRead,
   'ssti-marker': sstiMarker,
@@ -395,7 +502,8 @@ export const RUNNERS: Record<PlannedStep['action'], (c: ActionContext) => Promis
   'availability-probe': availabilityProbe,
   'replay-request': replayRequest,
   'content-discovery': contentDiscovery,
-  'auth-bypass': authBypass
+  'auth-bypass': authBypass,
+  'sql-injection-proof': sqlInjectionProof
 }
 
 /** The requests a step will send, in plain words, for the approval screen. */
@@ -423,6 +531,8 @@ export function previewOf(step: PlannedStep): string[] {
       return [`GET ${page} with hundreds of common paths in place of the last segment (up to 435 requests at 20 a second, signed out)`, 'then ask again for the first 15 paths that answered, to prove each one']
     case 'auth-bypass':
       return [`GET ${page} twice with no cookie and no token, looking for "${step.expect ? note(step.expect) : 'the string you will name'}"`]
+    case 'sql-injection-proof':
+      return [`sqlmap on "${step.param ?? 'the parameter'}" in ${page}: risk 1, level 1, boolean and error techniques, at most 80 requests, no data extracted`]
     default:
       return []
   }

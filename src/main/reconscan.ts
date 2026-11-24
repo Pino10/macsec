@@ -11,11 +11,12 @@ import { crawlJs } from './jsdeep'
 import { beginOp, endOp, SessionRun } from './engine'
 import { createSession, listSessions, readSession, saveAiReport, sessionDir } from './sessions'
 import { reconDelta, type ReconSnapshot } from './seckit/recondelta'
-import { inScope, normalizeTarget, reconPrompt, runRecon, type ReconFinding, type ReconResult } from './seckit/recon'
+import { inScope, interestingUrls, normalizeTarget, paramsOf, reconPrompt, runRecon, type ReconFinding, type ReconResult } from './seckit/recon'
 import { summarizeWithAi } from './aisummary'
 import { runTool } from './engine'
 import { installTool, isInstalled, toolDef, toolPath } from './toolbox'
 import { log } from './logs'
+import { fid } from './scanners/parse'
 
 const CATEGORY: Record<ReconFinding['kind'], FindingCategory> = { secret: 'secret', exposure: 'web', sourcemap: 'web', headers: 'web', takeover: 'network', subdomain: 'recon', endpoint: 'recon', tech: 'recon', listing: 'web', errorpage: 'web', cors: 'web', methods: 'web', cdn: 'recon', version: 'recon' }
 
@@ -62,6 +63,40 @@ async function run(id: string, req: ReconRequest): Promise<void> {
       tool: (n) => (n === 'subfinder' && sf && isInstalled(sf) ? toolPath('subfinder') : null),
       run: async (bin, args, timeoutMs) => runTool({ name: 'subfinder', bin, args, timeoutMs, absolute: true }, op, s.raw).catch(() => '')
     })
+    // gau: URLs the internet already knows, from other archives. Passive: it never touches the target.
+    if (!s.cancelled) {
+      const gauDef = toolDef('gau')
+      if (gauDef && !isInstalled(gauDef)) await installTool('gau', () => undefined).catch(() => undefined)
+      if (gauDef && isInstalled(gauDef)) {
+        const st = s.step('gau', 'URLs the internet already knows (gau)')
+        await s.run(st, async (note, line) => {
+          const out = await runTool({ name: 'gau', bin: 'gau', args: ['--threads', '5', '--timeout', '20', '--subs', '--json', result.domain], timeoutMs: 6 * 60_000 }, op, s.raw, line).catch((e) => {
+            note(`gau did not run: ${(e as Error).message}`)
+            return ''
+          })
+          const known = new Set(result.urls)
+          const fresh = parseGau(out, result.domain).filter((u) => !known.has(u))
+          result.urls = [...result.urls, ...fresh].slice(0, 20000)
+          result.params = paramsOf(result.urls)
+          const worth = interestingUrls(fresh).slice(0, 40)
+          note(`${fresh.length} new URLs from the archives, ${worth.length} worth a look`)
+          return worth.map((u) => {
+            const p = new URL(u)
+            return {
+              id: fid('gau', u),
+              tool: 'gau',
+              category: 'recon' as const,
+              severity: 'info' as const,
+              confidence: 'confirmed' as const,
+              title: `Archived: ${p.pathname.slice(0, 90)}`,
+              url: u,
+              file: u,
+              description: 'Seen in a public archive (Wayback, Common Crawl and others). Check whether it still answers, and whether it should be public.'
+            }
+          })
+        })
+      }
+    }
     writeFileSync(join(s.raw, 'recon.json'), JSON.stringify({ hosts: result.hosts, js: result.js, endpoints: result.endpoints, params: result.params, urls: result.urls.length, pages: result.pages ?? [] }))
     writeFileSync(join(s.raw, 'urls.txt'), result.urls.join('\n'))
     try {
@@ -137,4 +172,31 @@ export function reconData(id: string): unknown {
   const d = join(sessionDir(id), 'raw', 'delta.json')
   if (existsSync(d)) data.delta = JSON.parse(readFileSync(d, 'utf8'))
   return data
+}
+
+/** gau's answer: one JSON object per line, or plain URLs. Same domain only, de-duplicated, capped. */
+export function parseGau(text: string, domain: string): string[] {
+  const out = new Set<string>()
+  for (const line of text.split('\n')) {
+    const raw = line.trim()
+    if (!raw) continue
+    let url = raw
+    if (raw.startsWith('{')) {
+      try {
+        url = String((JSON.parse(raw) as { url?: string }).url ?? '')
+      } catch {
+        continue
+      }
+    }
+    try {
+      const p = new URL(url)
+      if (!/^https?:$/.test(p.protocol) || !inScope(p.hostname, domain)) continue
+      p.hash = ''
+      out.add(p.href)
+    } catch {
+      // Not an address.
+    }
+    if (out.size >= 20000) break
+  }
+  return [...out]
 }

@@ -5,7 +5,7 @@ import { LiveRun, useNow, clock, overall } from '../components/LiveRun'
 import { useEffect, useMemo, useState } from 'react'
 import { issueText } from '@shared/insights'
 import { verificationOf, VERIFICATION_TEXT, asvsOf } from '@shared/verification'
-import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText } from 'lucide-react'
+import { ArrowLeft, Bot, ChevronRight, Copy, CircleStop, ExternalLink, FileDown, FileSearch, FolderOpen, Search, Sparkles, Trash2, XCircle, RefreshCw, Pause, Play, Ticket, Bug, RotateCcw, FileText, Globe } from 'lucide-react'
 import { SEVERITIES, type Finding, type FindingCategory, type SessionDetail, type SessionInfo, type Severity, type SessionCompare } from '@shared/types'
 import { useApp } from '../store'
 import Markdown from '../components/Markdown'
@@ -167,6 +167,11 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
             </>
           ) : (
             <>
+              {s.kind === 'recon' && (
+                <button className="btn btn-primary" onClick={async () => { const r = await act('handoff', () => api.invoke('recon:handoff', id)); if (r) showSessionById(r.id) }} data-tip="Starts a web scan of the first live host, with the pages and endpoints this recon found already in the list.">
+                  <Globe size={14} /> Scan this site
+                </button>
+              )}
               {hasCode && (
                 <>
                   <button className="btn btn-primary" onClick={() => void act('claude', () => api.invoke('sessions:open', id, 'claude'))} data-tip="Opens Claude Code in Terminal, ready to fix these findings with you. With Remote Control on, you can also carry on at claude.ai/code or on your phone.">
