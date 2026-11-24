@@ -16,7 +16,7 @@ import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, re
 import { basename, join, relative } from 'path'
 import type { Finding, MobileScanRequest, SessionInfo } from '../shared/types'
 import { beginOp, endOp, runTool, SessionRun } from './engine'
-import { createSession, saveAiReport, sessionDir } from './sessions'
+import { createSession, saveAiReport, saveSession, sessionDir } from './sessions'
 import { checkAndroidManifest, checkFirebaseConfig, checkInfoPlist, checkNetworkSecurityConfig, checkProvisioning, checkTargetSdk, hardening, hardeningFindings, parseMobsfscan, type Hardening } from './scanners/mobile'
 import { parseGitleaks, parseOsv } from './scanners/parse'
 import { addEvidence } from './evidence'
@@ -90,6 +90,9 @@ export function startMobileScan(req: MobileScanRequest): SessionInfo {
   info.reviewer = req.reviewer
   info.mode = undefined
   if (kind === 'source') info.codePath = req.path
+  // createSession writes the file before the reviewer is set; without this the UI said "No AI"
+  // even though the AI step ran and wrote ai-report.md.
+  saveSession(info)
   void runMobile(info.id, req, kind, format).catch((e) => log('error', `Mobile check: ${(e as Error).message}`, info.id))
   return info
 }

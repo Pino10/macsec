@@ -63,6 +63,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.33.2
+
+- `startMobileScan` saves the session after setting `reviewer`; without it the AI step ran but the UI said "No AI". Regression test in `tests/v52-mobile-reviewer.test.ts`.
+
 ### Added in 1.33.1
 
 - Mobile/Web forms sync the saved reviewer after settings load; `ReviewerChoice` waits for all AI lists before resetting a choice. Regression: a cold start must not leave the mobile check on "none".

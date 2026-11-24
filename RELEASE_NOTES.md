@@ -1,3 +1,23 @@
+## 1.33.2
+
+The mobile scan was recording the AI report but not the reviewer, so the session said "No AI" while
+`ai-report.md` sat next to it. That is fixed.
+
+- `startMobileScan` now saves the session after setting `reviewer`, instead of writing the file first
+  and leaving the field undefined.
+- A mobile session started with a reviewer now shows that reviewer in the result, and the AI report
+  and the header agree.
+- Existing sessions that were created before this fix still have `reviewer: undefined`; their AI
+  report is in the Report tab, and a re-run labels it correctly. There is no safe way to guess which
+  model wrote an old report.
+
+1.33.1 fixed the other half: the Mobile/Web forms kept "none" when settings loaded late, and the
+reviewer picker reset a DeepSeek/model choice to none while its lists were loading.
+
+637 tests pass.
+
+---
+
 ## 1.33.1
 
 The mobile scan was starting with **no AI** in two situations, and both are fixed.
