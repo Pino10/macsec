@@ -63,6 +63,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.28.0
+
+- `tests/fixtures/mobile/red-screen.apk` (8,649 bytes, MIT, F-Droid) with its provenance, and `tests/v48-mobile-fixture.test.ts` covering the zip central directory, the AXML header and the dex magic.
+
 ### Added in 1.27.1
 
 - `Sessions.tsx`: the early return for an open result is after the search effect, restoring a constant hook count. When adding a hook to that component, keep it above the return.
