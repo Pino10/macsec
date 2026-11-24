@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.36.0 | Plugin runner for bring-your-own tools; bounty submission draft export | [1.36.0](RELEASE_NOTES.md#1360) |
 | 1.35.0 | General engagement profiles; review loop and evidence for every session kind; robust evidence | [1.35.0](RELEASE_NOTES.md#1350) |
 | 1.34.1 | Review loop is optional: fast pass, full assurance or a labelled single-source run | [1.34.1](RELEASE_NOTES.md#1341) |
 | 1.34.0 | Review loop: tool scan, blind AI review, merge with provenance, source-blind verifier | [1.34.0](RELEASE_NOTES.md#1340) |

@@ -660,6 +660,10 @@ export interface Channels {
   'loop:blind': { args: [string, Reviewer]; result: LoopState }
   'loop:combine': { args: [string]; result: LoopState }
   'loop:verify': { args: [string, Reviewer]; result: LoopState }
+  'plugins:list': { args: []; result: PluginDef[] }
+  'plugins:save': { args: [Record<string, unknown>]; result: PluginDef[] }
+  'plugins:delete': { args: [string]; result: PluginDef[] }
+  'plugins:run': { args: [string, string, boolean]; result: PluginRun }
   'patches:propose': { args: [string, string]; result: PatchRecord }
   'patches:list': { args: [string]; result: PatchRecord[] }
   'patches:apply': { args: [string, string]; result: PatchRecord }
@@ -687,7 +691,7 @@ export interface Channels {
   'sessions:owasp': { args: [string]; result: OwaspChecklistInfo }
   'sessions:masvs': { args: [string]; result: MasvsInfo }
   'sessions:compare': { args: [string]; result: SessionCompare }
-  'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json' | 'csv' | 'masvs-report']; result: string | null }
+  'sessions:export': { args: [string, 'sarif' | 'defectdojo' | 'cyclonedx' | 'json' | 'csv' | 'masvs-report' | 'bounty']; result: string | null }
   'projects:save-hook': { args: [string]; result: string | null }
   'projects:save-ci': { args: [string, 'github' | 'azure']; result: string | null }
   'checkup:run': { args: []; result: CheckupResult }
@@ -784,6 +788,24 @@ export interface LoopState {
   blind: BlindFinding[]
   combined: CombinedFinding[]
   report: boolean
+}
+
+export interface PluginDef {
+  id: string
+  name: string
+  bin: string
+  args: string[]
+  parser: 'json' | 'lines' | 'regex'
+  pattern?: string
+  severity?: Severity
+  description?: string
+}
+
+export interface PluginRun {
+  session: SessionInfo
+  added: number
+  output: string
+  detail: SessionDetail
 }
 
 export interface PatchRecord {

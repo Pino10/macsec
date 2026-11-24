@@ -25,7 +25,7 @@ import { jobs } from './jobs'
 import { log, logEvents, listLogs, clearLogs } from './logs'
 import { checkUpdates, checkUpdatesDaily, installApp, installTool, listTools, removeTool, toolDef, toolEnv, toolPath, updateToolData } from './toolbox'
 import { dockerPath, localSites, startWebScan } from './webscan'
-import { ciWorkflow, compareFindings, preCommitHook, previousSession, sessionCsv, toDefectDojo, toSarif } from './exports'
+import { bountyReport, ciWorkflow, compareFindings, preCommitHook, previousSession, sessionCsv, toDefectDojo, toSarif } from './exports'
 import { topFindings } from '../shared/insights'
 import { searchFindings } from './search'
 import { COMMON_VHOSTS, probeVhosts, resolveForVhosts } from './vhosts'
@@ -522,7 +522,7 @@ function registerIpc(): void {
   handle('sessions:export', async (id, format) => {
     const d = sessionDetail(String(id))
     if (!mainWindow) return null
-    const ext = format === 'sarif' ? 'sarif' : format === 'cyclonedx' ? 'cdx.json' : format === 'masvs-report' ? 'html' : format === 'csv' ? 'csv' : 'json'
+    const ext = format === 'sarif' ? 'sarif' : format === 'cyclonedx' ? 'cdx.json' : format === 'masvs-report' ? 'html' : format === 'csv' ? 'csv' : format === 'bounty' ? 'md' : 'json'
     let text: string
     if (format === 'sarif') text = JSON.stringify(toSarif(d.findings, app.getVersion()), null, 2)
     else if (format === 'defectdojo') text = JSON.stringify(toDefectDojo(d.findings, d), null, 2)
@@ -534,7 +534,7 @@ function registerIpc(): void {
     else if (format === 'masvs-report') {
       if (d.kind !== 'mobile-scan') throw new ValidationError('The MASVS report is for mobile checks.')
       text = masvsReportHtml(d, app.getVersion())
-    } else throw new ValidationError('Choose SARIF, DefectDojo, CycloneDX, CSV, JSON or the MASVS report.')
+    } else throw new ValidationError('Choose SARIF, DefectDojo, CycloneDX, CSV, JSON, the bounty draft or the MASVS report.')
     const r = await dialog.showSaveDialog(mainWindow, { title: 'Export findings', defaultPath: join(app.getPath('downloads'), `macsec-${d.id}.${ext}`) })
     if (r.canceled || !r.filePath) return null
     writeFileSync(r.filePath, text)

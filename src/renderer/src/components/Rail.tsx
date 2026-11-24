@@ -23,6 +23,7 @@ export const GROUPS: { label: string | null; items: Item[] }[] = [
   { label: 'Results', items: [{ id: 'sessions', label: 'Results', icon: <History size={I} /> }, { id: 'assets', label: 'Assets', icon: <Boxes size={I} /> }] }
 ]
 const FOOT: Item[] = [
+  { id: 'plugins', label: 'Plugins', icon: <Wrench size={I} /> },
   { id: 'tools', label: 'Tools', icon: <Wrench size={I} /> },
   { id: 'updates', label: 'Updates', icon: <ArrowDownToLine size={I} /> },
   { id: 'settings', label: 'Settings', icon: <Settings size={I} /> }

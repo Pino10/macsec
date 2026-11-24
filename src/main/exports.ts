@@ -233,3 +233,58 @@ export function sessionCsv(d: SessionDetail): string {
   ])
   return [head, ...rows].map((r) => r.map(cell).join(',')).join('\n') + '\n'
 }
+
+/** A submission draft for one programme, from the findings that are actually open. */
+export function bountyReport(d: SessionDetail, program: { client: string; authorityRef: string } | null): string {
+  const open = d.findings.filter((f) => f.verdict !== 'false-positive' && !f.triage && f.severity !== 'info')
+  const lines = [
+    `# Bug bounty submission: ${program?.client || d.title}`,
+    '',
+    `- Target: ${d.target}`,
+    `- Programme/authority: ${program?.client || 'not recorded'}${program?.authorityRef ? ` (${program.authorityRef})` : ''}`,
+    `- Build/run: ${d.id}`,
+    `- Prepared: ${new Date().toISOString().slice(0, 10)}`,
+    `- Findings: ${open.length}`,
+    '',
+    'Each section is one submission. Replace the placeholders with the programme’s required fields; do not add data you did not collect.',
+    ''
+  ]
+  for (const [i, f] of open.entries()) {
+    lines.push(
+      `## ${i + 1}. ${f.title}`,
+      '',
+      `- Severity: ${f.severity}`,
+      `- Asset: ${f.url ?? f.file ?? d.target}${f.line ? `:${f.line}` : ''}`,
+      `- CWE: ${f.cwe ?? 'not assigned'}`,
+      `- Confidence: ${f.confidence ?? 'possible'}`,
+      `- Proof: ${f.proof ?? 'no proof recorded'}`,
+      '',
+      '### Summary',
+      '',
+      f.description?.slice(0, 4000) ?? 'Describe the issue in one paragraph.',
+      '',
+      '### Steps to reproduce',
+      '',
+      '1. ',
+      '2. ',
+      '3. ',
+      '',
+      '### Evidence',
+      '',
+      f.proof ? `Recorded proof: ${f.proof}` : f.snippet ? '```\n' + f.snippet.slice(0, 2000) + '\n```' : 'Attach the request/response or screenshot from the session.',
+      '',
+      '### Impact',
+      '',
+      f.impact ?? f.why ?? 'Explain who can do what, and what data or action is reached. Do not claim more than the evidence shows.',
+      '',
+      '### Remediation',
+      '',
+      f.fix ?? 'State the fix and how to verify it.',
+      '',
+      '---',
+      ''
+    )
+  }
+  if (!open.length) lines.push('No open finding to submit. Triaged, false-positive and info findings are excluded.')
+  return lines.join('\n')
+}

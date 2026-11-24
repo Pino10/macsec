@@ -1,3 +1,36 @@
+## 1.36.0
+
+Bring-your-own tools and a submission draft for bounty programmes.
+
+### Plugin runner
+
+- New **Plugins** page: declare a name, an absolute binary, an argument array, a parser and an
+  optional default severity.
+- Placeholders: `{target}`, `{host}`, `{url}`, `{session}`. Arguments are a JSON array, run with
+  `execFile`; there is no shell.
+- Parsers: a JSON array of findings, one finding per line, or a regex with one capture group.
+- The run is manual, confirmed, capped at ten minutes, output-capped, and its findings are appended
+  to the chosen result as **possible** and tagged with the plugin name.
+- A remote target needs a live engagement that covers the host. Local code does not need a host, but
+  still needs the confirmation.
+- MacSec cannot meter the requests an external tool sends or sandbox what it does. The page says so;
+  the responsibility stays with the operator and the engagement.
+- Malformed output produces no finding, not an invented one.
+
+### Bounty submission draft
+
+- Export now has **Bounty submission draft (Markdown)**.
+- One section per open finding: severity, asset, CWE, confidence, proof, summary, steps to reproduce,
+  evidence, impact and remediation.
+- It takes the programme name and authority reference from the current engagement when there is one.
+- Info, triaged and false-positive findings are excluded. Placeholders are left for the programme
+  fields the operator must fill in.
+- The draft stays local; there is no upload and no automatic submission.
+
+654 tests (649 passed, 5 skipped).
+
+---
+
 ## 1.35.0
 
 The general engagement and the review loop for every target. 1.34.2 was tagged but its release build
