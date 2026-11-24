@@ -92,6 +92,26 @@ Use MacSec only on code and systems you own or are allowed to test.
 
 Drop Semgrep rules (`.yml`) into `extensions/semgrep-rules` and they run in every review.
 
+## Release notes
+
+Every release is documented in full in [RELEASE_NOTES.md](RELEASE_NOTES.md): what changed, how it
+works, and what is deliberately missing. The Updates page shows the same notes inside the app.
+Since 1.14 the product grew from a scanner workbench into something that can prove impact, gate a
+build and explain an attack path, so the history is worth reading in order.
+
+| Version | What it added | Notes |
+| --- | --- | --- |
+| 1.21.0 | The full release history, a SQLite session index, interface cleanup | [1.21.0](RELEASE_NOTES.md#1210) |
+| 1.20.0 | A command line with baselines, search across sessions, storage cleanup, an accuracy gate in CI, accessibility | [1.20.0](RELEASE_NOTES.md#1200) |
+| 1.19.0 | The five trust fixes: no credentials to tools, pinned DNS, masked evidence, signed releases, reviewer scope. Proofs reach findings | [1.19.0](RELEASE_NOTES.md#1190) |
+| 1.18.0 | Attack paths with the one fix that breaks them, four more skills, jsluice through Katana, a rebuilt Assets page | [1.18.0](RELEASE_NOTES.md#1180) |
+| 1.17.0 | WAF honeypots and deception, Metasploit runs proved by a callback, API sign-in mismatches, JavaScript delta | [1.17.0](RELEASE_NOTES.md#1170) |
+| 1.16.0 | gau, wafw00f and sqlmap with bounds, recon to scan handover, Homebrew installs, API specs from an address | [1.16.0](RELEASE_NOTES.md#1160) |
+| 1.15.0 | ffuf as a discovery engine, the read to write ladder, editable plan steps | [1.15.0](RELEASE_NOTES.md#1150) |
+| 1.14.0 | Controlled proofs under a written engagement, CIA by design, chaining, the Metasploit check list fixed | [1.14.0](RELEASE_NOTES.md#1140) |
+
+Earlier versions, back to 0.1, are in the same file.
+
 ## From the command line
 
 CI can gate a build without opening the app:

@@ -278,6 +278,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
             <button
               className={sureDelete ? 'btn btn-danger btn-sm' : 'icon-btn danger-text'}
               data-tip={sureDelete ? 'This deletes the session folder and its raw output for good' : 'Delete this session'}
+              title={sureDelete ? 'This deletes the session folder and its raw output for good' : 'Delete this session'}
               aria-label={sureDelete ? 'Confirm deleting this session' : 'Delete this session'}
               onClick={async () => {
                 if (!sureDelete) {

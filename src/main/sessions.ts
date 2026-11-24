@@ -16,6 +16,7 @@ import { join, sep } from 'path'
 import type { Finding, SessionDetail, SessionInfo, SessionKind, ChecklistData } from '../shared/types'
 import { dirs } from './paths'
 import { countBySeverity } from './scanners/parse'
+import { forgetSession, indexFindings, indexSessionRow } from './indexdb'
 
 export const sessionEvents = new EventEmitter()
 
@@ -44,6 +45,7 @@ export function saveSession(info: SessionInfo): void {
   // A session deleted while it was still finishing stays deleted.
   if (!existsSync(sessionDir(info.id))) return
   writeFileSync(join(sessionDir(info.id), 'session.json'), JSON.stringify(info, null, 2))
+  void indexSessionRow(info)
   sessionEvents.emit('updated', info)
 }
 
@@ -51,6 +53,7 @@ export function saveFindings(id: string, findings: Finding[]): void {
   if (!existsSync(sessionDir(id))) return
   applyIgnored(findings)
   writeFileSync(join(sessionDir(id), 'findings.json'), JSON.stringify(findings, null, 2))
+  void indexFindings(id, findings, new Date().toISOString())
 }
 
 export function saveAiReport(id: string, md: string): void {
@@ -93,6 +96,7 @@ export function listSessions(): SessionInfo[] {
 
 export function deleteSession(id: string): void {
   rmSync(sessionDir(id), { recursive: true, force: true })
+  void forgetSession(id)
 }
 
 /** The private copy of the code inside a session; only this folder is ever deleted by discardCode. */

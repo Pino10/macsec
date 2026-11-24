@@ -260,6 +260,22 @@ textarea {
   height: 52px;
   padding: 0 8px 0 4px;
   flex-shrink: 0;
+  min-width: 0;
+}
+.engine-state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.engine-state .engine-step {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 1150px) {
+  .engine-state .engine-step {
+    display: none;
+  }
 }
 .engine-state {
   display: inline-flex;
@@ -328,13 +344,19 @@ textarea {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px 24px;
   margin: 18px 0 24px;
+  flex-wrap: wrap;
 }
 .page-title {
   margin: 0;
   font: 600 32px/1.1 var(--display);
   letter-spacing: -0.025em;
+}
+@media (max-width: 900px) {
+  .page-title {
+    font-size: 26px;
+  }
 }
 .page-desc {
   margin: 8px 0 0;
@@ -507,6 +529,9 @@ select.input {
   padding: 3px;
   border-radius: 12px;
   background: var(--well);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
   border: 1px solid var(--line);
 }
 .seg button,

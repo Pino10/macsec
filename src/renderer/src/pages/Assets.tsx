@@ -71,7 +71,7 @@ function Chain_({ c }: { c: Chain }): React.JSX.Element {
 
 /** Every site, API, app and project MacSec has looked at, with one risk score and what to fix first. */
 export default function Assets(): React.JSX.Element {
-  const { showSession, sessions, act } = useApp()
+  const { showSession } = useApp()
   const api = window.macsec
   const [list, setList] = useState<AssetInfo[] | null>(null)
   const [kind, setKind] = useState<AssetInfo['kind'] | 'all'>('all')
@@ -196,9 +196,6 @@ export default function Assets(): React.JSX.Element {
             <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
               <button className="btn btn-sm" onClick={() => showSession(a.lastSession)}>
                 <ExternalLink size={12} /> The full result
-              </button>
-              <button className="btn btn-sm" onClick={() => void act('assets-refresh', () => api.invoke('assets:list')).then((r) => r && setList(r))}>
-                <RefreshCw size={12} /> Recompute
               </button>
             </div>
           </section>

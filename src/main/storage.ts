@@ -5,6 +5,7 @@
 import { execFile } from 'child_process'
 import { rmSync } from 'fs'
 import { listSessions, sessionDir } from './sessions'
+import { forgetSession, pruneIndex } from './indexdb'
 import { dirs } from './paths'
 import { log } from './logs'
 
@@ -39,11 +40,13 @@ export async function pruneSessions(days: number): Promise<{ removed: number; in
     if (new Date(s.createdAt).getTime() >= cutoff) continue
     try {
       rmSync(sessionDir(s.id), { recursive: true, force: true })
+      await forgetSession(s.id)
       removed++
     } catch {
       // A folder that cannot be removed is left, and the count says so.
     }
   }
+  await pruneIndex(new Date(cutoff).toISOString())
   log('info', `Removed ${removed} session${removed === 1 ? '' : 's'} older than ${d} days`)
   return { removed, info: await storageInfo() }
 }

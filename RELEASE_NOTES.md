@@ -1,83 +1,165 @@
+## 1.21.0
+
+The documentation release, and the last of the open items.
+
+### What is new
+
+- **Every release has proper notes again.** Versions 1.14 to 1.21 were shipped with short summaries; this release writes them out in full, in the same style as the notes before them: what changed, how it works, and what is deliberately missing. They are in this file and summarised in the README.
+- **A release history in the README.** A short table with the headline of every version since 1.14, so a new reader can see where the product came from without opening this file.
+- **The session index.** Search used to read every `findings.json` on the Mac. It now reads a small SQLite file in `~/MacSec/config/index.db`, written with the SQLite that ships inside the app's runtime. It is updated whenever a session or its findings are saved, cleaned when a session is deleted or pruned, and rebuilt by itself on the first search of an older install. If the runtime ever lacks SQLite, the app falls back to reading the sessions and says so once in the log, so search cannot break a Mac.
+
+### Cleaner interface
+
+- Result tabs scroll instead of running off the window, and the page header wraps on a narrow window instead of crushing the title.
+- The Engine bar truncates a long test title and hides its step line on a narrow window, instead of pushing the New test button away.
+- Assets had two refresh controls doing the same job; it has one.
+- The delete button on a result now has a native tooltip as well as the custom one, so it is readable however you reach it.
+
+### Still open, honestly
+
+- **Notarisation.** This needs an Apple Developer account, which the project does not have, so the app stays ad-hoc signed and first launch asks for "Open Anyway". Update integrity does not depend on it: releases are signed with an Ed25519 key and the app refuses an unsigned release. If the project ever gets an account, notarising is a workflow change and nothing else.
+- **Windows and Linux.** MacSec is a macOS workbench, and the tooling, Keychain use and process handling all assume it.
+
+---
+
 ## 1.20.0
 
-- **MacSec from the command line, with a baseline.** `MacSec --headless scan --path <folder>` runs a review with no window and exits 0 when it is clean, 1 when a new finding reaches `--fail-on` (default high), 2 on an error and 3 when the scanners are not installed. `--json` prints the result, `--install-missing` installs the three scanners a review needs, and `--baseline <file>` points at a committed baseline. `MacSec --headless baseline --path <folder>` writes `<folder>/.macsec-baseline.json`, so a team fails only on what is new. `MacSec --headless help` lists it all.
-- **Find a finding anywhere.** The box on Results now searches inside every finished session, not only the session titles: titles, tools, files and addresses, newest first, with the session it came from.
-- **Storage you can see and let go of.** Settings shows how much the MacSec folder holds and how many sessions and findings it keeps, and removes finished sessions older than the number of days you choose, with a clear second click and the count it removed.
-- **An accuracy gate in CI.** `npm run benchmark` scores the checks that carry the most weight against known-bad and known-good samples (exposed files, key placeholders, WAF deception, attack paths) and fails below 0.8 precision or recall. It is a step of its own in CI, so accuracy is measured on every change.
-- **Accessibility.** Faint text is now readable (the small-text colour went from about 3.5:1 to about 4.6:1), tooltips show on keyboard focus and on hover, the findings list answers to arrow keys and Home/End, and the result tabs answer to the left and right arrows.
-- **Still deferred, honestly:** a SQLite index. Search reads the newest 300 sessions, which is quick at this size; an index is worth doing when Macs hold thousands.
+The release that let MacSec gate a build, and let a person find things.
 
-Tests: 588 passed, 4 skipped.
+### What is new
+
+- **MacSec from the command line, with baselines.** `MacSec --headless scan --path <folder>` runs a full review with no window, no tray and no IPC. It exits 0 when the result is clean or only contains findings in the baseline, 1 when a new finding reaches `--fail-on` (default high), 2 on an error and 3 when the scanners are not installed. `--json` prints one object for a pipeline, `--install-missing` installs the three scanners a review always needs, and `--depth` chooses quick, standard or deep.
+- **A baseline a team can commit.** `MacSec --headless baseline --path <folder>` writes `<folder>/.macsec-baseline.json`. The identity of a finding is the check that made it plus where it is, so a finding that moves is still new, and a fixed finding cannot hide a different new one. Info findings, triaged findings and false positives never fail a build. `--no-baseline` always works, because a baseline must never be the only way to see a finding.
+- **Find a finding anywhere.** The search box on Results now reaches inside every finished session, not only the session titles: titles, tools, file names and addresses, newest first, each row opening the session it came from.
+- **Storage you can see and let go of.** Settings shows how much the MacSec folder holds and how many sessions and findings it keeps. It removes finished sessions older than the age you choose, with a clear second click and the number it removed. Nothing is swept in the background.
+- **An accuracy gate in CI.** `npm run benchmark` scores the checks that carry the most weight (exposed files, key placeholders, WAF deception and attack paths) against samples that are known bad and samples that are known fine. It fails below 0.8 precision or recall, and it runs as its own CI step, so accuracy is measured on every change instead of being believed.
+- **Accessibility that was overdue.** Small faint text went from about 3.5:1 to about 4.6:1 contrast, tooltips now appear on keyboard focus as well as hover, the findings list answers to arrow keys and Home/End, and the result tabs answer to the left and right arrows.
+
+### Under the hood
+
+- `cli.ts` and `baseline.ts` hold the rules, so the argument grammar and the comparison are unit tested without Electron. The headless branch runs before any window is created and flushes stdout before exiting.
+- The release workflow now runs `MacSec --headless help` and `--headless bench` against the built app, so the command line is exercised on real hardware on every release.
+
+### Limits
+
+- The search at this version read the newest 300 sessions on every query. That is fast enough for a few hundred sessions and not for thousands; 1.21 adds the index.
+
+---
 
 ## 1.19.0
 
-This release is mostly the five things the last review said were still open. It also connects a controlled proof back to the finding that started it.
+A trust release. Everything in it was a finding from the second review that was still open.
 
-- **Session credentials no longer go to tools.** httpx, Katana, Nuclei and WPScan run signed out. The signed-in crawl is MacSec's own, capped at 120 requests on the target's host, and the header check follows a redirect only when it stays on the same host. A pasted cookie can no longer ride a redirect to someone else.
-- **DNS is really pinned now.** A guarded request resolves once, refuses metadata and mixed answers, and then connects to the approved address (`netclient.ts`), with the name kept in the Host header and TLS SNI. The rebinding window is closed for every confirmation request.
-- **Evidence is masked everywhere.** The lines around a finding are redacted whatever the finding is about, so a key next to a SQL injection no longer lands in a report or an export.
-- **Releases are signed.** `SHA256SUMS.txt` carries an Ed25519 signature from a key only the release workflow holds, and the app refuses to install a release whose list is unsigned or signed by another key. The public half is in `build/release-signing.pub`. The release workflow fails if the key secret is missing.
-- **The reviewer can no longer read your credentials.** Each review gets its own Claude Code settings file that denies `.ssh`, `.aws`, `.gnupg`, Keychains, `.netrc`, `.npmrc`, `.docker`, `.kube` and the like, and the prompt says plainly that code is data, not instructions.
-- **A proof now reaches its finding.** When a controlled run proves a step that was planned from a finding, that finding becomes confirmed, wears the proof, and names the engagement and run. It shows on the finding, in the PDF, and the run says how many findings it proved.
-- **Attack paths say how sure they are.** A path is `likely` when every part is confirmed or proven, `possible` otherwise, and overlapping rules no longer show the same pair twice.
-- **Smaller fixes.** The Metasploit callback listener binds only the address the target will call back to. The API "answers without signing in" check ignores login pages. Quick web scans skip the deception sampling again. Assets loads when opened instead of on every session update. An uncaught error in the main process is logged and shown instead of disappearing. `SECURITY.md` and `THREAT_MODEL.md` exist.
+### What is new
 
-Tests: 581 passed, 4 skipped.
+- **Session credentials no longer reach scanner tools.** httpx, Katana, Nuclei and WPScan now run signed out. The signed-in walk is MacSec's own client, capped at 120 requests on the target's own host, and the header check follows a redirect only when it stays on the same host. A pasted cookie can no longer ride a redirect to a third party.
+- **DNS is really pinned.** A guarded request resolves the name once, refuses metadata and mixed answers, and then connects to the address that was approved, keeping the name in the Host header and in TLS SNI. The rebinding window that the guard described but did not close is closed.
+- **Evidence is masked everywhere.** The lines around a finding are redacted whatever the finding is about, so a key that happens to sit next to a SQL injection no longer reaches a report, a SARIF file or an issue.
+- **Releases are signed.** `SHA256SUMS.txt` carries an Ed25519 signature from a key that only the release workflow holds. The app verifies the signature before it verifies the hash and refuses an unsigned or wrongly signed release. The public half is in the repository; the private half is a GitHub Actions secret, and the workflow fails rather than publish an unsigned release.
+- **The reviewer cannot read your credentials.** Each review writes its own Claude Code settings file that denies `.ssh`, `.aws`, `.gnupg`, Keychains, `.netrc`, `.npmrc`, `.docker`, `.kube` and the like, and the prompt says plainly that code is data, not instructions.
+- **A proof reaches its finding.** When a controlled run proves a step that was planned from a finding, that finding becomes confirmed, wears the proof, and names the engagement and the run. It is shown on the finding and in the PDF, and the run reports how many findings it proved. This was the keystone the second review said was missing.
+- **Attack paths carry a confidence.** A path is `likely` when every part is confirmed or proven, and `possible` otherwise. Overlapping rules no longer show the same pair of findings twice.
+- **Smaller fixes.** The Metasploit callback listener binds only the address the target will call back to. The API "answers without signing in" check ignores login pages. Quick web scans skip the deception sampling again. Assets loads when opened instead of on every session update. An uncaught error in the main process is logged and shown instead of disappearing. `SECURITY.md` and `THREAT_MODEL.md` were added.
 
-Still open, honestly: the headless CLI with a baseline, a SQLite session index with search and retention, notarised builds, and a benchmark loop against a known vulnerable app. Those are 1.20.
+### Limitations that remain
+
+- The headless command line, the session index and the benchmark did not exist yet.
+
+---
 
 ## 1.18.0
 
-- **Attack paths, and where to break them.** Findings that add up are now shown as a path: how the attack would go, what it needs, what it reaches, and the single cheapest fix that breaks it. Five new paths cover an upload that is served as a page, a key that opens a cloud service, a debug page with secrets behind it, a CORS gap over real user data, and a GraphQL API that trusts the account it is asked about. Each path is built only from findings that were really found, never from a guess. It appears in a new **Attack paths** tab on a result, in the PDF summary, in the fix plan, and on Assets.
-- **Four more skills, and the functions that use them.** `attack-chains` (how small findings become one attack, how to write it), `api-authorization` (cross-account reads, tenant leaks, mass assignment), `js-deep-analysis` (source maps, bundles, sinks, what changed) and `privilege-escalation` (climbing from a normal account). They are loaded by the web, API, server and code-review AI, not just listed.
-- **jsluice, through Katana.** The web scan now runs Katana with `-jsluice` in Standard and Thorough, so the endpoints and paths jsluice finds in the JavaScript join the pages MacSec tests next. No new download: it uses the Katana already installed.
-- **Assets page rebuilt.** It opens with what the score means (and the four bands), filters by kind, sorts worst first, and each asset shows its spark, its counts, what is proven, how long fixes took, the fix list with the score change, and the attack paths with the place to break them. Refreshing is explicit, and the empty and loading states say what is happening.
-- **Tests.** 5 new path tests, plus the skill and jsluice parsers; 574 passed, 4 skipped.
+Attack paths, more skills, and a rebuilt Assets page.
 
-Limits, on purpose: a path is a story built from findings, not a test that the chain works, and the app says so.
+### What is new
+
+- **Attack paths with a place to break them.** Findings that add up are shown as a path: how the attack would go, what it needs, what it reaches, and the one cheapest fix that removes it. Six new paths cover an upload served as a page, a key that opens a cloud service, a debug page with secrets behind it, CORS over real user data, a GraphQL API that trusts the account it is asked about, and no limit on guessing with an account to guess. The paths appear in a tab of their own on a result, in the executive PDF, in the fix plan and on Assets. A path is built only from findings that were really found, never from a guess.
+- **Four more skills, wired to the functions that use them.** `attack-chains`, `api-authorization`, `js-deep-analysis` and `privilege-escalation` are loaded by the web, API, server and code-review AI, not merely listed. The total reached 48.
+- **jsluice, through Katana.** The web scan runs Katana with `-jsluice` in Standard and Thorough, and reads the endpoints it pulls out of the JavaScript, resolved against the script they came from and filtered to the target's host. No new download and no Go toolchain.
+- **Assets rebuilt.** It opens with what the score means and its four bands, filters by kind, sorts worst first, and shows per asset: the spark, the counts, what is proven, how long fixes took, the fix list with the score each action returns, and the attack paths with the place to break them.
+
+### Limits
+
+- A path is a story built from findings, not a test that the chain works, and the interface says so.
+
+---
 
 ## 1.17.0
 
-- **WAF honeypots and deception, learned from the people who run them.** Shields waste a scanner's time: a port mimic accepts every connection so a scan shows every port open; dynamic path spoofing answers random paths with 200 and a nearly identical page, nudging the length so a size filter stops working; decoy .env and .sql files are served to catch scanners; tarpits hold the scanner open. MacSec now checks for all of it, compares structure instead of size, adds one note that says "this is deception", and turns the matching findings down to info instead of reporting them. The scan's AI is told to judge noise as noise and to point at the results that do not fit the pattern.
-- **A `waf-deception` skill**, with the tricks, the vendor fingerprints (Cloudflare, Imperva, Akamai, F5, AWS, Sucuri, Wordfence, ModSecurity) and what to do, so the reviewer reads a honeypot as a honeypot.
-- **Metasploit runs, with a callback as the proof.** One approved module from a short run-only list, always with `cmd/unix/generic` and a single curl or wget back to this Mac. The callback carries the target's address and a one-off marker, which proves the command ran. No meterpreter, no session, no handler, no persistence. It only runs when the engagement marks a staging target this Mac can reach. EternalBlue, BlueKeep, Spring4Shell, ProxyLogon and Drupalgeddon 2 are deliberately absent: they crash a host or write files MacSec cannot remove.
-- **API security: a described sign-in that is not enforced.** When a spec says an endpoint needs a token and the same request with no token answers with data, MacSec reports it.
-- **JavaScript: what is new since last time.** After the JS pass, MacSec compares endpoints and routes with the previous scan of the same host and lists the new ones first, because new code is where new bugs are.
-- **The update check cannot fail silently any more.** It tries the API, then the releases feed, then github.com itself, and the Updates page shows the reason with a Try again button if all three fail.
+WAF deception, a real Metasploit proof, and the update check fixed.
 
-Tests: the new deception, run-only list, callback, planner and tool suites all pass.
+### What is new
+
+- **WAF honeypots and deception.** Public research on port mimics, dynamic path spoofing, decoy files and tarpits is now in the app. A port mimic that answers every connection is labelled as deception rather than as services. Random paths that answer 200 with the same structure are caught by comparing structure instead of size, because the lengths are nudged to defeat size filters. Decoy `.env` and `.sql` files, slow tarpits and the usual vendor fingerprints (Cloudflare, Imperva, Akamai, F5, AWS, Sucuri, Wordfence, ModSecurity) are recognised too. The scan adds one explained note and turns matching results down to info. Nothing is hidden and nothing is reported as a vulnerability.
+- **A `waf-deception` skill**, and the scan's AI is told to judge noise as noise and to point at the few results that do not fit the pattern.
+- **Metasploit runs, with a callback as the proof.** One approved module from a short run-only list, always with `cmd/unix/generic` and a single curl or wget back to a listener on this Mac. The callback carries the target's address and a one-off marker, so a run with no callback is `not-proven`. No session, no handler, no meterpreter, no persistence. It refuses unless the engagement marks a staging target this Mac can reach. EternalBlue, BlueKeep, Spring4Shell, ProxyLogon and Drupalgeddon 2 are deliberately absent: they crash a host or write a file MacSec cannot remove.
+- **API security: a described sign-in that is not enforced.** When a spec says an endpoint needs a token and the same request with no token answers with data, MacSec reports it.
+- **JavaScript: what is new since last time.** After the JS pass, endpoints and routes are compared with the previous scan of the same host, and the new ones are listed first, because new code is where new bugs are.
+- **The update check cannot fail silently.** It tries the GitHub API, then the release feed, then github.com itself, and the Updates page shows the reason with a Try again button if all three fail.
+
+### Limits
+
+- The Metasploit run list is reasoned about, not tested against every target.
+
+---
 
 ## 1.16.0
 
-- **More of the bug-bounty toolkit, with the same rules.** **gau** adds the URLs the internet already knows about a domain (Wayback, Common Crawl and others) to recon, passively. **wafw00f** names the firewall in front of a site during a web scan when control confirmations are on. **sqlmap** is in the toolbox for one thing only: a bounded fingerprint of one parameter under a written engagement, with `--risk=1 --level=1 --technique=BE`, one thread, no dump, no shell, no file read or write, and its requests counted against the cap.
-- **Recon hands over to the web scan.** On a recon session, "Scan this site" starts a web scan of the first live host with the pages the recon found already in the list (same host only), so discovery is not thrown away between the two.
-- **Web scan does more when you sign in and when you do not.** Inline JavaScript is crawled in Standard as well as Thorough, recon pages seed the crawl, and each hit from ffuf or wafw00f is kept with its proof.
-- **API security: load a spec from an address.** A web scan finds `openapi.json` or `swagger.json`; the API page now loads it straight from that address, reviews it, and tests it.
-- **Apps install with one click, through Homebrew.** Nmap, WPScan, radare2, Ghidra and the Google Cloud CLI show an "Install with Homebrew" button, only when you press it, with the command in the log. Nmap, WPScan and radare2 now show their installed version on the Tools page.
-- **Tests.** 555 passed, 4 skipped, including the new tool parsers, the sqlmap bounds (no dump or shell flags, request reservation, cap refusal) and the recon handoff seeds.
+More of the bug-bounty toolkit, with the same rules.
 
-Limits, on purpose: ordinary scans still only read. sqlmap runs only under an engagement, in its fingerprint mode. Metasploit-driven exploitation and a headless CLI for CI are the next pieces.
+### What is new
+
+- **gau in recon.** URLs the internet already knows about a domain, from the Wayback Machine, Common Crawl and others. Passive, never touching the target. They join the same in-scope list, add parameter names, and interesting ones become leads with a step of their own.
+- **wafw00f in the web scan.** It names the firewall during the confirmation step. Identification only, never an attack.
+- **sqlmap as a controlled proof.** One parameter, GET only, `--risk=1 --level=1 --technique=BE`, one thread and no retries. No dump, no shell, no file read or write, no tamper, no forms. It reserves its requests against the engagement before it starts, deletes its own session folder, and only a naming of the parameter and the technique becomes a finding.
+- **Recon hands over to the scan.** "Scan this site" on a recon session starts a web scan of its first live host with up to 300 same-host pages from the recon already in the list, so discovery is not thrown away between the two halves.
+- **Web scan and API.** Inline JavaScript is crawled in Standard as well as Thorough, recon pages seed the crawl before Nuclei and the JS pass, and API security can load a specification straight from an address, which is what an `openapi.json` a scan finds needs.
+- **Homebrew installs.** Nmap, WPScan, radare2, Ghidra and the Google Cloud CLI install from their own row, only when the button is pressed, with the command written to the log first. Nmap, WPScan and radare2 now show their installed version.
+- **Policy update.** ffuf and sqlmap left the "listed only, never run" list; they are managed, bounded tools now, and the policy test asserts it.
+
+### Limits
+
+- Metasploit driven by the engagement, and the headless command line, were still ahead.
+
+---
 
 ## 1.15.0
 
-- **ffuf is in the toolbox.** On the Web scan page, "Content discovery with ffuf" asks for 200 to 435 common paths at 20 a second, signed out, with ffuf's own calibration. Every path that answers is asked again by MacSec and reported only with a proof, and each one joins the pages the scan tests next. Your own lists in `~/MacSec/extensions/wordlists/*.txt` are used first. ffuf is free, comes from its own GitHub release and is checked against the checksum its authors publish.
-- **The ladder: read, then write, then proof.** Controlled proofs now plan as a chain: a write step is marked to run only after a read on the same site is proven, and the run still stops at the first proof of each goal. Two new rungs: content discovery under an engagement, and an anonymous read that proves a private page opens with no cookie and no token.
-- **Fill in what only you know.** A plan step can be edited before it runs: the string that proves it, the address to read an uploaded file back from, the method, headers and body of a request you paste, and the undo sentence. MacSec re-validates every field on the server, so the plan a run uses is the plan you approved.
-- **Request caps stay true.** Requests ffuf sends on your behalf are counted against the engagement in one audited line, so a discovery run cannot hide inside a proof.
-- **Tests.** 35 in the controlled-proof suite now, including discovery with an injected ffuf, the anonymous read, the ladder ordering, and the refusals.
+ffuf, and the read to write ladder.
 
-Limits, on purpose: still no shells, no data dumps, no password guessing, no persistence and no evasion. Metasploit-driven exploitation and a headless CLI for CI are the next pieces.
+### What is new
+
+- **ffuf as a bounded discovery engine.** The web scan can ask for 200 to 435 common paths at 20 requests a second, signed out, with ffuf's own calibration. Every path that answers is asked again by MacSec, compared with a path that cannot exist, and only then reported with a proof. Each hit joins the pages Nuclei and the JavaScript crawler test next.
+- **Your own word lists.** Lists in `~/MacSec/extensions/wordlists/*.txt` are validated (plain paths only) and used before MacSec's own 435 paths.
+- **Two new controlled-proof rungs.** Content discovery under the engagement, which reserves its whole request count in one audited line, and an anonymous read that proves a private page opens with no cookie and no token.
+- **The ladder.** The planner chains a write step so it runs only after a read on the same site is proven, and the run still stops at the first proof of each goal.
+- **Steps can be filled in before they run.** The expected string, the read-back address, the method, headers, body and undo sentence are edited in the plan and re-validated on the server, so the run uses the plan that was approved.
+
+### Limits
+
+- Discovery is hundreds of ordinary GETs; a firewall will log it and a fragile host may feel it. The interface says so.
+
+---
 
 ## 1.14.0
 
-- **Controlled proofs.** A new page proves what someone could actually do on a site you are engaged to test, and stops at the first result. It needs a written engagement first: client, authority reference, who gave it, the hosts it covers, the window, and caps for requests and writes. Every step says in advance what it sends, what it aims to prove and what it will not do. You tick the steps, type `EXPLOIT <host>`, and the run sends requests one at a time, logs each one with the values hidden, and stops when the goal is proven. Four built-in proofs: read a system file through a parameter (confidentiality), template arithmetic (integrity), write one file and read it back (integrity), and time one request against three (availability). The fifth is the escape hatch: paste any request and name the string that proves it.
-- **CIA, said out loud.** Every proof aims at confidentiality, integrity or availability. The run reports which of the three was proven, and says which was not. A report can no longer imply impact it did not show.
-- **Chaining and escalation, planned cheaply.** Planning uses the findings already on this Mac, with no AI call at all. The optional AI planner sees only a short digest of findings, is called once, and can only pick steps from the catalogue: MacSec validates every field, so a model cannot invent a payload or a host. A step can chain from another, a read before a write on the same page, and the run stops as soon as each goal is proven.
-- **The engagement is the gate.** No engagement, no run. Revoking one stops everything. The caps are counted from the runs stored on disk, so restarting the app does not reset the budget. Write steps also need the leftover acknowledgement, and every write is removed again or listed with exactly where it is.
-- **Metasploit's check list is scanners only now.** The exploit modules were removed from it: several of them run code during their check (Shellshock and Struts2 do), so calling it "check only" was not true. A test now refuses exploit names in both lists.
+The controlled-exploitation release. The one that changed what the product can do.
+
+### What is new
+
+- **Controlled proofs.** A new page proves what someone could actually do on a site the person is engaged to test, and stops at the first result. It needs a written engagement first: client, authority reference, who gave it, the hosts it covers, the window, and caps for requests and writes. Every step says in advance what it sends, what it aims to prove and what it will not do. The person ticks the steps, types `EXPLOIT <host>`, and the run sends requests one at a time, logs each one with the values hidden, and stops when the goal is proven.
+- **CIA, said out loud.** Every proof aims at confidentiality, integrity or availability, and the run reports which was proven and which was not.
+- **Four built-in proofs and an escape hatch.** Read a system file through a parameter, template arithmetic, write one file and read it back, time one request against three, and replay one pasted request.
+- **Chaining and escalation, planned cheaply.** Planning uses the findings already on the Mac with no AI call. The optional AI planner sees only a short digest of findings, is called once, and can only pick from the catalogue; MacSec validates every field. A step can chain from another, a read before a write on the same page, and the run stops as soon as each goal is proven.
+- **The engagement is the gate.** No engagement, no run. Revoking one stops everything. Caps are counted from the runs stored on disk, so restarting the app does not reset the budget. Write steps need the leftover acknowledgement, and every write is removed again or listed with exactly where it is.
+- **Metasploit's check list is scanners only.** The exploit modules were removed from it, because several of them run code during their check (Shellshock and Struts2 do), so "check only" was not true. A test now refuses exploit names in both lists.
 - **Smaller fixes.** A window that fails to draw shows an error panel with a copy button instead of going blank. Deleting a session takes two clicks. The input validators moved to `src/main/validate.ts`, so they can be tested without Electron.
 
-Limits, on purpose: no shells, no data dumps, no password guessing, no persistence, no evasion and no concurrency. The availability proof is a measured slowdown, never a flood. Metasploit-driven exploitation (approved modules with command payloads, a callback for the proof) and a headless CLI for CI are the next pieces.
+### Limits
+
+- Deliberately absent: shells, data dumps, password guessing, persistence, evasion and concurrency. The availability proof is a measured slowdown, never a flood.
+
+---
 
 ## 1.13.0
 
