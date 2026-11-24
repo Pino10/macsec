@@ -685,6 +685,11 @@ export interface Channels {
   'raycast:install': { args: []; result: IntegrationsInfo }
   'mcp:enable': { args: [boolean]; result: IntegrationsInfo }
   'sessions:delete': { args: [string]; result: SessionInfo[] }
+  /** Find a finding across every session. */
+  'sessions:search': { args: [string]; result: SearchHit[] }
+  /** How much MacSec keeps, and letting go of old sessions. */
+  'app:storage': { args: []; result: StorageInfo }
+  'sessions:prune': { args: [number]; result: { removed: number; info: StorageInfo } }
   'sessions:cancel': { args: [string]; result: void }
   'sessions:pdf': { args: [string]; result: string | null }
   'sessions:open': { args: [string, 'folder' | 'code' | 'claude' | 'claude-one' | 'codex' | 'file', string?, number?]; result: void }
@@ -719,6 +724,24 @@ export interface Channels {
   'impact:runs': { args: []; result: ImpactRun[] }
   /** Fill in the fields a plan step cannot know (the expected string, a read-back address, an undo note). */
   'impact:update-step': { args: [{ planId: string; stepId: string; patch: Partial<PlannedStep> }]; result: ImpactPlan }
+}
+
+export interface SearchHit {
+  sessionId: string
+  sessionTitle: string
+  kind: SessionKind
+  at: string
+  findingId: string
+  title: string
+  severity: string
+  tool: string
+  where: string
+}
+
+export interface StorageInfo {
+  bytes: number
+  sessions: number
+  findings: number
 }
 
 export interface Events {

@@ -92,6 +92,18 @@ Use MacSec only on code and systems you own or are allowed to test.
 
 Drop Semgrep rules (`.yml`) into `extensions/semgrep-rules` and they run in every review.
 
+## From the command line
+
+CI can gate a build without opening the app:
+
+```sh
+MacSec --headless scan --path ~/Laramac/www/shop --depth standard --fail-on high
+MacSec --headless baseline --path ~/Laramac/www/shop   # writes .macsec-baseline.json, commit it
+MacSec --headless bench                                  # the accuracy of the built-in checks
+```
+
+Exit codes: 0 clean or only known findings, 1 a new finding reached the threshold, 2 an error, 3 scanners missing (install them in the app, or add `--install-missing`). `--json` prints the result for a pipeline, and `--baseline <file>` / `--no-baseline` choose what counts as known.
+
 ## Development
 
 ```sh

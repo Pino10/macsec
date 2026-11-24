@@ -39,6 +39,13 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
+      - name: The command line works
+        run: |
+          APP="dist/mac-arm64/MacSec.app/Contents/MacOS/MacSec"
+          "$APP" --headless help | head -3
+          "$APP" --headless bench
+          echo "The headless command line answered."
+
       - name: Check the signature and that the app starts
         run: |
           APP="dist/mac-arm64/MacSec.app"

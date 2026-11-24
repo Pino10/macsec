@@ -63,6 +63,13 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.20
+
+- `cli.ts` + `baseline.ts`: the headless door (`--headless` in `index.ts`, before any window), argument rules, baseline identity (`checkId|place`), exit codes and `--json`.
+- `benchmarks.ts` + `benchmark` script: four scored checks against labelled samples, a CI step, and a floor of 0.8 precision and recall.
+- `search.ts` (cross-session finding search) and `storage.ts` (folder size, session count, delete by age), with the Settings controls.
+- Accessibility: contrast on faint text, tooltips on focus, arrow keys in the findings list and the tabs.
+
 ### Added in 1.19
 
 - `netclient.ts`: a request that connects to the approved address (lookup pinned), used by `ConfirmClient`. `NetGuard.addressFor()` keeps it. Tools get no session credentials; `webscan.ts` has its own signed-in walk.

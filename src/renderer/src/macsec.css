@@ -13,7 +13,7 @@
 
   --ink: var(--ivory);
   --ink-2: rgba(222, 230, 255, 0.72);
-  --ink-3: rgba(190, 200, 235, 0.5);
+  --ink-3: rgba(190, 200, 235, 0.66);
   --line: rgba(150, 170, 255, 0.1);
   --line-2: rgba(150, 170, 255, 0.18);
   --glass: rgba(13, 17, 36, 0.58);
@@ -1363,7 +1363,9 @@ div + .pick-item {
 [data-tip] {
   position: relative;
 }
-[data-tip]:hover::after {
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after,
+[data-tip]:focus-within::after {
   content: attr(data-tip);
   position: absolute;
   bottom: calc(100% + 8px);
@@ -2649,7 +2651,7 @@ html[data-tone='light'] {
   --slate: #5b6482;
   --ink: #131a2e;
   --ink-2: rgba(19, 26, 46, 0.78);
-  --ink-3: rgba(19, 26, 46, 0.58);
+  --ink-3: rgba(19, 26, 46, 0.7);
   --line: rgba(40, 60, 120, 0.13);
   --line-2: rgba(40, 60, 120, 0.22);
   --glass: rgba(255, 255, 255, 0.78);

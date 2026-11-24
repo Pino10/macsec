@@ -27,6 +27,8 @@ import { checkUpdates, checkUpdatesDaily, installApp, installTool, listTools, re
 import { dockerPath, localSites, startWebScan } from './webscan'
 import { ciWorkflow, compareFindings, preCommitHook, previousSession, toDefectDojo, toSarif } from './exports'
 import { topFindings } from '../shared/insights'
+import { searchFindings } from './search'
+import { pruneSessions, storageInfo } from './storage'
 import { label } from './risk'
 import { runCheckup } from './checkup'
 import { startTray } from './tray'
@@ -861,6 +863,9 @@ function registerIpc(): void {
     return sessionOwasp(s, kids)
   })
   handle('sessions:masvs', (id) => sessionMasvs(sessionDetail(String(id))))
+  handle('sessions:search', (q) => searchFindings(String(q ?? '')))
+  handle('app:storage', () => storageInfo())
+  handle('sessions:prune', (days) => pruneSessions(Number(days)))
   handle('sessions:delete', (id) => {
     cancelSession(String(id))
     deleteSession(String(id))
@@ -1390,12 +1395,25 @@ app.on('second-instance', () => {
   }
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // MacSec is dark unless the person chose light or to follow the Mac.
   nativeTheme.themeSource = getSettings().look === 'light' ? 'light' : getSettings().look === 'auto' ? 'system' : 'dark'
   ensureDirs()
   const crypto = { available: () => safeStorage.isEncryptionAvailable(), encrypt: (s: string) => safeStorage.encryptString(s).toString('base64'), decrypt: (s: string) => safeStorage.decryptString(Buffer.from(s, 'base64')) }
   setSecretsCrypto(crypto)
+  // The CI door: no window, no tray, no IPC. The answer goes to stdout and the code says it all.
+  if (process.argv.includes('--headless')) {
+    const { runCli } = await import('./cli')
+    let code = 2
+    try {
+      code = await runCli(process.argv.slice(process.argv.indexOf('--headless') + 1))
+    } catch (e) {
+      process.stdout.write(`MacSec: ${(e as Error).stack ?? String(e)}\n`)
+    }
+    await new Promise<void>((resolve) => process.stdout.write('', () => resolve()))
+    app.exit(code)
+    return
+  }
   // Every GitHub API call uses your GitHub sign-in when you added one: 5,000 an hour instead of 60.
   configureGitHub({ userAgent: USER_AGENT, token: () => getSecret('github') })
   setModelCrypto(crypto)
