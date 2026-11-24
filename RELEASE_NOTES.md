@@ -1,3 +1,23 @@
+## 1.32.0
+
+The mobile scan now reads the things that were missing on iOS, and it stops reporting a profile wildcard that the signed app never asks for.
+
+### What changed on iOS
+
+- **Signed entitlements, not just the profile.** The scan runs `codesign -d --entitlements` on the built app and checks what the binary actually requests. A wildcard `keychain-access-groups` in the profile is no longer a finding on its own: if the signed app does not include the entitlement, it cannot use the wildcard group. This removes the false positive in the earlier report.
+- **Distribution and signing.** The profile is decoded with `security cms`; the scan reports ad hoc or development builds, the provisioned device count, the team name and ID, the profile expiry, the signing authority chain and `get-task-allow`.
+- **Info.plist beyond ATS.** `GMSApiKey` and Google key patterns, always-location, contacts, microphone and photo-library usage, and a missing `ScreenshotBlockEnabled` flag.
+- **The JavaScript bundle.** The Hermes bundle is included in the string pass: test, UAT, staging, demo and localhost hosts become one finding; Google, AWS and Stripe key patterns become another; an `sslPinning` mention without a pin hash becomes an informational note. The same pass now runs on Android's `assets/index.android.bundle`.
+
+### What it still does not do
+
+- It does not run the app. Screenshot blocking, pinning enforcement, jailbreak detection and the actual base URL at runtime still need a device and a proxy.
+- It does not verify key restrictions with Google, and it does not contact test hosts.
+
+634 tests pass (629 passed, 5 skipped). The iOS checks were run against the supplied OmniBisic IPA via `OMNI_IPA_DIR`: ad hoc for 25 devices, team `Sathish Manju`, signed entitlements without a Keychain group, `GMSApiKey` present, test hosts and keys in the bundle.
+
+---
+
 ## 1.31.0
 
 Patch generation, in a scratch copy, with tests, a diff, a typed confirmation and a rollback. It is
