@@ -24,7 +24,6 @@ export default function Sessions(): React.JSX.Element {
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
   const [kind, setKind] = useState<SessionInfo['kind'] | 'all'>('all')
-  if (openSession) return <SessionView id={openSession} onBack={() => showSession(null)} />
   const list = sessions.filter((s) => (kind === 'all' || s.kind === kind) && (!q.trim() || `${s.title} ${s.target}`.toLowerCase().includes(q.toLowerCase())))
   // The same box searches inside every finding, not only the session titles.
   useEffect(() => {
@@ -35,6 +34,7 @@ export default function Sessions(): React.JSX.Element {
     const t = window.setTimeout(() => void window.macsec.invoke('sessions:search', q).then(setHits).catch(() => setHits([])), 300)
     return () => window.clearTimeout(t)
   }, [q])
+  if (openSession) return <SessionView id={openSession} onBack={() => showSession(null)} />
   return (
     <>
       <PageHead title="Results" desc="Every test you ran, kept with its findings, the AI’s report and each tool’s raw output.">
