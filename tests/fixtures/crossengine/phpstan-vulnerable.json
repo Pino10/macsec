@@ -1,0 +1,1 @@
+{"files":{"/p/app/Search.php":{"messages":[{"message":"Query built with a variable: possible SQL injection.","line":6,"identifier":"macsec.sql"}]}}}

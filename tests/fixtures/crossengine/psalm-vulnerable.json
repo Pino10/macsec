@@ -1,0 +1,1 @@
+{"issues":[{"type":"TaintedSql","file_name":"/p/app/Search.php","line_from":6,"message":"Detected tainted SQL"}]}
