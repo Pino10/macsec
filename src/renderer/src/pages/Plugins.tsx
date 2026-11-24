@@ -9,6 +9,8 @@ export default function Plugins(): React.JSX.Element {
   const { sessions, showSession, act, notify } = useApp()
   const api = window.macsec
   const [list, setList] = useState<PluginDef[]>([])
+  const [presets, setPresets] = useState<{ name: string; bin: string; args: string[]; parser: PluginDef['parser']; pattern?: string; severity: string; description: string; install: string }[]>([])
+  const [preset, setPreset] = useState('')
   const [session, setSession] = useState('')
   const [plugin, setPlugin] = useState('')
   const [ok, setOk] = useState(false)
@@ -16,6 +18,7 @@ export default function Plugins(): React.JSX.Element {
   const [form, setForm] = useState({ name: '', bin: '', args: '["--target","{target}"]', parser: 'json' as PluginDef['parser'], severity: 'medium', pattern: '', description: '' })
   useEffect(() => {
     void api.invoke('plugins:list').then(setList).catch(() => setList([]))
+    void api.invoke('plugins:presets').then(setPresets).catch(() => setPresets([]))
   }, [api])
   const finished = sessions.filter((s) => s.status !== 'running').slice(0, 30)
   useEffect(() => {
@@ -56,6 +59,24 @@ export default function Plugins(): React.JSX.Element {
       <div className="split" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div className="panel" style={{ padding: 16, display: 'grid', gap: 10 }}>
           <strong>Add a plugin</strong>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select className="input" value={preset} onChange={(e) => setPreset(e.target.value)} aria-label="Plugin preset">
+              <option value="">Start from a preset…</option>
+              {presets.map((x) => (<option key={x.name} value={x.name}>{x.name}</option>))}
+            </select>
+            <button
+              className="btn btn-sm"
+              disabled={!preset}
+              onClick={() => {
+                const x = presets.find((v) => v.name === preset)
+                if (!x) return
+                setForm({ name: x.name, bin: x.bin, args: JSON.stringify(x.args), parser: x.parser, severity: x.severity, pattern: x.pattern ?? '', description: `${x.description} Install: ${x.install}` })
+              }}
+            >
+              Use preset
+            </button>
+          </div>
+          <p className="hint">Presets are templates, not installed tools. Install the tool first; MacSec never installs a plugin binary.</p>
           <p className="hint">The binary must be an absolute path. Placeholders: <span className="mono">{'{target}'}</span>, <span className="mono">{'{host}'}</span>, <span className="mono">{'{url}'}</span>, <span className="mono">{'{session}'}</span>. Arguments are a JSON array; there is no shell.</p>
           <input className="input" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} aria-label="Plugin name" />
           <input className="input mono" placeholder="/usr/local/bin/tool" value={form.bin} onChange={(e) => setForm({ ...form, bin: e.target.value })} aria-label="Binary" />
@@ -63,6 +84,7 @@ export default function Plugins(): React.JSX.Element {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <select className="input" value={form.parser} onChange={(e) => setForm({ ...form, parser: e.target.value as PluginDef['parser'] })} aria-label="Parser">
               <option value="json">JSON array</option>
+              <option value="jsonl">JSONL (one JSON object per line)</option>
               <option value="lines">One finding per line</option>
               <option value="regex">Regex per line</option>
             </select>

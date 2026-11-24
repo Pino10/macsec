@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.37.0
+
+- `ProgrammeInfo` on the engagement (platform, URL, rate limit, exclusions); bounty draft prints it.
+- `pluginPresets()` and the JSONL parser; the Plugins page can load a preset into the form.
+
 ### Added in 1.36.0
 
 - `plugins.ts`: declared binary/args/parser, no shell, manual run, engagement for remote hosts, findings appended as possible; `plugins:*` IPC and the Plugins page.

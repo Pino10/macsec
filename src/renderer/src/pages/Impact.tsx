@@ -15,6 +15,10 @@ const clsName = (c: ImpactClass): string => c[0].toUpperCase() + c.slice(1)
 
 const DRAFT_DEFAULTS = {
   profile: 'pentest',
+  programmePlatform: 'generic',
+  programmeUrl: '',
+  programmeRate: '',
+  programmeExclusions: '',
   client: '',
   authorityRef: '',
   authorizedBy: '',
@@ -60,6 +64,19 @@ function EngagementForm({ onSaved }: { onSaved: (e: Engagement) => void }): Reac
                 <option value="lab">Lab or training</option>
               </select>
             </label>
+            {f.profile === 'bounty' && (
+              <>
+                <select className="input" value={f.programmePlatform} onChange={(e) => set({ programmePlatform: e.target.value })} aria-label="Programme platform">
+                  <option value="generic">Generic programme</option>
+                  <option value="hackerone">HackerOne</option>
+                  <option value="bugcrowd">Bugcrowd</option>
+                  <option value="intigriti">Intigriti</option>
+                </select>
+                <input className="input" placeholder="Programme URL" value={f.programmeUrl} onChange={(e) => set({ programmeUrl: e.target.value })} aria-label="Programme URL" />
+                <input className="input" placeholder="Programme rate limit (what the policy says)" value={f.programmeRate} onChange={(e) => set({ programmeRate: e.target.value })} aria-label="Programme rate limit" />
+                <textarea className="input" rows={2} placeholder="Programme exclusions, one per line" value={f.programmeExclusions} onChange={(e) => set({ programmeExclusions: e.target.value })} aria-label="Programme exclusions" />
+              </>
+            )}
             <input className="input" placeholder="Client or project" value={f.client} onChange={(e) => set({ client: e.target.value })} aria-label="Client or project" />
             <input className="input" placeholder="Authority reference (contract, ticket, email subject, programme id)" value={f.authorityRef} onChange={(e) => set({ authorityRef: e.target.value })} aria-label="Authority reference" />
             <input className="input" placeholder="Who gave the authority (a person, or the programme)" value={f.authorizedBy} onChange={(e) => set({ authorizedBy: e.target.value })} aria-label="Who gave the authority" />
@@ -107,6 +124,7 @@ function EngagementForm({ onSaved }: { onSaved: (e: Engagement) => void }): Reac
                 const e = await act('impact-engagement', () =>
                   api.invoke('impact:save-engagement', {
                     profile: f.profile as 'pentest' | 'bounty' | 'red-team' | 'internal' | 'lab',
+                    programme: { platform: f.programmePlatform as 'hackerone' | 'bugcrowd' | 'intigriti' | 'generic', url: f.programmeUrl || undefined, rateLimit: f.programmeRate || undefined, exclusions: f.programmeExclusions.split(/[\n,]+/).map((x) => x.trim()).filter(Boolean) },
                     client: f.client,
                     authorityRef: f.authorityRef,
                     authorizedBy: f.authorizedBy,

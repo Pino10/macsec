@@ -48,9 +48,20 @@ export interface EngagementCaps {
 
 export type EngagementProfile = 'pentest' | 'bounty' | 'red-team' | 'internal' | 'lab'
 
+export type BountyPlatform = 'hackerone' | 'bugcrowd' | 'intigriti' | 'generic'
+
+export interface ProgrammeInfo {
+  platform: BountyPlatform
+  url?: string
+  rateLimit?: string
+  exclusions?: string[]
+}
+
 export interface EngagementDraft {
   /** What kind of authority this is. The proof gates are the same; the reporting and defaults are not. */
   profile?: EngagementProfile
+  /** Programme rules for a bounty or a named engagement. */
+  programme?: ProgrammeInfo
   client: string
   /** The written authority: a contract or ticket number, an email subject, a programme reference. */
   authorityRef: string
