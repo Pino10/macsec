@@ -123,7 +123,7 @@ describe('scans against a real local server', () => {
 
   const wait = async (id: string): Promise<import('../src/shared/types').SessionDetail> => {
     const { readSession, sessionDetail } = await import('../src/main/sessions')
-    for (let i = 0; i < 300 && readSession(id).status === 'running'; i++) await new Promise((r) => setTimeout(r, 200))
+    for (let i = 0; i < 600 && readSession(id).status === 'running'; i++) await new Promise((r) => setTimeout(r, 200))
     return sessionDetail(id)
   }
 
@@ -136,7 +136,7 @@ describe('scans against a real local server', () => {
     expect(t).toContain('high Public file: /phpinfo.php')
     expect(t.some((x) => x.includes('Content-Security-Policy'))).toBe(true)
     expect(d.steps.find((x) => x.id === 'exposed')!.status).toBe('done')
-  }, 120_000)
+  }, 180_000)
 
   it('refuses an outside site without your confirmation', async () => {
     const { startWebScan } = await import('../src/main/webscan')

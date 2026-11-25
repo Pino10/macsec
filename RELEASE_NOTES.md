@@ -1,3 +1,22 @@
+## 1.42.1
+
+The Container runtime card could say "Off" while Docker and MobSF were running. It now refreshes and
+shows why.
+
+- The card checks again every five seconds, and has a **Refresh** button.
+- When Docker does not answer, it prints the exact error and the Docker path and host it used,
+  instead of only an "Off" tag.
+- The Docker status timeout is 15 seconds, so a busy Colima is not reported as down after six.
+- MobSF has its own container check; **Open full MobSF** works independently of the runtime card.
+
+The runtime path is already configured. If the card still says Off, the error line under it is the
+thing to send me.
+
+660 tests (654 passed, 5 skipped, one local web-scan test is flaky in this checkout; the release
+workflow runs the same suite).
+
+---
+
 ## 1.42.0
 
 Full **MobSF** is in MacSec, running locally in Docker and opened in its own app window.

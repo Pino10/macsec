@@ -11,10 +11,20 @@ export default function ContainerRuntime(): React.JSX.Element {
   const [form, setForm] = useState({ dockerPath: '', dockerHost: '', home: '', colimaHome: '', limaHome: '', managedDir: '' })
   const [open, setOpen] = useState(false)
   useEffect(() => {
-    void api.invoke('container:status').then((s) => {
-      setSt(s)
-      setForm({ dockerPath: s.dockerPath === 'docker' ? '' : s.dockerPath, dockerHost: s.dockerHost, home: s.home, colimaHome: '', limaHome: '', managedDir: s.managed })
-    })
+    let alive = true
+    const load = (): void => {
+      void api.invoke('container:status').then((s) => {
+        if (!alive) return
+        setSt(s)
+        setForm((f) => (f.dockerPath || f.dockerHost ? f : { dockerPath: s.dockerPath === 'docker' ? '' : s.dockerPath, dockerHost: s.dockerHost, home: s.home, colimaHome: '', limaHome: '', managedDir: s.managed }))
+      }).catch(() => undefined)
+    }
+    load()
+    const timer = window.setInterval(load, 5000)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+    }
   }, [api])
   const apply = async (key: string, call: () => Promise<ContainerStatus>): Promise<void> => {
     const r = await act(key, call)
@@ -29,7 +39,10 @@ export default function ContainerRuntime(): React.JSX.Element {
           <div className="hint">Used only by container plugins. {st?.running ? `Docker is running${st.version ? ` (${st.version})` : ''}.` : 'Docker is not reachable.'} {st?.colima ? 'Colima is running.' : 'Colima is not running.'}</div>
         </div>
         {st && <span className={`tag ${st.running ? 'tag-ok' : ''}`}>{st.running ? 'On' : 'Off'}</span>}
+        <button className="link" onClick={() => void api.invoke('container:status').then(setSt).catch(() => undefined)}>Refresh</button>
       </div>
+      {st && !st.running && st.detail && <p className="hint mono" style={{ color: 'var(--sev-high)' }}>{st.detail}</p>}
+      {st && <p className="hint mono">Docker: {st.dockerPath} · host: {st.dockerHost || 'default'}</p>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="btn btn-sm" disabled={!st?.colima} onClick={() => void apply('container-start', () => api.invoke('container:start'))}>
           <Play size={13} /> Start

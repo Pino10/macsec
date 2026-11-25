@@ -63,6 +63,10 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.42.1
+
+- Container runtime card polls every 5s, has Refresh, prints Docker error/path/host; docker info timeout 15s.
+
 ### Added in 1.42.0
 
 - `mobsf.ts` + MobSF page: official Docker image, port 8765, named reports volume, start/stop/remove, sandboxed MobSF window.

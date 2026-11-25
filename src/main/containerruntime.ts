@@ -28,8 +28,8 @@ const run = (bin: string, args: string[], timeout = 20_000): Promise<{ ok: boole
 
 export async function containerStatus(): Promise<ContainerStatus> {
   const c = getSettings().container ?? {}
-  const info = await run(dockerBin(), ['info', '--format', '{{.ServerVersion}}'], 6000)
-  const cl = await run(colima(), ['status'], 6000)
+  const info = await run(dockerBin(), ['info', '--format', '{{.ServerVersion}}'], 15_000)
+  const cl = await run(colima(), ['status'], 10_000)
   return {
     dockerPath: dockerBin(),
     dockerHost: c.dockerHost ?? '',
