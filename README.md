@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.42.1 | Runtime card refresh and the exact Docker error instead of a silent Off | [1.42.1](RELEASE_NOTES.md#1421) |
 | 1.42.0 | Full MobSF in a local Docker container, opened in its own MacSec window | [1.42.0](RELEASE_NOTES.md#1420) |
 | 1.41.0 | Container runtime managed from Tools, with start/stop and uninstall; plugin cleanup | [1.41.0](RELEASE_NOTES.md#1410) |
 | 1.40.0 | AD review from a BloodHound export: Kerberos, delegation, privileged accounts, LAPS | [1.40.0](RELEASE_NOTES.md#1400) |
