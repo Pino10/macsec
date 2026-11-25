@@ -464,6 +464,17 @@ export interface ContainerStatus {
   detail: string
 }
 
+export interface MobsfStatus {
+  installed: boolean
+  running: boolean
+  url: string
+  container: string
+  image: string
+  username: string
+  password: string
+  detail: string
+}
+
 export interface AppSettings {
   /** Laramac's www folder by default. */
   wwwPath: string
@@ -676,6 +687,11 @@ export interface Channels {
   'loop:verify': { args: [string, Reviewer]; result: LoopState }
   'ad:pick': { args: []; result: string | null }
   'ad:start': { args: [string]; result: SessionInfo }
+  'mobsf:status': { args: []; result: MobsfStatus }
+  'mobsf:start': { args: []; result: MobsfStatus }
+  'mobsf:stop': { args: []; result: MobsfStatus }
+  'mobsf:remove': { args: [boolean, boolean, boolean]; result: MobsfStatus }
+  'mobsf:open': { args: []; result: string }
   'container:status': { args: []; result: ContainerStatus }
   'container:configure': { args: [{ dockerPath?: string; dockerHost?: string; home?: string; colimaHome?: string; limaHome?: string; managedDir?: string }]; result: ContainerStatus }
   'container:start': { args: []; result: ContainerStatus }

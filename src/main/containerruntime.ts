@@ -10,28 +10,28 @@ import type { ContainerStatus } from '../shared/types'
 import { dirs } from './paths'
 import { getSettings, setSettings } from './settings'
 
-const env = (): NodeJS.ProcessEnv => {
+export const dockerEnv = (): NodeJS.ProcessEnv => {
   const c = getSettings().container ?? {}
   return { ...process.env, ...(c.dockerHost ? { DOCKER_HOST: c.dockerHost } : {}), ...(c.home ? { HOME: c.home } : {}), ...(c.colimaHome ? { COLIMA_HOME: c.colimaHome } : {}), ...(c.limaHome ? { LIMA_HOME: c.limaHome } : {}), ...(c.dockerPath ? { MACSEC_DOCKER: c.dockerPath } : {}) }
 }
-const docker = (): string => getSettings().container?.dockerPath || process.env.MACSEC_DOCKER || [join(dirs.root(), 'tools', 'bin', 'docker'), '/opt/homebrew/bin/docker', '/usr/local/bin/docker', '/usr/bin/docker'].find((p) => existsSync(p)) || 'docker'
+export const dockerBin = (): string => getSettings().container?.dockerPath || process.env.MACSEC_DOCKER || [join(dirs.root(), 'tools', 'bin', 'docker'), '/opt/homebrew/bin/docker', '/usr/local/bin/docker', '/usr/bin/docker'].find((p) => existsSync(p)) || 'docker'
 const colima = (): string => {
-  const d = docker()
+  const d = dockerBin()
   const besides = d.replace(/\/docker$/, '/colima')
   if (existsSync(besides)) return besides
   return ['/opt/homebrew/bin/colima', '/usr/local/bin/colima'].find((p) => existsSync(p)) || 'colima'
 }
 const run = (bin: string, args: string[], timeout = 20_000): Promise<{ ok: boolean; out: string; err: string }> =>
   new Promise((resolvePromise) => {
-    execFile(bin, args, { timeout, maxBuffer: 4 * 1024 * 1024, env: env() }, (e, stdout, stderr) => resolvePromise({ ok: !e, out: String(stdout ?? ''), err: String(stderr ?? e?.message ?? '') }))
+    execFile(bin, args, { timeout, maxBuffer: 4 * 1024 * 1024, env: dockerEnv() }, (e, stdout, stderr) => resolvePromise({ ok: !e, out: String(stdout ?? ''), err: String(stderr ?? e?.message ?? '') }))
   })
 
 export async function containerStatus(): Promise<ContainerStatus> {
   const c = getSettings().container ?? {}
-  const info = await run(docker(), ['info', '--format', '{{.ServerVersion}}'], 6000)
+  const info = await run(dockerBin(), ['info', '--format', '{{.ServerVersion}}'], 6000)
   const cl = await run(colima(), ['status'], 6000)
   return {
-    dockerPath: docker(),
+    dockerPath: dockerBin(),
     dockerHost: c.dockerHost ?? '',
     home: c.home ?? '',
     colimaPath: colima(),

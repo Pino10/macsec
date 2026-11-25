@@ -101,6 +101,7 @@ build and explain an attack path, so the history is worth reading in order.
 
 | Version | What it added | Notes |
 | --- | --- | --- |
+| 1.42.0 | Full MobSF in a local Docker container, opened in its own MacSec window | [1.42.0](RELEASE_NOTES.md#1420) |
 | 1.41.0 | Container runtime managed from Tools, with start/stop and uninstall; plugin cleanup | [1.41.0](RELEASE_NOTES.md#1410) |
 | 1.40.0 | AD review from a BloodHound export: Kerberos, delegation, privileged accounts, LAPS | [1.40.0](RELEASE_NOTES.md#1400) |
 | 1.39.0 | Container plugin runner: internal Docker network, proxy-only route, budget kill | [1.39.0](RELEASE_NOTES.md#1390) |
