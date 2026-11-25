@@ -63,6 +63,11 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 **Tool updates:** `toolbox.ts` records the version installed in `tools/versions.json` and checks GitHub and PyPI daily (`checkUpdatesDaily`). Installing again is how an update happens.
 
+### Added in 1.42.0
+
+- `mobsf.ts` + MobSF page: official Docker image, port 8765, named reports volume, start/stop/remove, sandboxed MobSF window.
+- 1.41 runtime management folded in after its cancelled build.
+
 ### Added in 1.41.0
 
 - `containerruntime.ts` + Container runtime Tools card: status, configure, start/stop, uninstall (managed folder only); `container:*` IPC.

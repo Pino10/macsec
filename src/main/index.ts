@@ -85,6 +85,7 @@ const isMac = process.platform === 'darwin'
 const RENDERER_URL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
 const RENDERER_FILE = join(__dirname, '../renderer/index.html')
 let mainWindow: BrowserWindow | null = null
+let mobsfWindow: BrowserWindow | null = null
 let material: 'liquid-glass' | 'vibrancy' | 'none' = 'none'
 
 

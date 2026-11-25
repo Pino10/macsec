@@ -1,3 +1,41 @@
+## 1.42.0
+
+Full **MobSF** is in MacSec, running locally in Docker and opened in its own app window.
+
+### MobSF page
+
+- Start the official `opensecurity/mobile-security-framework-mobsf` image, open the **complete MobSF
+  UI**, stop it, or remove the container.
+- Local only: `http://127.0.0.1:8765`, login `mobsf / mobsf`, fixed port, named volume for reports.
+- **Open full MobSF** opens a separate MacSec window. It is the real MobSF interface, not a summary:
+  upload an APK, IPA or source zip and use static analysis, manifests, certificates, trackers and
+  reports.
+- The window is sandboxed: no Node integration, a separate session partition, and navigation is
+  limited to `127.0.0.1:8765`.
+- Removing the container can also remove the reports volume and the image; the boxes say what will
+  be deleted.
+- The first start pulls the image and waits for the UI. Docker or Colima must be running; the
+  Container runtime card on Tools manages that.
+
+### Also included
+
+- The 1.41 container-runtime management (its build was cancelled, the tag is gone): status,
+  configure, start/stop and uninstall of the runtime, with managed-folder deletion and external
+  installs only unlinked.
+
+### Limits
+
+- MobSF is a third-party Docker image. MacSec starts and opens it; it does not audit MobSF's own
+  code or sandbox its analysis.
+- Default credentials are for a local port only. Do not expose port 8765 to a network.
+- Reports live in the Docker volume; if you delete the volume, they are gone.
+- This is the full UI, not an API-fed subset. MacSec does not import MobSF findings into its own
+  session; use the report in the MobSF window.
+
+660 tests (655 passed, 5 skipped).
+
+---
+
 ## 1.41.0
 
 The container runtime is now managed from MacSec, and what MacSec installs can be removed from
