@@ -252,6 +252,15 @@ export default function Settings(): React.JSX.Element {
             Open logs
           </button>
         </div>
+        <div className="ms-row">
+          <div className="grow">
+            <div className="row-title">How MacSec stays safe</div>
+            <div className="row-sub">What MacSec reads, what it only does inside a written scope, and what it never does. Written for security teams you share it with.</div>
+          </div>
+          <button className="btn btn-sm" onClick={() => setPage('safety')}>
+            Open
+          </button>
+        </div>
       </div>
       <p className="hint" style={{ marginTop: 14 }}>
         MacSec {appInfo?.version}. Use it only on code and systems you own or are allowed to test.{' '}

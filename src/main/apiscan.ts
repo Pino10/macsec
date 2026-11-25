@@ -29,6 +29,9 @@ import { dirs } from './paths'
 import { log } from './logs'
 import { summarizeWithAi, summaryPrompt } from './aisummary'
 import { WAF_DECEPTION_NOTE } from './wafdeception'
+import { guardedFetch } from './guardedfetch'
+
+const gfetch = guardedFetch()
 
 const specDir = (): string => join(dirs.config(), 'api-specs')
 
@@ -109,7 +112,7 @@ async function probe(endpoints: Endpoint[], base: string, auth: ApiAuth, cancell
     }
     if (url.host !== host) continue
     try {
-      const r = await fetch(url, { headers, redirect: 'manual', signal: AbortSignal.timeout(15000) })
+      const r = await gfetch(url, { headers, redirect: 'manual', signal: AbortSignal.timeout(15000) })
       const body = (await r.text()).slice(0, 500_000)
       const where = { file: `${e.method} ${e.path}`, url: url.href }
       const acao = r.headers.get('access-control-allow-origin')
@@ -122,7 +125,7 @@ async function probe(endpoints: Endpoint[], base: string, auth: ApiAuth, cancell
       if (signedIn && e.secured !== false && anonChecks < 20 && r.status < 300) {
         anonChecks++
         try {
-          const anon = await fetch(url, { headers: anonHeaders, redirect: 'manual', signal: AbortSignal.timeout(15000) })
+          const anon = await gfetch(url, { headers: anonHeaders, redirect: 'manual', signal: AbortSignal.timeout(15000) })
           const anonBody = (await anon.text()).slice(0, 200_000)
           const keys = /json/.test(anon.headers.get('content-type') ?? '') ? [...sensitiveKeys((() => { try { return JSON.parse(anonBody) } catch { return {} } })())] : []
           const loginPage = /<input[^>]+type=["']?password/i.test(anonBody) || /sign in|log in|login/i.test((anonBody.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '').slice(0, 200))

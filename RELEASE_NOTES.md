@@ -1,3 +1,9 @@
+## 1.43.0
+
+- **Every direct web check is guarded.** The exposed-files check, the API checks, the script key scan, the signed-out comparison, the deep recon header checks and the recon probe now ask the network guard first and connect to the address it approved, like the rest of MacSec. Before, these few used a plain request.
+- **How MacSec stays safe.** A new page (Settings, then Open) explains in plain English what ordinary scans read, what only runs inside a written engagement, and what MacSec never does. You can add your organisation name (you type it) and copy the text to share with a security team. It makes no certification or compliance claim.
+- **Agent tests.** The AI agent settings are tested, including a check that no code skips an agent's permission checks and that only patch generation, in its scratch copy, lets an agent edit files.
+
 ## 1.42.1
 
 The Container runtime card could say "Off" while Docker and MobSF were running. It now refreshes and

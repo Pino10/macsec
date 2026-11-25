@@ -49,6 +49,9 @@ import { runAutopilot, type Action } from './autopilot'
 import { corsChecks } from './sessioncheck'
 import type { Reply } from './confirmtests'
 import { accessChecks, ConfirmClient, risky, fuzzContent, fuzzParams, loginChecks, resetCheck, wafControl } from './confirmtests'
+import { guardedFetch } from './guardedfetch'
+
+const gfetch = guardedFetch()
 
 /** Laramac's sites, from the www folder, at their .test addresses. */
 export function localSites(): { name: string; url: string }[] {
@@ -138,7 +141,7 @@ export function looksReal(path: string, body: string, notFound: { status: number
 /** MacSec's own check for files that should never be public: one ordinary GET per path, slowly. */
 async function exposedFiles(base: string, paths: string[], headers: Record<string, string>, cancelled: () => boolean, note: (d: string) => void): Promise<Finding[]> {
   const get = async (p: string): Promise<{ status: number; body: string; length: number }> => {
-    const r = await fetch(`${base}/${p}`, { redirect: 'manual', headers: { 'User-Agent': 'MacSec exposure check', Range: 'bytes=0-65535', ...headers }, signal: AbortSignal.timeout(12000) })
+    const r = await gfetch(`${base}/${p}`, { redirect: 'manual', headers: { 'User-Agent': 'MacSec exposure check', Range: 'bytes=0-65535', ...headers }, signal: AbortSignal.timeout(12000) })
     const body = r.status >= 300 && r.status < 400 ? '' : await r.text()
     return { status: r.status, body, length: body.length }
   }

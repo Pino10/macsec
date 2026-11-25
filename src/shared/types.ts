@@ -489,6 +489,8 @@ export interface AppSettings {
   notifications: boolean
   /** How Claude Code signs in: your normal account, or an Anthropic API key from the Keychain. */
   claudeAuth: 'account' | 'key'
+  /** Optional: the organisation using MacSec, typed by the person. Shown on the safety page only. */
+  organisation?: string
   /** Let AI tools use MacSec through its MCP server on 127.0.0.1. Off by default. */
   mcpEnabled?: boolean
   /** Slack, Teams, Discord or other webhook. The address is in the Keychain. */

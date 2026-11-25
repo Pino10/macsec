@@ -384,6 +384,7 @@ function registerIpc(): void {
     if (isEditorChoice(p.editor)) safe.editor = p.editor
     if (typeof p.notifications === 'boolean') safe.notifications = p.notifications
     if (p.claudeAuth === 'account' || p.claudeAuth === 'key') safe.claudeAuth = p.claudeAuth
+    if (typeof p.organisation === 'string') safe.organisation = p.organisation.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 80)
     if (p.look === 'dark' || p.look === 'light' || p.look === 'auto') {
       safe.look = p.look
       nativeTheme.themeSource = p.look === 'auto' ? 'system' : p.look
