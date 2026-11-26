@@ -263,3 +263,14 @@ describe('executive summary', () => {
     expect(html).toContain('&lt;img')
   })
 })
+
+describe('one score everywhere', () => {
+  it('an asset score is the posture score of its open findings (higher is better)', async () => {
+    const { scoreOf } = await import('../src/main/assets')
+    const { postureScore } = await import('../src/shared/posture')
+    expect(scoreOf([])).toBe(100)
+    expect(scoreOf([f({ severity: 'high' })])).toBe(postureScore({ critical: 0, high: 1, medium: 0, low: 0, info: 0 }))
+    expect(scoreOf([f({ severity: 'critical' })])).toBeLessThan(scoreOf([f({ severity: 'high' })]))
+    expect(scoreOf([f({ severity: 'high', triage: 'fixed' }), f({ severity: 'info' })])).toBe(100)
+  })
+})

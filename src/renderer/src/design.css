@@ -281,3 +281,29 @@ html[data-tone='light'] .flow-go { box-shadow: 0 -10px 20px -16px rgba(20, 30, 6
 @media (max-width: 900px) { .settings-layout { grid-template-columns: 1fr; } .settings-nav { position: static; display: flex; flex-wrap: wrap; gap: 4px; } }
 .tool-search input:not([type='checkbox']):not([type='radio']) { border: 0; background: none; box-shadow: none; border-radius: 0; }
 .row .row-title, .row .row-sub { display: block; white-space: nowrap; }
+
+/* ------------------------------------------------ Split layout: steps on the left, a sticky summary on the right */
+.step-split { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.step-split .flow-go { display: none; }
+.split-aside { position: sticky; top: 8px; display: grid; gap: 12px; padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.split-aside h3 { margin: 0; font: 600 13px var(--display); letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-3); }
+.split-aside dl { margin: 0; display: grid; gap: 8px; }
+.split-aside dt { font-size: 11.5px; color: var(--ink-3); }
+.split-aside dd { margin: 1px 0 0; font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.split-aside .btn-primary { width: 100%; justify-content: center; }
+.split-aside .hint { margin: 0; }
+@media (max-width: 1000px) { .step-split { grid-template-columns: 1fr; } .split-aside { position: static; } }
+
+/* ------------------------------------------------ Project cards */
+.proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.proj-card { display: grid; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.proj-card:hover { border-color: var(--border-2); }
+.proj-card header { display: flex; align-items: center; gap: 8px; }
+.proj-card header strong { font: 600 14px var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-card .proj-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.proj-card .proj-actions select { width: auto; height: 28px; font-size: 12.5px; }
+
+/* ------------------------------------------------ Logs toolbar */
+.log-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.log-bar .tool-search { max-width: 360px; }
+.log-count { margin-left: auto; font-size: 12px; color: var(--ink-3); }

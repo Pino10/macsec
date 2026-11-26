@@ -1,3 +1,9 @@
+## 1.46.0
+
+- **One score everywhere.** Assets now shows the same score as the Overview and the results: 0 to 100, higher is better, with the same words (Strong, Guarded, Exposed, At risk). The line under each asset is that score after each test, and "Worst first" puts the lowest score on top. The score ring uses the same bands.
+- **Recon and Web scan** keep a summary beside the steps (site, coverage, estimate, and why it cannot start yet) with the Start button, instead of a bar at the bottom.
+- **Projects** are cards with their actions together. **Plugins** puts "Run a plugin" and your saved plugins first; adding one folds away once you have plugins. **Logs** can be searched and copied, and shows how many lines match. **This Mac** shows its settings score as a ring.
+
 ## 1.45.0
 
 - **Tools has search and filters.** Find a scanner by name or by what it checks, and show All, Installed, Not installed or Updates only.

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Box, CheckCircle2, CircleAlert, CircleX, Info, Laptop, Play } from 'lucide-react'
+import { Box, CheckCircle2, CircleAlert, CircleX, Info, Play } from 'lucide-react'
 import type { CheckupResult, Finding } from '@shared/types'
 import { useApp } from '../store'
+import ScoreRing from '../components/ScoreRing'
 import { PageHead } from '../ui'
 
 const ICON = { ok: <CheckCircle2 size={16} style={{ color: 'var(--ok, #3ccf8e)' }} />, warn: <CircleAlert size={16} style={{ color: 'var(--warn, #e0a64b)' }} />, bad: <CircleX size={16} style={{ color: 'var(--bad, #f0605d)' }} />, info: <Info size={16} style={{ opacity: 0.7 }} /> }
@@ -34,9 +35,9 @@ export default function ThisMac(): React.JSX.Element {
       </PageHead>
       {r && (
         <div className="panel mac-score">
-          <Laptop size={28} />
+          <ScoreRing score={r.score} size={64} />
           <div>
-            <strong>{r.score} / 100</strong>
+            <strong>This Mac’s settings</strong>
             <span className="hint">macOS {r.macos} · checked {new Date(r.at).toLocaleString()}</span>
           </div>
           <span className="hint" style={{ marginLeft: 'auto' }}>

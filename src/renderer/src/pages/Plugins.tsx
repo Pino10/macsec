@@ -57,94 +57,100 @@ export default function Plugins(): React.JSX.Element {
     <>
       <PageHead title="Plugins" desc="Bring a tool MacSec does not know. You declare the binary, its arguments, how to read its output and whether HTTP traffic can be metered through MacSec's local proxy. There is no shell, no automatic run and no sandbox; a remote target needs an engagement that covers it." />
       <div className="split" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        <div className="panel" style={{ padding: 16, display: 'grid', gap: 10 }}>
-          <strong>Add a plugin</strong>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <select className="input" value={preset} onChange={(e) => setPreset(e.target.value)} aria-label="Plugin preset">
-              <option value="">Start from a preset…</option>
-              {presets.map((x) => (<option key={x.name} value={x.name}>{x.name}</option>))}
+        <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+          <div className="panel" style={{ padding: 16, display: 'grid', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <strong className="grow">Run a plugin</strong>
+              {list.length > 0 && <button className="link" onClick={async () => { if (!window.confirm('Remove every plugin definition? Binaries and images are not deleted.')) return; const r = await act('plugin-clear', () => api.invoke('plugins:clear')); if (r) setList(r) }}>Remove all definitions</button>}
+            </div>
+            <select className="input" value={session} onChange={(e) => setSession(e.target.value)} aria-label="Session">
+              {finished.length === 0 && <option value="">No finished result</option>}
+              {finished.map((s) => (<option key={s.id} value={s.id}>{s.title} · {s.target}</option>))}
             </select>
-            <button
-              className="btn btn-sm"
-              disabled={!preset}
-              onClick={() => {
-                const x = presets.find((v) => v.name === preset)
-                if (!x) return
-                setForm({ name: x.name, bin: x.bin, args: JSON.stringify(x.args), parser: x.parser, severity: x.severity, pattern: x.pattern ?? '', description: `${x.description} Install: ${x.install}`, metering: x.metering ?? 'none', containerImage: '' })
-              }}
-            >
-              Use preset
+            <select className="input" value={plugin} onChange={(e) => setPlugin(e.target.value)} aria-label="Plugin">
+              {list.length === 0 && <option value="">No plugin saved</option>}
+              {list.map((p) => (<option key={p.id} value={p.id}>{p.name} ({p.parser})</option>))}
+            </select>
+            <label className="consent">
+              <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
+              <span>I am allowed to run this tool against this target, and I understand MacSec cannot count the requests this external tool sends.</span>
+            </label>
+            <button className="btn btn-primary" disabled={!session || !plugin || !ok || busy} onClick={() => void run()}>
+              <Play size={14} /> {busy ? 'Running…' : 'Run plugin'}
             </button>
+            <p className="hint">The run is local, uses an argument array, has a 10-minute cap and adds its findings to the selected result as possible. A remote target needs a live engagement that covers the host.</p>
           </div>
-          <p className="hint">Presets are templates, not installed tools. Install the tool first; MacSec never installs a plugin binary.</p>
-          <p className="hint">The binary must be an absolute path. Placeholders: <span className="mono">{'{target}'}</span>, <span className="mono">{'{host}'}</span>, <span className="mono">{'{url}'}</span>, <span className="mono">{'{session}'}</span>. Arguments are a JSON array; there is no shell.</p>
-          <input className="input" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} aria-label="Plugin name" />
-          <input className="input mono" placeholder="/usr/local/bin/tool (or leave empty for a container)" value={form.bin} onChange={(e) => setForm({ ...form, bin: e.target.value })} aria-label="Binary" />
-          <input className="input mono" placeholder="Container image, for example projectdiscovery/nuclei:latest" value={form.containerImage} onChange={(e) => setForm({ ...form, containerImage: e.target.value })} aria-label="Container image" />
-          <p className="hint">A container image runs on an internal Docker network; the metering proxy is the only route. This needs Colima or Docker Desktop running. The tool must already be in the image.</p>
-          <textarea className="input mono" rows={2} value={form.args} onChange={(e) => setForm({ ...form, args: e.target.value })} aria-label="Arguments JSON" />
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <select className="input" value={form.parser} onChange={(e) => setForm({ ...form, parser: e.target.value as PluginDef['parser'] })} aria-label="Parser">
-              <option value="json">JSON array</option>
-              <option value="jsonl">JSONL (one JSON object per line)</option>
-              <option value="lines">One finding per line</option>
-              <option value="regex">Regex per line</option>
-            </select>
-            <select className="input" value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })} aria-label="Default severity">
-              {['critical', 'high', 'medium', 'low', 'info'].map((s) => (<option key={s} value={s}>{s}</option>))}
-            </select>
-            {form.parser === 'regex' && <input className="input mono" placeholder="Pattern with one capture group" value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} aria-label="Pattern" />}
-            <select className="input" value={form.metering} onChange={(e) => setForm({ ...form, metering: e.target.value as 'proxy' | 'none' })} aria-label="Metering">
-              <option value="none">Unmetered (raw TCP tools)</option>
-              <option value="proxy">Metered proxy (HTTP/HTTPS tools)</option>
-            </select>
+        {list.length > 0 && (
+          <div className="panel">
+            {list.map((p) => (
+              <div key={p.id} className="row" style={{ cursor: 'default' }}>
+                <Wrench size={15} />
+                <span className="grow">
+                  <span className="row-title">{p.name}</span>
+                  <span className="row-sub mono">{p.containerImage ? `container: ${p.containerImage}` : p.bin} {p.args.join(' ')}</span>
+                </span>
+                <button className="icon-btn danger-text" aria-label={`Delete ${p.name}`} onClick={async () => { const r = await act('plugin-del', () => api.invoke('plugins:delete', p.id)); if (r) setList(r) }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
           </div>
-          <input className="input" placeholder="What it does (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} aria-label="Description" />
-          <button className="btn btn-primary" disabled={!form.name.trim() || (!form.bin.trim() && !form.containerImage.trim())} onClick={() => void save()}>
-            <Plus size={14} /> Save plugin
-          </button>
+        )}
         </div>
-
-        <div className="panel" style={{ padding: 16, display: 'grid', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <strong className="grow">Run a plugin</strong>
-            {list.length > 0 && <button className="link" onClick={async () => { if (!window.confirm('Remove every plugin definition? Binaries and images are not deleted.')) return; const r = await act('plugin-clear', () => api.invoke('plugins:clear')); if (r) setList(r) }}>Remove all definitions</button>}
-          </div>
-          <select className="input" value={session} onChange={(e) => setSession(e.target.value)} aria-label="Session">
-            {finished.length === 0 && <option value="">No finished result</option>}
-            {finished.map((s) => (<option key={s.id} value={s.id}>{s.title} · {s.target}</option>))}
-          </select>
-          <select className="input" value={plugin} onChange={(e) => setPlugin(e.target.value)} aria-label="Plugin">
-            {list.length === 0 && <option value="">No plugin saved</option>}
-            {list.map((p) => (<option key={p.id} value={p.id}>{p.name} ({p.parser})</option>))}
-          </select>
-          <label className="consent">
-            <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
-            <span>I am allowed to run this tool against this target, and I understand MacSec cannot count the requests this external tool sends.</span>
-          </label>
-          <button className="btn btn-primary" disabled={!session || !plugin || !ok || busy} onClick={() => void run()}>
-            <Play size={14} /> {busy ? 'Running…' : 'Run plugin'}
-          </button>
-          <p className="hint">The run is local, uses an argument array, has a 10-minute cap and adds its findings to the selected result as possible. A remote target needs a live engagement that covers the host.</p>
-        </div>
-      </div>
-
-      {list.length > 0 && (
-        <div className="panel" style={{ marginTop: 16 }}>
-          {list.map((p) => (
-            <div key={p.id} className="row" style={{ cursor: 'default' }}>
-              <Wrench size={15} />
-              <span className="grow">
-                <span className="row-title">{p.name}</span>
-                <span className="row-sub mono">{p.containerImage ? `container: ${p.containerImage}` : p.bin} {p.args.join(' ')}</span>
-              </span>
-              <button className="icon-btn danger-text" aria-label={`Delete ${p.name}`} onClick={async () => { const r = await act('plugin-del', () => api.invoke('plugins:delete', p.id)); if (r) setList(r) }}>
-                <Trash2 size={14} />
+        <details className="panel" open={list.length === 0} style={{ padding: 16 }}>
+          <summary style={{ cursor: 'pointer' }}>
+            <strong>Add a plugin</strong>
+          </summary>
+          <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select className="input" value={preset} onChange={(e) => setPreset(e.target.value)} aria-label="Plugin preset">
+                <option value="">Start from a preset…</option>
+                {presets.map((x) => (<option key={x.name} value={x.name}>{x.name}</option>))}
+              </select>
+              <button
+                className="btn btn-sm"
+                disabled={!preset}
+                onClick={() => {
+                  const x = presets.find((v) => v.name === preset)
+                  if (!x) return
+                  setForm({ name: x.name, bin: x.bin, args: JSON.stringify(x.args), parser: x.parser, severity: x.severity, pattern: x.pattern ?? '', description: `${x.description} Install: ${x.install}`, metering: x.metering ?? 'none', containerImage: '' })
+                }}
+              >
+                Use preset
               </button>
             </div>
-          ))}
-        </div>
-      )}
+            <p className="hint">Presets are templates, not installed tools. Install the tool first; MacSec never installs a plugin binary.</p>
+            <p className="hint">The binary must be an absolute path. Placeholders: <span className="mono">{'{target}'}</span>, <span className="mono">{'{host}'}</span>, <span className="mono">{'{url}'}</span>, <span className="mono">{'{session}'}</span>. Arguments are a JSON array; there is no shell.</p>
+            <input className="input" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} aria-label="Plugin name" />
+            <input className="input mono" placeholder="/usr/local/bin/tool (or leave empty for a container)" value={form.bin} onChange={(e) => setForm({ ...form, bin: e.target.value })} aria-label="Binary" />
+            <input className="input mono" placeholder="Container image, for example projectdiscovery/nuclei:latest" value={form.containerImage} onChange={(e) => setForm({ ...form, containerImage: e.target.value })} aria-label="Container image" />
+            <p className="hint">A container image runs on an internal Docker network; the metering proxy is the only route. This needs Colima or Docker Desktop running. The tool must already be in the image.</p>
+            <textarea className="input mono" rows={2} value={form.args} onChange={(e) => setForm({ ...form, args: e.target.value })} aria-label="Arguments JSON" />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <select className="input" value={form.parser} onChange={(e) => setForm({ ...form, parser: e.target.value as PluginDef['parser'] })} aria-label="Parser">
+                <option value="json">JSON array</option>
+                <option value="jsonl">JSONL (one JSON object per line)</option>
+                <option value="lines">One finding per line</option>
+                <option value="regex">Regex per line</option>
+              </select>
+              <select className="input" value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })} aria-label="Default severity">
+                {['critical', 'high', 'medium', 'low', 'info'].map((s) => (<option key={s} value={s}>{s}</option>))}
+              </select>
+              {form.parser === 'regex' && <input className="input mono" placeholder="Pattern with one capture group" value={form.pattern} onChange={(e) => setForm({ ...form, pattern: e.target.value })} aria-label="Pattern" />}
+              <select className="input" value={form.metering} onChange={(e) => setForm({ ...form, metering: e.target.value as 'proxy' | 'none' })} aria-label="Metering">
+                <option value="none">Unmetered (raw TCP tools)</option>
+                <option value="proxy">Metered proxy (HTTP/HTTPS tools)</option>
+              </select>
+            </div>
+            <input className="input" placeholder="What it does (optional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} aria-label="Description" />
+            <button className="btn btn-primary" disabled={!form.name.trim() || (!form.bin.trim() && !form.containerImage.trim())} onClick={() => void save()}>
+              <Plus size={14} /> Save plugin
+            </button>
+        
+          </div>
+        </details>
+      </div>
+
     </>
   )
 }
