@@ -11,9 +11,13 @@ import { dirs } from './paths'
 import { readSession, saveFindings, sessionDetail, sessionDir } from './sessions'
 import { currentEngagement, engagementProblem } from './engagement'
 import { getSettings } from './settings'
-import { startMeteredProxy } from './pluginproxy'
+import { startMeteredProxy, type ProxyScope } from './pluginproxy'
+import { sharedGuard } from './netguard'
 import { fid } from './scanners/parse'
 import { log } from './logs'
+
+/** A plugin may only reach the hosts of the engagement it runs under, through the network guard. */
+const scopeFor = (e: { hosts: string[] } | null): ProxyScope | undefined => (e ? { hosts: e.hosts, guard: sharedGuard } : undefined)
 
 const file = (): string => join(dirs.config(), 'plugins.json')
 const MAX = 50
@@ -208,7 +212,7 @@ async function runContainerPlugin(sessionId: string, p: PluginDef, confirmed: bo
     proxy = await startMeteredProxy(cap, () => {
       killed = true
       void execDocker(['kill', name], 10_000)
-    }, '0.0.0.0')
+    }, '0.0.0.0', scopeFor(e))
     const proxyUrl = `http://host.docker.internal:${new URL(proxy.url).port}`
     const args = containerArgs(p, name, net, proxyUrl, target, host)
     const out = await new Promise<string>((resolve, reject) => {
@@ -266,7 +270,7 @@ export async function runPlugin(sessionId: string, pluginId: string, confirmed: 
   const cap = e ? Math.max(1, Math.min(p.metering === 'proxy' ? 1000 : 1, e.caps.requests - e.used.requests)) : 200
   let proxy: Awaited<ReturnType<typeof startMeteredProxy>> | null = null
   let child: ReturnType<typeof execFile> | null = null
-  if (p.metering === 'proxy') proxy = await startMeteredProxy(cap, () => child?.kill('SIGTERM'))
+  if (p.metering === 'proxy') proxy = await startMeteredProxy(cap, () => child?.kill('SIGTERM'), '127.0.0.1', scopeFor(e))
   const out = await new Promise<string>((resolve, reject) => {
     child = execFile(p.bin, args, { cwd: sessionDir(sessionId), timeout: 10 * 60_000, maxBuffer: 8 * 1024 * 1024, env: proxy ? { ...process.env, HTTP_PROXY: proxy.url, HTTPS_PROXY: proxy.url, ALL_PROXY: proxy.url, NO_PROXY: '127.0.0.1,localhost', MACSEC_PLUGIN_PROXY: proxy.url } : process.env }, (err, stdout, stderr) => {
       if (err && !stdout) return reject(new Error(`${p.name} failed: ${String(stderr).trim().split('\n').slice(-2).join(' ')}`))

@@ -52,3 +52,27 @@ describe('the metering proxy', () => {
     expect(proxy.count()).toBe(2)
   })
 })
+
+describe('the proxy scope', () => {
+  it('refuses a host outside the engagement and a metadata address', async () => {
+    const { NetGuard } = await import('../src/main/netguard')
+    const { splitHostPort } = await import('../src/main/pluginproxy')
+    const guard = new NetGuard(async (h: string) => (h === 'meta.example' ? ['169.254.169.254'] : ['93.184.216.34']))
+    proxy = await startMeteredProxy(10, undefined, '127.0.0.1', { hosts: ['shop.example', 'meta.example'], guard })
+    const p = new URL(proxy.url)
+    const get = (path: string): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const req = httpRequest({ hostname: p.hostname, port: p.port, path, method: 'GET' }, (res) => {
+          res.resume()
+          res.on('end', () => resolve(res.statusCode ?? 0))
+        })
+        req.on('error', reject)
+        req.end()
+      })
+    expect(await get('http://other.example/')).toBe(403)
+    expect(await get('http://meta.example/')).toBe(403)
+    expect(splitHostPort('[::1]:8443', 443)).toEqual({ host: '::1', port: 8443 })
+    expect(splitHostPort('Shop.Example', 443)).toEqual({ host: 'shop.example', port: 443 })
+    expect(splitHostPort('a:99999', 443)).toBeNull()
+  })
+})
