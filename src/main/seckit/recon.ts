@@ -15,6 +15,7 @@
 import { promises as dns } from 'dns'
 import { createHash } from 'crypto'
 import { advertisedMethods, bannersOf, corsReflection, detectWaf, dirListing, errorLeak, fileShows, libsIn, LISTING_DIRS, matchNvd, nvdUrl, proofOf, TEST_ORIGIN, versionSeverity, type Confidence, type Proof, type Product } from './confirm'
+import { guardedFetch } from '../guardedfetch'
 
 export type ReconDepth = 'passive' | 'standard' | 'deep'
 export type Sev = 'critical' | 'high' | 'medium' | 'low' | 'info'
@@ -637,8 +638,9 @@ export async function runRecon(target: string, ctx: ReconContext): Promise<Recon
     void reader.cancel().catch(() => undefined)
     return Buffer.concat(chunks).subarray(0, max).toString('utf8')
   }
+  const guardedGet = guardedFetch()
   const get = async (u: string, ms = 12000, extra: Record<string, string> = {}, method = 'GET', max = 3_000_000): Promise<{ status: number; headers: Headers; text: string; location?: string; url: string }> => {
-    const r = await fetch(u, { method, redirect: 'manual', headers: { ...UA, ...extra }, signal: AbortSignal.timeout(ms) })
+    const r = await guardedGet(u, { method, redirect: 'manual', headers: { ...UA, ...extra }, signal: AbortSignal.timeout(ms) })
     const text = method === 'HEAD' || method === 'OPTIONS' || (r.status >= 300 && r.status < 400) ? '' : await readCapped(r, max)
     return { status: r.status, headers: r.headers, text, location: r.headers.get('location') ?? undefined, url: u }
   }

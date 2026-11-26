@@ -12,10 +12,10 @@
  *   - the audit log keeps the method, the masked address, the status and a hash, never a secret.
  */
 import { createHash } from 'crypto'
-import { lookup } from 'dns/promises'
 import { isIP } from 'net'
 import type { Engagement, ImpactAuditEntry } from '../../shared/impact'
 import { classify, NetGuard } from '../netguard'
+import { pinnedRequest } from '../netclient'
 import { maskSecrets } from '../evidence'
 import { hostCovers, ValidationError } from '../validate'
 
@@ -93,7 +93,12 @@ export class ImpactClient {
   stopped: string | null = null
   private bad = 0
 
-  constructor(private o: ImpactClientOptions) {}
+  /** The guard in use. Production always has one (a run with no guard given gets its own); only tests turn it off or inject a fetch. */
+  private guard: NetGuard | null
+
+  constructor(private o: ImpactClientOptions) {
+    this.guard = o.guard === false ? null : (o.guard ?? (o.fetchImpl ? null : new NetGuard()))
+  }
 
   /** The authority this client is spending, for a runner that needs to know what is allowed. */
   get engagement(): Engagement {
@@ -119,12 +124,16 @@ export class ImpactClient {
       if (c !== 'public' && !this.o.engagement.allowPrivate) throw new ImpactRefused(`${host} is a ${c} address. Mark the engagement as a staging server if that is right.`)
       return
     }
-    if (!this.o.guard) return
-    await this.o.guard.check(host)
+    if (!this.guard) return
+    try {
+      await this.guard.check(host)
+    } catch (e) {
+      throw new ImpactRefused((e as Error).message)
+    }
     if (this.o.engagement.allowPrivate) return
-    const ips = await lookup(host, { all: true }).then((r) => r.map((x) => x.address)).catch(() => [] as string[])
-    const inside = ips.filter((ip) => classify(ip) !== 'public')
-    if (inside.length) throw new ImpactRefused(`${host} resolves to ${inside[0]}, which is not a public address. Mark the engagement as a staging server if that is right.`)
+    // The guard pinned the first answer, and the request connects to exactly that address.
+    const approved = this.guard.addressFor(host)
+    if (approved && classify(approved) !== 'public') throw new ImpactRefused(`${host} resolves to ${approved}, which is not a public address. Mark the engagement as a staging server if that is right.`)
   }
 
   /**
@@ -181,22 +190,27 @@ export class ImpactClient {
     if (this.o.delayMs) await sleep(this.o.delayMs)
 
     const t = this.o.now?.() ?? Date.now()
-    let reply: Response
+    let reply: { status: number; headers: Headers }
+    let text: string
     try {
-      reply = await (this.o.fetchImpl ?? fetch)(url.href, {
-        method,
-        headers,
-        body: body as BodyInit | undefined,
-        redirect: 'manual',
-        signal: AbortSignal.timeout(20000)
-      })
+      if (this.o.fetchImpl) {
+        const r = await this.o.fetchImpl(url.href, { method, headers, body: body as BodyInit | undefined, redirect: 'manual', signal: AbortSignal.timeout(20000) })
+        reply = r
+        text = r.status >= 300 && r.status < 400 ? '' : (await r.text()).slice(0, this.o.bodyCap ?? 300_000)
+      } else {
+        if (typeof body !== 'string' && body !== undefined) throw new Error('Only text bodies are sent.')
+        // Connect to the address the guard approved, never to a fresh DNS answer (rebinding). Never follows a redirect.
+        const host = url.hostname.replace(/^\[|\]$/g, '')
+        const r = await pinnedRequest(url.href, { method, headers, body, timeoutMs: 20000, maxBytes: this.o.bodyCap ?? 300_000, address: isIP(host) ? host : (this.guard?.addressFor(host) ?? null) })
+        reply = r
+        text = r.status >= 300 && r.status < 400 ? '' : r.body
+      }
     } catch (e) {
       this.bad++
       if (this.bad >= 3) this.stopped = 'The server stopped answering three times in a row, so the run stopped to avoid harming it.'
       this.audit.push({ at: new Date().toISOString(), method, url: maskUrl(url.href), requestBytes, status: 0, responseBytes: 0, responseSha: '', note: 'no answer' })
       throw new ImpactRefused(`The request did not complete: ${(e as Error).message}. Nothing was retried.`)
     }
-    const text = reply.status >= 300 && reply.status < 400 ? '' : (await reply.text()).slice(0, this.o.bodyCap ?? 300_000)
     this.bad = reply.status >= 500 ? this.bad + 1 : 0
     if (this.bad >= 3) this.stopped = 'The server answered with errors three times in a row, so the run stopped to avoid harming it.'
     const at = new Date().toISOString()

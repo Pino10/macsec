@@ -19,6 +19,7 @@ import { endpointsIn, parseSourceMap, secretsIn, sourceMapUrl } from './seckit/r
 import { isPublicLibrary, plausibleVersion, seriesNote } from './decoys'
 import { libsIn, proofOf, type Product } from './seckit/confirm'
 import { cloudRefs, type Refs } from './mobilestatic'
+import { guardedFetch } from './guardedfetch'
 
 // ---------------------------------------------------------------- Reading one script
 
@@ -211,7 +212,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 
 export async function crawlJs(o: CrawlOptions): Promise<JsCrawl> {
   const res: JsCrawl = { scripts: [], findings: [], endpoints: [], routes: [], graphql: [], envVars: [], hosts: [], libs: [], refs: { firebase: [], s3: [], gcs: [] }, chunksFound: 0 }
-  const doFetch = o.fetchImpl ?? fetch
+  const doFetch = o.fetchImpl ?? guardedFetch()
   const seen = new Set<string>()
   const queue = [...new Set(o.scripts)]
   const cap = o.cap ?? 150

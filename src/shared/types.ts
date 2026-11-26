@@ -465,6 +465,10 @@ export interface ContainerStatus {
 }
 
 export interface MobsfStatus {
+  /** Where MobSF comes from: your own folder, Docker, one you started yourself, or not found yet. */
+  mode: 'folder' | 'docker' | 'outside' | 'none'
+  /** The MobSF folder MacSec found or was given, or an empty string. */
+  folder: string
   installed: boolean
   running: boolean
   url: string
@@ -489,6 +493,8 @@ export interface AppSettings {
   notifications: boolean
   /** How Claude Code signs in: your normal account, or an Anthropic API key from the Keychain. */
   claudeAuth: 'account' | 'key'
+  /** Optional: the organisation using MacSec, typed by the person. Shown on the safety page only. */
+  organisation?: string
   /** Let AI tools use MacSec through its MCP server on 127.0.0.1. Off by default. */
   mcpEnabled?: boolean
   /** Slack, Teams, Discord or other webhook. The address is in the Keychain. */
@@ -509,6 +515,8 @@ export interface AppSettings {
   /** The newest skill pack version already announced, so each update is announced once. */
   packsNotified?: Record<string, string>
   /** Optional container runtime used by the plugin runner. */
+  /** The person's own MobSF folder (checked before use). */
+  mobsf?: { path?: string }
   container?: { dockerPath?: string; dockerHost?: string; home?: string; colimaHome?: string; limaHome?: string; managedDir?: string }
 }
 
@@ -692,6 +700,7 @@ export interface Channels {
   'mobsf:stop': { args: []; result: MobsfStatus }
   'mobsf:remove': { args: [boolean, boolean, boolean]; result: MobsfStatus }
   'mobsf:open': { args: []; result: string }
+  'mobsf:choose': { args: []; result: MobsfStatus | null }
   'container:status': { args: []; result: ContainerStatus }
   'container:configure': { args: [{ dockerPath?: string; dockerHost?: string; home?: string; colimaHome?: string; limaHome?: string; managedDir?: string }]; result: ContainerStatus }
   'container:start': { args: []; result: ContainerStatus }

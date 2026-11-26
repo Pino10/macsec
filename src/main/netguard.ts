@@ -96,3 +96,6 @@ export class NetGuard {
     }
   }
 }
+
+/** One shared guard for the direct web checks, so every one of them sees the same pins. */
+export const sharedGuard = new NetGuard()

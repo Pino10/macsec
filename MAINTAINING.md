@@ -69,7 +69,7 @@ Builds run on GitHub's own Macs. The app is ad-hoc signed (no Apple Developer ac
 
 ### Added in 1.42.0
 
-- `mobsf.ts` + MobSF page: official Docker image, port 8765, named reports volume, start/stop/remove, sandboxed MobSF window.
+- `mobsf.ts` + MobSF page: three modes. Your own MobSF folder (`venv/bin/gunicorn` started with an argument array on 127.0.0.1:8765), a MobSF already running (only opened, never stopped), or the official Docker image with a named reports volume. Sandboxed MobSF window in `index.ts` (`openMobsfWindow`). `tests/v60-wiring.test.ts` fails if a `Channels` key has no handler.
 - 1.41 runtime management folded in after its cancelled build.
 
 ### Added in 1.41.0

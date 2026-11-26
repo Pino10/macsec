@@ -11,6 +11,9 @@ import { fid } from './scanners/parse'
 import { parseGitleaks } from './scanners/parse'
 import { runTool, type Op } from './engine'
 import { installTool, isInstalled, toolDef } from './toolbox'
+import { guardedFetch } from './guardedfetch'
+
+const gfetch = guardedFetch()
 
 const f = (x: Omit<Finding, 'id' | 'tool' | 'category'> & { tool?: string }): Finding => ({ id: fid('webextra', x.title, x.url), tool: x.tool ?? 'MacSec', category: 'web', ...x })
 
@@ -64,7 +67,7 @@ export async function keysInJavaScript(urls: string[], host: string, rawDir: str
     if (op.cancelled) break
     note(`Downloading script ${i + 1} of ${js.length}`)
     try {
-      const r = await fetch(u, { headers: { 'User-Agent': 'MacSec', ...headers }, signal: AbortSignal.timeout(15000) })
+      const r = await gfetch(u, { headers: { 'User-Agent': 'MacSec', ...headers }, signal: AbortSignal.timeout(15000) })
       if (!r.ok) continue
       const name = `${i}.js`
       writeFileSync(join(dir, name), (await r.text()).slice(0, 5_000_000))
@@ -107,9 +110,9 @@ export async function signedOutCheck(urls: string[], headers: Record<string, str
     if (cancelled()) break
     note(`Comparing ${i + 1} of ${pages.length}`)
     try {
-      const a = await fetch(u, { headers: { 'User-Agent': 'MacSec', ...headers }, redirect: 'manual', signal: AbortSignal.timeout(15000) })
+      const a = await gfetch(u, { headers: { 'User-Agent': 'MacSec', ...headers }, redirect: 'manual', signal: AbortSignal.timeout(15000) })
       const inBody = await a.text()
-      const b = await fetch(u, { headers: { 'User-Agent': 'MacSec' }, redirect: 'manual', signal: AbortSignal.timeout(15000) })
+      const b = await gfetch(u, { headers: { 'User-Agent': 'MacSec' }, redirect: 'manual', signal: AbortSignal.timeout(15000) })
       const outBody = await b.text()
       const same = a.status === 200 && b.status === 200 && inBody.length > 500 && Math.abs(inBody.length - outBody.length) / inBody.length < 0.05
       if (same && !/(log ?in|sign ?in|password)/i.test(outBody.slice(0, 20000))) {

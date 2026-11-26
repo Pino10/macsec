@@ -14,6 +14,7 @@ import { devopsChecks, dnsChecks, protectionOf } from './webposture'
 import { bannersOf, proofOf, type Product } from './seckit/confirm'
 import { cveFindings, epssFor, liveCves } from './cvelive'
 import { fid } from './scanners/parse'
+import { guardedFetch } from './guardedfetch'
 
 export interface LiveHost {
   host: string
@@ -54,7 +55,7 @@ export function mergeByTitle(perHost: { host: string; findings: Finding[] }[]): 
 
 export async function deepHosts(hosts: LiveHost[], o: DeepOptions = {}): Promise<Finding[]> {
   const note = o.note ?? (() => undefined)
-  const doFetch = o.fetchImpl ?? fetch
+  const doFetch = o.fetchImpl ?? guardedFetch()
   const list = hosts.filter((h) => h.status > 0 && h.status < 500).slice(0, o.maxHosts ?? 30)
   const perHeaders: { host: string; findings: Finding[] }[] = []
   const perTls: { host: string; findings: Finding[] }[] = []

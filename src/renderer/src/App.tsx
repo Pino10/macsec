@@ -25,6 +25,7 @@ import Tools from './pages/Tools'
 import Plugins from './pages/Plugins'
 import Ad from './pages/Ad'
 import Mobsf from './pages/Mobsf'
+import Safety from './pages/Safety'
 import Logs from './pages/Logs'
 import Settings from './pages/Settings'
 import Updates from './pages/Updates'
@@ -154,6 +155,7 @@ function Shell(): React.JSX.Element {
               {page === 'ad' && <Ad />}
               {page === 'mobsf' && <Mobsf />}
               {page === 'logs' && <Logs />}
+              {page === 'safety' && <Safety />}
               {page === 'settings' && <Settings />}
             </div>
           </div>
