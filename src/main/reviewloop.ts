@@ -4,7 +4,7 @@
  * set without knowing which side found what. Nothing here confirms a finding.
  */
 import { execFile } from 'child_process'
-import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'fs'
+import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { BlindFinding, CombinedFinding, LoopState, Reviewer, Severity } from '../shared/types'
 import { askAi } from './aisummary'
@@ -57,13 +57,11 @@ const readText = (file: string): string => {
 export async function writeEvidence(sessionId: string, unpacked?: string): Promise<string> {
   const s = readSession(sessionId)
   const parts: string[] = [`App: ${s.title}`, `Target: ${s.target.replace(/^.*\//, '')}`, `Kind: ${s.kind}`, '']
-  const raw: string[] = [...parts]
   const add = (label: string, file: string, max = 20_000): void => {
     if (!existsSync(file)) return
     const text = readText(file).slice(0, max)
     if (!text.trim()) return
     parts.push(`## ${label}`, maskSecrets(text), '')
-    raw.push(`## ${label}`, text, '')
   }
   if (s.kind === 'mobile-scan') {
     const base = unpacked ?? join(sessionDir(sessionId), 'unpacked')
@@ -80,7 +78,6 @@ export async function writeEvidence(sessionId: string, unpacked?: string): Promi
         if (ent.trim()) add('signed entitlements (codesign)', join(app, '..', 'entitlements.tmp'), 20_000)
         if (ent.trim()) {
           parts.push('## signed entitlements (codesign)', maskSecrets(ent), '')
-          raw.push('## signed entitlements (codesign)', ent, '')
         }
       }
     }
@@ -119,7 +116,8 @@ export async function writeEvidence(sessionId: string, unpacked?: string): Promi
   if (parts.length <= 4) parts.push('No evidence file was available for this kind. Run the scan again, or keep the code for a remote review.')
   const text = parts.join('\n').slice(0, MAX_EVIDENCE)
   writeFileSync(evidenceFile(sessionId), text)
-  writeFileSync(rawEvidenceFile(sessionId), raw.join('\n').slice(0, MAX_EVIDENCE * 2), { mode: 0o600 })
+  // Older versions kept an unmasked copy next to the masked one. Secrets are not kept at rest, so it is removed.
+  rmSync(rawEvidenceFile(sessionId), { force: true })
   return text
 }
 
@@ -266,6 +264,7 @@ export function combineFindings(tool: { id: string; title: string; severity: Sev
 }
 
 export function loopState(sessionId: string): LoopState {
+  rmSync(rawEvidenceFile(sessionId), { force: true })
   const blind = existsSync(blindFile(sessionId)) ? (JSON.parse(readFileSync(blindFile(sessionId), 'utf8')) as BlindFinding[]) : []
   const combined = existsSync(combinedFile(sessionId)) ? (JSON.parse(readFileSync(combinedFile(sessionId), 'utf8')) as CombinedFinding[]) : []
   return { evidence: existsSync(evidenceFile(sessionId)), rawEvidence: existsSync(rawEvidenceFile(sessionId)), blind, combined, report: existsSync(reportFile(sessionId)) }
