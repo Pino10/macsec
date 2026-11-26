@@ -1,3 +1,7 @@
+## 1.43.2
+
+- **Plugin tools stay inside the engagement.** The counting proxy used to pass a plugin's traffic to any address. It now only reaches the hosts of the engagement the plugin runs under, asks the network guard first (cloud metadata and DNS tricks are refused) and connects to the address the guard approved. Anything else gets a refusal. It also reads IPv6 addresses in CONNECT requests correctly. It is still a counter and not a sandbox: a tool that ignores the proxy is not counted, and the container runner remains the safer route.
+
 ## 1.43.1
 
 - **MobSF now works with the folder you already have.** MacSec looks for your MobSF folder (the one saved in settings, `~/Mobile-Security-Framework-MobSF`, `~/MobSF`, or inside `~/MacSec/tools`), then a MobSF that is already running on this Mac, then Docker. A MobSF that was already running is only opened, never stopped. There is a "Choose MobSF folder" button, and the page says plainly which way it is running. The container no longer restarts by itself after a reboot.
