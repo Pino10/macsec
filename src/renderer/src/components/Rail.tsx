@@ -1,77 +1,72 @@
 import Logo from './Logo'
-import { Network, Bug,   ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar, Boxes, Crosshair, PlusCircle, Command } from 'lucide-react'
-import { Bell_ } from './Notifications'
+import { ChevronDown, Network, Bug, ArrowDownToLine, Laptop, FileSearch, FolderGit2, Globe, History, LayoutDashboard, Plug, ScrollText, Settings, ShieldHalf, Cloud, Wrench, Smartphone, Radar, Boxes, Crosshair, Command } from 'lucide-react'
+import { useState } from 'react'
 import { useApp, type Page } from '../store'
 
 type Item = { id: Page; label: string; icon: React.ReactNode }
 const I = 16
-export const GROUPS: { label: string | null; items: Item[] }[] = [
-  { label: null, items: [{ id: 'new', label: 'Start a test', icon: <PlusCircle size={I} /> }, { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={I} /> }, { id: 'projects', label: 'Projects', icon: <FolderGit2 size={I} /> }] },
+const it = (id: Page, label: string, icon: React.ReactNode): Item => ({ id, label, icon })
+export const GROUPS: { label: string | null; items: Item[]; fold?: boolean }[] = [
+  { label: null, items: [it('overview', 'Overview', <LayoutDashboard size={I} />), it('projects', 'Projects', <FolderGit2 size={I} />)] },
   {
-    label: 'Run a test',
-    items: [
-      { id: 'review', label: 'Code review', icon: <FileSearch size={I} /> },
-      { id: 'web', label: 'Web scan', icon: <Globe size={I} /> },
-      { id: 'api', label: 'API security', icon: <Plug size={I} /> },
-      { id: 'recon', label: 'Recon', icon: <Radar size={I} /> },
-      { id: 'mobile', label: 'Mobile apps', icon: <Smartphone size={I} /> },
-      { id: 'mobsf', label: 'MobSF', icon: <Bug size={I} /> },
-      { id: 'ad', label: 'AD review', icon: <Network size={I} /> },
-      { id: 'audit', label: 'Cloud and servers', icon: <Cloud size={I} /> },
-      { id: 'impact', label: 'Controlled proofs', icon: <Crosshair size={I} /> },
-      { id: 'mac', label: 'This Mac', icon: <Laptop size={I} /> }
-    ]
+    label: 'Tests',
+    items: [it('review', 'Code review', <FileSearch size={I} />), it('web', 'Web scan', <Globe size={I} />), it('api', 'API security', <Plug size={I} />), it('mobile', 'Mobile apps', <Smartphone size={I} />), it('recon', 'Recon', <Radar size={I} />), it('audit', 'Cloud and servers', <Cloud size={I} />)]
   },
-  { label: 'Results', items: [{ id: 'sessions', label: 'Results', icon: <History size={I} /> }, { id: 'assets', label: 'Assets', icon: <Boxes size={I} /> }] }
+  {
+    label: 'Advanced',
+    fold: true,
+    items: [it('impact', 'Controlled proofs', <Crosshair size={I} />), it('ad', 'AD review', <Network size={I} />), it('mobsf', 'MobSF', <Bug size={I} />), it('mac', 'This Mac', <Laptop size={I} />)]
+  },
+  { label: 'Results', items: [it('sessions', 'Results', <History size={I} />), it('assets', 'Assets', <Boxes size={I} />)] }
 ]
-const FOOT: Item[] = [
-  { id: 'plugins', label: 'Plugins', icon: <Wrench size={I} /> },
-  { id: 'tools', label: 'Tools', icon: <Wrench size={I} /> },
-  { id: 'updates', label: 'Updates', icon: <ArrowDownToLine size={I} /> },
-  { id: 'settings', label: 'Settings', icon: <Settings size={I} /> }
-]
-export const PAGE_ORDER: Page[] = [...GROUPS.flatMap((g) => g.items), ...FOOT].map((i) => i.id)
+const FOOT: Item[] = [it('plugins', 'Plugins', <Wrench size={I} />), it('tools', 'Tools', <Wrench size={I} />), it('updates', 'Updates', <ArrowDownToLine size={I} />), it('settings', 'Settings', <Settings size={I} />)]
+/** The order of the ⌘1 to ⌘9 shortcuts. Kept as it was, so nobody's habit changes. */
+export const PAGE_ORDER: Page[] = ['new', 'overview', 'projects', 'review', 'web', 'api', 'recon', 'mobile', 'mobsf', 'ad', 'audit', 'impact', 'mac', 'sessions', 'assets', 'plugins', 'tools', 'updates', 'settings']
 
 export default function Rail(): React.JSX.Element {
   const { page, setPage, sessions, updates, appUpdate } = useApp()
   const running = sessions.filter((s) => s.status === 'running').length
+  const [open, setOpen] = useState<Record<string, boolean>>({})
 
-  const item = (it: Item): React.JSX.Element => (
-    <button key={it.id} className="rail-item" aria-current={page === it.id ? 'page' : undefined} onClick={() => setPage(it.id)}>
-      <span className="ri">{it.icon}</span>
-      {it.label}
-      {it.id === 'sessions' && (running ? <span className="live" aria-label={`${running} running`} /> : sessions.length ? <span className="count">{sessions.length}</span> : null)}
-      {it.id === 'updates' && (appUpdate || updates.length > 0) && <span className="tag tag-ion" style={{ marginLeft: 'auto' }}>{appUpdate ? appUpdate.version : `${updates.length} new`}</span>}
+  const item = (x: Item): React.JSX.Element => (
+    <button key={x.id} className="rail-item" aria-current={page === x.id ? 'page' : undefined} onClick={() => setPage(x.id)}>
+      <span className="ri">{x.icon}</span>
+      {x.label}
+      {x.id === 'sessions' && (running ? <span className="live" aria-label={`${running} running`} /> : sessions.length ? <span className="count">{sessions.length}</span> : null)}
+      {x.id === 'updates' && (appUpdate || updates.length > 0) && <span className="tag tag-ion" style={{ marginLeft: 'auto' }}>{appUpdate ? appUpdate.version : `${updates.length} new`}</span>}
     </button>
   )
   return (
     <aside className="rail glass">
       <div className="brand drag">
-        <Logo size={40} running={running > 0} />
+        <Logo size={32} running={running > 0} />
         <div>
           <strong>MacSec</strong>
-          <small>{running ? `${running} ${running === 1 ? 'test' : 'tests'} running` : 'Security engine'}</small>
+          <small>{running ? `${running} ${running === 1 ? 'test' : 'tests'} running` : 'Security workbench'}</small>
         </div>
       </div>
       <nav aria-label="Main">
-        {GROUPS.map((g, i) => (
-          <div key={i} className="rail-group">
-            {g.label && <span>{g.label}</span>}
-            {g.items.map(item)}
-          </div>
-        ))}
+        {GROUPS.map((g, i) => {
+          // An advanced group stays folded until it is opened, or while a page inside it is showing.
+          const inside = g.items.some((x) => x.id === page)
+          const shown = !g.fold || inside || open[g.label ?? ''] === true
+          return (
+            <div key={i} className="rail-group">
+              {g.label &&
+                (g.fold ? (
+                  <button className="rail-fold" aria-expanded={shown} onClick={() => setOpen((o) => ({ ...o, [g.label!]: !shown }))}>
+                    {g.label}
+                    <ChevronDown size={12} />
+                  </button>
+                ) : (
+                  <span>{g.label}</span>
+                ))}
+              {shown && g.items.map(item)}
+            </div>
+          )
+        })}
       </nav>
-      <div className="rail-foot">
-        <button className="rail-item" onClick={() => window.dispatchEvent(new Event('macsec:palette'))} aria-label="Search everything">
-          <span className="ri">
-            <Command size={16} />
-          </span>
-          Search
-          <span className="count">⌘K</span>
-        </button>
-        <Bell_ />
-        {FOOT.map(item)}
-      </div>
+      <div className="rail-foot">{FOOT.map(item)}</div>
     </aside>
   )
 }

@@ -102,7 +102,7 @@ export function NotificationLayer(): React.JSX.Element {
 }
 
 /** The bell in the sidebar: a count of unread messages and the history. */
-export function Bell_(): React.JSX.Element {
+export function Bell_({ variant = 'rail' }: { variant?: 'rail' | 'top' }): React.JSX.Element {
   const { notices, markRead, clearNotices } = useApp()
   const [list, setList] = useState(false)
   const [open, setOpen] = useState<number | null>(null)
@@ -110,13 +110,20 @@ export function Bell_(): React.JSX.Element {
   const detail = notices.find((n) => n.id === open)
   return (
     <>
-      <button className="rail-item" aria-expanded={list} onClick={() => setList((v) => !v)}>
-        <span className="ri">
+      {variant === 'top' ? (
+        <button className="top-icon" aria-expanded={list} aria-label={unread ? `Messages, ${unread} unread` : 'Messages'} title="Messages" onClick={() => setList((v) => !v)}>
           <Bell size={16} />
-        </span>
-        Messages
-        {unread > 0 && <span className="count">{unread}</span>}
-      </button>
+          {unread > 0 && <span className="top-badge">{unread}</span>}
+        </button>
+      ) : (
+        <button className="rail-item" aria-expanded={list} onClick={() => setList((v) => !v)}>
+          <span className="ri">
+            <Bell size={16} />
+          </span>
+          Messages
+          {unread > 0 && <span className="count">{unread}</span>}
+        </button>
+      )}
       {list &&
         createPortal(
           <div className="note-scrim note-scrim-soft" onClick={() => setList(false)}>

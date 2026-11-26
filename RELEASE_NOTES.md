@@ -1,3 +1,15 @@
+## 1.44.0
+
+A new look and a calmer way around the app. Nothing a scan does has changed.
+
+- **New design, dark first.** Flat graphite surfaces, thin borders, one accent colour and severity colours that mean something. Light mode follows the same design. Your accent colour and text size settings still work.
+- **A shorter sidebar.** Tests you use most are in front: Code review, Web scan, API security, Mobile apps, Recon, Cloud and servers. The rarer ones (Controlled proofs, AD review, MobSF, This Mac) sit under Advanced, which opens by itself when you are on one of them. Search and Messages moved to the top bar. The ⌘1 to ⌘9 shortcuts are unchanged.
+- **A new Overview.** One row of numbers (posture, open findings, targets tested, scanners ready), then what to fix first and your recent tests side by side, then quick starts.
+- **A clearer result page.** A compact header, one row of severity numbers and tabs with an underline instead of boxes.
+- **Guided tests are easier to follow.** Numbered steps with a clear current step, and the Start button in a bar at the bottom.
+- **Controlled proofs form.** The engagement form is one tidy column with dates and caps on one row, instead of fields scattered across the page.
+- **Plainer messages.** When Docker is not running, the Container runtime card says so in plain words and keeps the technical text under Technical details.
+
 ## 1.43.3
 
 - **Claude desktop no longer times out on MacSec.** The small script the Claude app starts only answered an error in one exact case. If MacSec was closed, or the saved token no longer matched, the Claude app got no answer and waited until it said "Request timed out". The script now always answers and says plainly what is wrong. MacSec refreshes the script when it opens, so you do not need to connect again. A test runs the real script against a real local server.

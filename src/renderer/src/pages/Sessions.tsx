@@ -211,7 +211,7 @@ function SessionView({ id, onBack }: { id: string; onBack: () => void }): React.
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', minWidth: 0 }}>
           <KindIcon kind={s.kind} size={20} />
           <div style={{ minWidth: 0 }}>
-            <h1 className="page-title" style={{ fontSize: 28 }}>
+            <h1 className="page-title">
               {s.title}
             </h1>
             <div className="hint" style={{ marginTop: 4 }}>
