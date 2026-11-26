@@ -1,3 +1,9 @@
+## 1.43.1
+
+- **MobSF now works with the folder you already have.** MacSec looks for your MobSF folder (the one saved in settings, `~/Mobile-Security-Framework-MobSF`, `~/MobSF`, or inside `~/MacSec/tools`), then a MobSF that is already running on this Mac, then Docker. A MobSF that was already running is only opened, never stopped. There is a "Choose MobSF folder" button, and the page says plainly which way it is running. The container no longer restarts by itself after a reboot.
+- **About 25 buttons did nothing; now they work.** The MobSF, Container runtime, Plugins, Patches, Review loop and AD review pages had a screen and the code behind them but were never connected to the app, so pressing them failed. They are connected now, with every input checked. A new test fails if any screen action has no handler, so this cannot happen again.
+- **Safer fixes.** A patch id is checked before MacSec touches any folder, so a made-up id cannot point outside the patches folder. The MobSF window may only show MobSF on this Mac, asks for no permissions and cannot open other sites.
+
 ## 1.43.0
 
 - **Every direct web check is guarded.** The exposed-files check, the API checks, the script key scan, the signed-out comparison, the deep recon header checks and the recon probe now ask the network guard first and connect to the address it approved, like the rest of MacSec. Before, these few used a plain request.

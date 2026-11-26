@@ -167,7 +167,14 @@ export function listPatches(sessionId?: string): PatchRecord[] {
 }
 
 /** Apply only with the typed phrase and only after the project's tests passed. */
+/** Patch ids are made by MacSec: patch- and eight hex digits. Anything else could point outside the patches folder. */
+export function checkPatchId(id: string): string {
+  if (typeof id !== 'string' || !/^patch-[0-9a-f]{8}$/.test(id)) throw new Error('That fix is not on this Mac.')
+  return id
+}
+
 export async function applyPatch(id: string, phrase: string): Promise<PatchRecord> {
+  checkPatchId(id)
   const file = join(dirs.root(), 'patches', id, 'record.json')
   if (!existsSync(file)) throw new Error('That patch is not on this Mac.')
   const r = JSON.parse(readFileSync(file, 'utf8')) as PatchRecord
@@ -200,6 +207,7 @@ export async function applyPatch(id: string, phrase: string): Promise<PatchRecor
 }
 
 export async function rollbackPatch(id: string): Promise<PatchRecord> {
+  checkPatchId(id)
   const file = join(dirs.root(), 'patches', id, 'record.json')
   if (!existsSync(file)) throw new Error('That patch is not on this Mac.')
   const r = JSON.parse(readFileSync(file, 'utf8')) as PatchRecord
@@ -220,6 +228,7 @@ export async function rollbackPatch(id: string): Promise<PatchRecord> {
 }
 
 export function discardPatch(id: string): void {
+  checkPatchId(id)
   const dir = join(dirs.root(), 'patches', id)
   if (existsSync(dir)) rmSync(dir, { recursive: true, force: true })
 }

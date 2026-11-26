@@ -465,6 +465,10 @@ export interface ContainerStatus {
 }
 
 export interface MobsfStatus {
+  /** Where MobSF comes from: your own folder, Docker, one you started yourself, or not found yet. */
+  mode: 'folder' | 'docker' | 'outside' | 'none'
+  /** The MobSF folder MacSec found or was given, or an empty string. */
+  folder: string
   installed: boolean
   running: boolean
   url: string
@@ -511,6 +515,8 @@ export interface AppSettings {
   /** The newest skill pack version already announced, so each update is announced once. */
   packsNotified?: Record<string, string>
   /** Optional container runtime used by the plugin runner. */
+  /** The person's own MobSF folder (checked before use). */
+  mobsf?: { path?: string }
   container?: { dockerPath?: string; dockerHost?: string; home?: string; colimaHome?: string; limaHome?: string; managedDir?: string }
 }
 
@@ -694,6 +700,7 @@ export interface Channels {
   'mobsf:stop': { args: []; result: MobsfStatus }
   'mobsf:remove': { args: [boolean, boolean, boolean]; result: MobsfStatus }
   'mobsf:open': { args: []; result: string }
+  'mobsf:choose': { args: []; result: MobsfStatus | null }
   'container:status': { args: []; result: ContainerStatus }
   'container:configure': { args: [{ dockerPath?: string; dockerHost?: string; home?: string; colimaHome?: string; limaHome?: string; managedDir?: string }]; result: ContainerStatus }
   'container:start': { args: []; result: ContainerStatus }

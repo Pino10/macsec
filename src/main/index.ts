@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto'
 import { execFile } from 'child_process'
 import type { Server } from 'http'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
-import { basename, join, normalize, resolve, sep } from 'path'
+import { basename, isAbsolute, join, normalize, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { release } from 'os'
 import type { ApiScanRequest, Channels, Events, Finding, FreeLlmInfo, IntegrationsInfo, ReconRequest, ReviewRequest, Reviewer, ScanMode, SessionInfo, SkillPackInfo, WebScanRequest } from '../shared/types'
@@ -45,6 +45,12 @@ import { macsecCli, macsecTools } from './mcptools'
 import { loadSpec, loadSpecText, startApiScan } from './apiscan'
 import { deleteProfile, listProfiles, saveProfile } from './profiles'
 import { startMobileScan } from './mobilescan'
+import { configureContainer, containerStatus, startContainer, stopContainer, uninstallContainer } from './containerruntime'
+import { chooseMobsfFolder, mobsfStatus, removeMobsf, startMobsf, stopMobsf, stopMobsfQuietly } from './mobsf'
+import { clearPlugins, deletePlugin, listPlugins, pluginPresets, runPlugin, savePlugin } from './plugins'
+import { applyPatch, discardPatch, listPatches, proposePatch, rollbackPatch } from './patch'
+import { blindReview, combineReview, loopState, verifyCombined } from './reviewloop'
+import { startAdAudit } from './adreview'
 import { captureStatus, sessionFromHar, startCapture, stopCapture, stopCaptureQuietly } from './trafficcapture'
 import { createAvd, liveSetup, realExec, startAvd, validAvd, validSerial } from './mobilelive'
 import { reconData, startRecon } from './reconscan'
@@ -151,15 +157,55 @@ function createWindow(): void {
 
 /** The sign-in windows, which may browse your site; every other window is locked down. */
 const loginContents = new Set<number>()
+/** The MobSF window: its id and the one address it may show. */
+const mobsfOrigins = new Map<number, string>()
+const originOf = (u: string): string => {
+  try {
+    return new URL(u).origin
+  } catch {
+    return ''
+  }
+}
+
+/** Opens MobSF in its own locked-down window (own cookies, no Node, no permissions, only 127.0.0.1). */
+function openMobsfWindow(url: string): void {
+  if (!/^http:\/\/127\.0\.0\.1:(8765|8000)\/?$/.test(url)) throw new ValidationError('MobSF is only opened from this Mac.')
+  if (mobsfWindow && !mobsfWindow.isDestroyed()) {
+    mobsfWindow.focus()
+    return
+  }
+  const win = new BrowserWindow({ width: 1280, height: 860, title: 'MobSF', backgroundColor: '#ffffff', webPreferences: { partition: 'persist:macsec-mobsf', sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true } })
+  mobsfWindow = win
+  const id = win.webContents.id
+  mobsfOrigins.set(id, originOf(url))
+  win.webContents.session.setPermissionRequestHandler((_w, _p, cb) => cb(false))
+  win.webContents.session.setPermissionCheckHandler(() => false)
+  win.on('closed', () => {
+    mobsfOrigins.delete(id)
+    if (mobsfWindow === win) mobsfWindow = null
+  })
+  void win.loadURL(url)
+}
 
 /** No navigation away, no popups, no webviews, no permissions. */
 function hardenWebContents(): void {
   app.on('web-contents-created', (_e, contents) => {
     contents.on('will-navigate', (event, url) => {
+      const mobsf = mobsfOrigins.get(contents.id)
+      if (mobsf) {
+        // The MobSF window may move around MobSF itself and nowhere else.
+        if (originOf(url) !== mobsf) event.preventDefault()
+        return
+      }
       if (!isAppUrl(url) && !loginContents.has(contents.id)) event.preventDefault()
     })
     contents.on('will-attach-webview', (event) => event.preventDefault())
     contents.setWindowOpenHandler(({ url }) => {
+      const mobsf = mobsfOrigins.get(contents.id)
+      if (mobsf) {
+        if (originOf(url) === mobsf) void contents.loadURL(url)
+        return { action: 'deny' }
+      }
       // In a sign-in window, pop-ups (single sign-on) open in the same window.
       if (loginContents.has(contents.id) && /^https?:\/\//.test(url)) void contents.loadURL(url)
       else if (isWebUrl(url)) void shell.openExternal(url)
@@ -990,6 +1036,86 @@ function registerIpc(): void {
       throw new ValidationError((e as Error).message)
     }
   })
+  // ---- Container runtime, MobSF, plugins, patches, review loop, AD review
+  const text = (v: unknown, max = 500): string => (typeof v === 'string' ? v.slice(0, max) : '')
+  const sessionId = (v: unknown): string => {
+    if (typeof v !== 'string' || !/^[A-Za-z0-9._-]{1,120}$/.test(v)) throw new ValidationError('That result does not exist.')
+    return v
+  }
+  const patchId = (v: unknown): string => {
+    if (typeof v !== 'string' || !/^patch-[0-9a-f]{8}$/.test(v)) throw new ValidationError('That fix is not on this Mac.')
+    return v
+  }
+  const failing = <T>(fn: () => Promise<T> | T): Promise<T> =>
+    Promise.resolve()
+      .then(fn)
+      .catch((e: unknown) => {
+        throw e instanceof ValidationError ? e : new ValidationError((e as Error).message)
+      })
+  const absolute = (v: unknown): string => {
+    const t = text(v, 1024).trim()
+    if (t && (!isAbsolute(t) || resolve(t) !== t)) throw new ValidationError('Use a full folder path that starts with /.')
+    return t
+  }
+  handle('container:status', () => containerStatus())
+  handle('container:configure', (input) => {
+    const i = (input ?? {}) as Record<string, unknown>
+    return failing(() => configureContainer({ dockerPath: absolute(i.dockerPath), dockerHost: text(i.dockerHost, 300), home: absolute(i.home), colimaHome: absolute(i.colimaHome), limaHome: absolute(i.limaHome), managedDir: absolute(i.managedDir) }))
+  })
+  handle('container:start', () => failing(() => startContainer()))
+  handle('container:stop', () => failing(() => stopContainer()))
+  handle('container:uninstall', (confirmed) => failing(() => uninstallContainer(confirmed === true)))
+
+  handle('mobsf:status', () => mobsfStatus())
+  handle('mobsf:start', () => failing(() => startMobsf()))
+  handle('mobsf:stop', () => failing(() => stopMobsf()))
+  handle('mobsf:remove', (confirmed, reports, image) => failing(() => removeMobsf(confirmed === true, reports === true, image === true)))
+  handle('mobsf:choose', async () => {
+    if (!mainWindow) return null
+    const r = await dialog.showOpenDialog(mainWindow, { title: 'Choose your MobSF folder', buttonLabel: 'Use this folder', properties: ['openDirectory'] })
+    if (r.canceled || !r.filePaths[0]) return null
+    return failing(() => chooseMobsfFolder(r.filePaths[0]))
+  })
+  handle('mobsf:open', async () => {
+    const st = await mobsfStatus()
+    if (!st.running) throw new ValidationError('Start MobSF first.')
+    openMobsfWindow(st.url)
+    return st.url
+  })
+
+  handle('plugins:list', () => listPlugins())
+  handle('plugins:presets', () => pluginPresets())
+  handle('plugins:save', (input) => failing(() => savePlugin(input)))
+  handle('plugins:delete', (id) => failing(() => deletePlugin(text(id, 80))))
+  handle('plugins:clear', () => clearPlugins())
+  handle('plugins:run', (sid, pid, confirmed) => failing(() => runPlugin(sessionId(sid), text(pid, 80), confirmed === true)))
+
+  handle('patches:list', (sid) => listPatches(sessionId(sid)))
+  handle('patches:propose', (sid, fid) => failing(() => proposePatch(sessionId(sid), text(fid, 200))))
+  handle('patches:apply', (id, phrase) => failing(() => applyPatch(patchId(id), text(phrase, 100))))
+  handle('patches:rollback', (id) => failing(() => rollbackPatch(patchId(id))))
+  handle('patches:discard', (id) => failing(() => discardPatch(patchId(id))))
+
+  const loopReviewer = (v: unknown): Reviewer => {
+    const r = pick(v, REVIEWERS, 'none')
+    if (r === 'none') throw new ValidationError('Choose an AI reviewer first.')
+    return r
+  }
+  handle('loop:state', (sid) => loopState(sessionId(sid)))
+  handle('loop:blind', (sid, reviewer) => failing(() => blindReview(sessionId(sid), loopReviewer(reviewer))))
+  handle('loop:combine', (sid) => failing(() => combineReview(sessionId(sid))))
+  handle('loop:verify', (sid, reviewer) => failing(() => verifyCombined(sessionId(sid), loopReviewer(reviewer))))
+
+  handle('ad:pick', async () => {
+    if (!mainWindow) return null
+    const r = await dialog.showOpenDialog(mainWindow, { title: 'Choose a BloodHound export', buttonLabel: 'Review', properties: ['openFile'], filters: [{ name: 'BloodHound export', extensions: ['json', 'zip'] }] })
+    if (r.canceled || !r.filePaths[0]) return null
+    const p = resolve(r.filePaths[0])
+    picked.add(p)
+    return p
+  })
+  handle('ad:start', (path) => failing(() => startAdAudit(allowedProject(path))))
+
   handle('mobile:live-setup', () => liveSetup())
   handle('mobile:avd-start', async (name) => {
     if (!validAvd(name)) throw new ValidationError('That test phone name is not valid.')
@@ -1483,4 +1609,7 @@ app.on('window-all-closed', () => {
   if (!isMac) app.quit()
 })
 
-app.on('before-quit', () => stopCaptureQuietly())
+app.on('before-quit', () => {
+  stopCaptureQuietly()
+  stopMobsfQuietly()
+})
