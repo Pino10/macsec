@@ -38,7 +38,7 @@ import { countBySeverity, parseTrivy } from './scanners/parse'
 import { checkPackUpdates, installPack, packState, packUpdates, removePack, SKILL_PACKS } from './seckit/skillpacks'
 import { deepHandoffPrompt } from './seckit/deepaudit'
 import { deepPlanFor } from './deepreview'
-import { connectClaudeDesktop, desktopAppInstalled, desktopAppPath, desktopConfigPath, desktopConnected } from './desktop'
+import { connectClaudeDesktop, refreshBridge, desktopAppInstalled, desktopAppPath, desktopConfigPath, desktopConnected } from './desktop'
 import { checkHookUrl, hookBody, raycastScripts, sendHook, type HookKind } from './webhooks'
 import { MCP_PORT, mcpToken, mcpUrl, startMcpServer } from './mcp'
 import { macsecCli, macsecTools } from './mcptools'
@@ -870,6 +870,11 @@ function registerIpc(): void {
     void shell.openPath(raycastDir())
     return integrations()
   })
+  try {
+    refreshBridge(mcpUrl(MCP_PORT), join(dirs.config(), 'mcp-token'))
+  } catch {
+    // Connecting again from Settings fixes it.
+  }
   if (getSettings().mcpEnabled) void startMcp().then(writeCli)
   // When a session ends: a webhook message and, when MacSec is in the background, a notification.
   finishEvents.on('finished', (info: SessionInfo) => {

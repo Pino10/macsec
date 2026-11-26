@@ -1,3 +1,13 @@
+## 1.43.3
+
+- **Claude desktop no longer times out on MacSec.** The small script the Claude app starts only answered an error in one exact case. If MacSec was closed, or the saved token no longer matched, the Claude app got no answer and waited until it said "Request timed out". The script now always answers and says plainly what is wrong. MacSec refreshes the script when it opens, so you do not need to connect again. A test runs the real script against a real local server.
+- **MobSF image.** It was already pinned to `v4.4.5` since 1.42.0.
+- **AD review reads real exports.** A standard SharpHound or BloodHound CE file wraps its objects in `data` and `meta`, which the review did not read, so it could report nothing for a real export. It does now. The krbtgt account is recognised with its domain name, and "password not required" is read from the name SharpHound uses.
+- **Removing the container runtime is safer.** Only a folder inside MacSec's own tools folder is ever deleted. A runtime folder you pointed at elsewhere is left alone and the page says where it is.
+- **Review loop.** Links inside an app or code folder are no longer followed, so a link to a file outside it cannot be sent to the AI. Both prompts say the evidence is untrusted data and must not be followed as instructions.
+- **No unmasked evidence copy.** The review loop no longer keeps `evidence.raw.txt`, and removes any left by an older version. Only the masked evidence pack stays.
+- **Bounty draft.** Only a finding with a recorded proof becomes a submission. Everything else is listed as a lead that is not ready to submit.
+
 ## 1.43.2
 
 - **Plugin tools stay inside the engagement.** The counting proxy used to pass a plugin's traffic to any address. It now only reaches the hosts of the engagement the plugin runs under, asks the network guard first (cloud metadata and DNS tricks are refused) and connects to the address the guard approved. Anything else gets a refusal. It also reads IPv6 addresses in CONNECT requests correctly. It is still a counter and not a sandbox: a tool that ignores the proxy is not counted, and the container runner remains the safer route.

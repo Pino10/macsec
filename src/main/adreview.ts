@@ -57,6 +57,12 @@ export function parseAdExport(text: string, hint?: string): AdNode[] {
   else if (data && typeof data === 'object') {
     const o = data as Record<string, unknown>
     let found = false
+    // SharpHound and BloodHound CE: { "data": [ ...objects ], "meta": { "type": "users", ... } }.
+    if (Array.isArray(o.data)) {
+      found = true
+      const meta = (o.meta ?? {}) as Record<string, unknown>
+      for (const r of o.data as unknown[]) add(typeof meta.type === 'string' ? meta.type : hint, r)
+    }
     for (const k of ['users', 'computers', 'groups', 'domains', 'gpos', 'ous']) {
       if (Array.isArray(o[k])) {
         found = true
@@ -103,7 +109,7 @@ export function analyzeAd(nodes: AdNode[], source: string): Finding[] {
     if (!enabled) continue
     if (n.kind === 'user' || n.kind === 'computer') {
       const spns = arr(p.serviceprincipalnames)
-      if (n.kind === 'user' && spns.length && n.name.toUpperCase() !== 'KRBTGT') {
+      if (n.kind === 'user' && spns.length && !/^KRBTGT(@|$)/i.test(n.name)) {
         add(n, 'high', 'Kerberoastable service account', `The export shows ${spns.length} SPN(s): ${spns.slice(0, 4).join(', ')}. A service account with an SPN can be requested and cracked offline.`, 'Use a managed service account or a long random password, remove unnecessary SPNs, and rotate the account password.')
       }
       if (n.kind === 'user' && truth(p.dontreqpreauth)) {
@@ -118,7 +124,7 @@ export function analyzeAd(nodes: AdNode[], source: string): Finding[] {
       }
       if (truth(p.admincount)) add(n, 'medium', 'AdminCount=1 account', 'The object is marked AdminCount=1, which often means it was privileged and may still hold inherited rights.', 'Confirm whether the account still needs privileged access; remove it from protected groups or reset AdminCount only with care.')
       if (truth(p.pwdneverexpires)) add(n, 'low', 'Password never expires', 'The export sets PasswordNeverExpires on an enabled account.', 'Prefer a long unique password or a managed service account; document any exception.')
-      if (truth(p.passwordnotrequired)) add(n, 'medium', 'Password not required', 'The account can have an empty password.', 'Set a strong password or disable the account.')
+      if (truth(p.passwordnotrequired) || truth(p.passwordnotreqd)) add(n, 'medium', 'Password not required', 'The account can have an empty password.', 'Set a strong password or disable the account.')
       if (n.kind === 'computer' && p.haslaps !== undefined && !truth(p.haslaps)) add(n, 'low', 'LAPS not detected', 'The export does not show LAPS on this computer.', 'Roll out Windows LAPS for local administrator password rotation.')
     }
   }
