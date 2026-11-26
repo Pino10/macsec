@@ -26,25 +26,25 @@ function Spark({ points }: { points: number[] }): React.JSX.Element | null {
 /** How a score is built, so nobody reads 43 as a grade. */
 function Legend(): React.JSX.Element {
   return (
-    <div className="panel" style={{ padding: 14, marginBottom: 16 }}>
-      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+    <details className="panel" style={{ padding: '10px 14px', marginBottom: 14 }}>
+      <summary className="hint" style={{ cursor: 'pointer' }}>How risk is worked out (higher is worse)</summary>
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center', marginTop: 10 }}>
         <span className="hint" style={{ flex: 1, minWidth: 260 }}>
-          <b style={{ color: 'var(--ink)' }}>The score is how exposed an asset is right now, not a grade.</b> It starts near 100 and falls with each open finding: severity counts, proof counts more, and fixing or marking a finding takes it back. The spark is the same score after each test.
+          <b style={{ color: 'var(--ink)' }}>Risk is how exposed an asset is right now, from 0 (clean) to 100. Higher is worse.</b> Each open finding adds to it: severity counts, proof counts more, and fixing or marking a finding takes it back. The line is the same number after each test. (The Overview shows a different number, the posture score, where higher is better.)</span>
+        <span className="hint">
+          <b style={{ color: 'var(--ok)' }}>0</b> clean
         </span>
         <span className="hint">
-          <b style={{ color: 'var(--ok)' }}>85+</b> calm
+          <b style={{ color: 'var(--sev-low)' }}>1-24</b> low
         </span>
         <span className="hint">
-          <b style={{ color: 'var(--sev-low)' }}>65-84</b> worth a look
+          <b style={{ color: 'var(--sev-medium)' }}>25-49</b> medium
         </span>
         <span className="hint">
-          <b style={{ color: 'var(--sev-medium)' }}>45-64</b> fix soon
-        </span>
-        <span className="hint">
-          <b style={{ color: 'var(--sev-critical)' }}>under 45</b> act now
+          <b style={{ color: 'var(--sev-critical)' }}>50+</b> act
         </span>
       </div>
-    </div>
+    </details>
   )
 }
 
@@ -90,7 +90,7 @@ export default function Assets(): React.JSX.Element {
 
   const shown = useMemo(() => {
     const l = (list ?? []).filter((a) => kind === 'all' || a.kind === kind)
-    return l.sort((a, b) => (worstFirst ? a.risk - b.risk : b.lastScan.localeCompare(a.lastScan)))
+    return l.sort((a, b) => (worstFirst ? b.risk - a.risk || b.lastScan.localeCompare(a.lastScan) : b.lastScan.localeCompare(a.lastScan)))
   }, [list, kind, worstFirst])
 
   const withPaths = (list ?? []).filter((a) => a.chains.length > 0).length
@@ -141,7 +141,7 @@ export default function Assets(): React.JSX.Element {
               </div>
               <div style={{ textAlign: 'center', minWidth: 64 }}>
                 <div style={{ fontSize: 30, fontWeight: 650, color: band(a.risk), lineHeight: 1.1 }}>{a.risk}</div>
-                <div className="hint">{a.riskLabel}</div>
+                <div className="hint">Risk: {a.riskLabel.toLowerCase()}</div>
               </div>
               <span style={{ color: band(a.risk) }} title="The score after each test">
                 <Spark points={a.trend.map((t) => t.risk)} />

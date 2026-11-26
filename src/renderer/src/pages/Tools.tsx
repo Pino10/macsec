@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Cloud, Microscope, Server, Smartphone, Swords } from 'lucide-react'
-import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Terminal, Trash2, Wrench } from 'lucide-react'
+import { ArrowUpCircle, Bot, Check, Cpu, Download, ExternalLink, FolderOpen, Globe2, KeyRound, Package, RefreshCw, Shield, Sparkles, Search, Terminal, Trash2, Wrench } from 'lucide-react'
 import type { AgentInfo, LocalLlm, OptionalTool, ToolCategory, ToolInfo } from '@shared/types'
 import { useApp } from '../store'
 import { FreeLlmPanel, Integrations, ModelServersPanel, SkillPacks, PacksAsk } from '../components/Extras'
@@ -26,9 +26,19 @@ export const skillTitle = (name: string): string => {
   return fixed.startsWith('iOS') ? fixed : fixed.charAt(0).toUpperCase() + fixed.slice(1)
 }
 
+const matchTool = (t: ToolInfo, q: string, show: 'all' | 'installed' | 'missing' | 'updates'): boolean => {
+  if (show === 'installed' && !t.installed) return false
+  if (show === 'missing' && t.installed) return false
+  if (show === 'updates' && !t.updateAvailable) return false
+  const n = q.trim().toLowerCase()
+  return !n || `${t.name} ${t.purpose}`.toLowerCase().includes(n)
+}
+
 export default function Tools(): React.JSX.Element {
   const [tab, setTab] = useState<'scanners' | 'ai' | 'skills' | 'extras'>('scanners')
   const [allSkills, setAllSkills] = useState(false)
+  const [q, setQ] = useState('')
+  const [show, setShow] = useState<'all' | 'installed' | 'missing' | 'updates'>('all')
   const { tools, setTools, act, busy, settings, updateSettings, notify } = useApp()
   const api = window.macsec
   const [agents, setAgents] = useState<AgentInfo[]>([])
@@ -316,8 +326,22 @@ export default function Tools(): React.JSX.Element {
 
       {tab === 'scanners' && (
       <>
+      <div className="tool-bar">
+        <label className="tool-search">
+          <Search size={14} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a scanner or what it checks" aria-label="Find a scanner" />
+        </label>
+        <div className="seg" role="radiogroup" aria-label="Show">
+          {([['all', `All ${tools.length}`], ['installed', `Installed ${tools.filter((t) => t.installed).length}`], ['missing', `Not installed ${tools.filter((t) => !t.installed).length}`], ['updates', `Updates ${tools.filter((t) => t.updateAvailable).length}`]] as const).map(([k, l]) => (
+            <button key={k} role="radio" aria-checked={show === k} onClick={() => setShow(k)}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+      {tools.length > 0 && !tools.some((t) => matchTool(t, q, show)) && <p className="hint" style={{ margin: '18px 2px' }}>Nothing matches. Clear the search or choose All.</p>}
       {GROUPS.map((g) => {
-        const list = tools.filter((t) => t.category === g.id)
+        const list = tools.filter((t) => t.category === g.id && matchTool(t, q, show))
         if (!list.length) return null
         return (
           <div key={g.id}>
