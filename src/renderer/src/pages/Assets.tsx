@@ -3,12 +3,13 @@ import { ArrowDown, Boxes, ChevronRight, ExternalLink, RefreshCw } from 'lucide-
 import type { AssetInfo, Chain } from '@shared/types'
 import { useApp } from '../store'
 import { Counts, Empty, PageHead, Sev, ago } from '../ui'
+import { postureWord } from '@shared/posture'
 
 const KIND: Record<AssetInfo['kind'], string> = { site: 'Website', api: 'API', domain: 'Domain', app: 'Mobile app', project: 'Project', mac: 'This Mac', other: 'Other' }
 const KINDS: (AssetInfo['kind'] | 'all')[] = ['all', 'site', 'api', 'domain', 'project', 'app', 'mac']
 
-/** The colour of a score: the same bands the rest of the app uses. */
-const band = (risk: number): string => (risk >= 70 ? 'var(--sev-critical)' : risk >= 45 ? 'var(--sev-medium)' : risk >= 20 ? 'var(--sev-low)' : 'var(--ok)')
+/** The colour of a score (higher is better): the same words the Overview uses. */
+const band = (score: number): string => (score >= 90 ? 'var(--ok)' : score >= 70 ? 'var(--sev-low)' : score >= 45 ? 'var(--sev-medium)' : 'var(--sev-critical)')
 
 function Spark({ points }: { points: number[] }): React.JSX.Element | null {
   if (points.length < 2) return null
@@ -17,7 +18,7 @@ function Spark({ points }: { points: number[] }): React.JSX.Element | null {
   const max = Math.max(100, ...points)
   const d = points.map((p, i) => `${i ? 'L' : 'M'}${((i / (points.length - 1)) * w).toFixed(1)},${(h - (p / max) * h).toFixed(1)}`).join(' ')
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Risk over ${points.length} tests: ${points.join(', ')}`}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Score over ${points.length} tests: ${points.join(', ')}`}>
       <path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   )
@@ -27,21 +28,21 @@ function Spark({ points }: { points: number[] }): React.JSX.Element | null {
 function Legend(): React.JSX.Element {
   return (
     <details className="panel" style={{ padding: '10px 14px', marginBottom: 14 }}>
-      <summary className="hint" style={{ cursor: 'pointer' }}>How risk is worked out (higher is worse)</summary>
+      <summary className="hint" style={{ cursor: 'pointer' }}>How the score is worked out (higher is better)</summary>
       <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center', marginTop: 10 }}>
         <span className="hint" style={{ flex: 1, minWidth: 260 }}>
-          <b style={{ color: 'var(--ink)' }}>Risk is how exposed an asset is right now, from 0 (clean) to 100. Higher is worse.</b> Each open finding adds to it: severity counts, proof counts more, and fixing or marking a finding takes it back. The line is the same number after each test. (The Overview shows a different number, the posture score, where higher is better.)</span>
+          <b style={{ color: 'var(--ink)' }}>The score is how safe an asset is right now, from 0 to 100. Higher is better, and it is the same score the Overview shows.</b> Each open finding takes points off, criticals the most, and fixing or marking a finding gives them back. The line is the same number after each test.</span>
         <span className="hint">
-          <b style={{ color: 'var(--ok)' }}>0</b> clean
+          <b style={{ color: 'var(--ok)' }}>90+</b> strong
         </span>
         <span className="hint">
-          <b style={{ color: 'var(--sev-low)' }}>1-24</b> low
+          <b style={{ color: 'var(--sev-low)' }}>70-89</b> guarded
         </span>
         <span className="hint">
-          <b style={{ color: 'var(--sev-medium)' }}>25-49</b> medium
+          <b style={{ color: 'var(--sev-medium)' }}>45-69</b> exposed
         </span>
         <span className="hint">
-          <b style={{ color: 'var(--sev-critical)' }}>50+</b> act
+          <b style={{ color: 'var(--sev-critical)' }}>under 45</b> at risk
         </span>
       </div>
     </details>
@@ -69,7 +70,7 @@ function Chain_({ c }: { c: Chain }): React.JSX.Element {
   )
 }
 
-/** Every site, API, app and project MacSec has looked at, with one risk score and what to fix first. */
+/** Every site, API, app and project MacSec has looked at, with one score and what to fix first. */
 export default function Assets(): React.JSX.Element {
   const { showSession } = useApp()
   const api = window.macsec
@@ -90,7 +91,7 @@ export default function Assets(): React.JSX.Element {
 
   const shown = useMemo(() => {
     const l = (list ?? []).filter((a) => kind === 'all' || a.kind === kind)
-    return l.sort((a, b) => (worstFirst ? b.risk - a.risk || b.lastScan.localeCompare(a.lastScan) : b.lastScan.localeCompare(a.lastScan)))
+    return l.sort((a, b) => (worstFirst ? a.score - b.score || b.lastScan.localeCompare(a.lastScan) : b.lastScan.localeCompare(a.lastScan)))
   }, [list, kind, worstFirst])
 
   const withPaths = (list ?? []).filter((a) => a.chains.length > 0).length
@@ -129,7 +130,7 @@ export default function Assets(): React.JSX.Element {
         {shown.map((a) => (
           <section key={a.key} className="panel" aria-label={a.name} style={{ padding: 16 }}>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span className="glyph" style={{ ['--g' as string]: band(a.risk), width: 38, height: 38, borderRadius: 11 }}>
+              <span className="glyph" style={{ ['--g' as string]: band(a.score), width: 38, height: 38, borderRadius: 11 }}>
                 <Boxes size={18} />
               </span>
               <div style={{ flex: 1, minWidth: 180 }}>
@@ -140,11 +141,11 @@ export default function Assets(): React.JSX.Element {
                 </div>
               </div>
               <div style={{ textAlign: 'center', minWidth: 64 }}>
-                <div style={{ fontSize: 30, fontWeight: 650, color: band(a.risk), lineHeight: 1.1 }}>{a.risk}</div>
-                <div className="hint">Risk: {a.riskLabel.toLowerCase()}</div>
+                <div style={{ fontSize: 30, fontWeight: 650, color: band(a.score), lineHeight: 1.1 }}>{a.score}</div>
+                <div className="hint">{postureWord(a.score, true)}</div>
               </div>
-              <span style={{ color: band(a.risk) }} title="The score after each test">
-                <Spark points={a.trend.map((t) => t.risk)} />
+              <span style={{ color: band(a.score) }} title="The score after each test">
+                <Spark points={a.trend.map((t) => t.score)} />
               </span>
               <button className="btn btn-sm" onClick={() => showSession(a.lastSession)}>
                 Open latest <ChevronRight size={13} />

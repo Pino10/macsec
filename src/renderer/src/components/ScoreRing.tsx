@@ -4,7 +4,7 @@ export default function ScoreRing({ score, size = 76, empty = false }: { score: 
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
   const pct = empty ? 0 : Math.max(0, Math.min(100, score)) / 100
-  const color = score >= 80 ? 'var(--ok)' : score >= 60 ? 'var(--sev-medium)' : score >= 40 ? 'var(--sev-high)' : 'var(--sev-critical)'
+  const color = score >= 90 ? 'var(--ok)' : score >= 70 ? 'var(--sev-medium)' : score >= 45 ? 'var(--sev-high)' : 'var(--sev-critical)'
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={empty ? 'No score yet' : `Score ${score} out of 100`}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-3)" strokeWidth={stroke} />

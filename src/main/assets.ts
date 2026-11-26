@@ -7,12 +7,16 @@
 import type { Action, AssetInfo, Finding, SessionInfo, Severity } from '../shared/types'
 export type { Action, AssetInfo }
 import { chainsOf } from './chains'
+import { postureScore } from '../shared/posture'
 import { findingKey } from './watch'
 
 const BASE: Record<Severity, number> = { critical: 90, high: 70, medium: 45, low: 20, info: 0 }
 const SEVS: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
 
 const isOpen = (f: Finding): boolean => f.verdict !== 'false-positive' && !f.triage && f.severity !== 'info'
+
+/** The one score shown everywhere (Overview, Assets, reports): 100 means nothing open, higher is better. */
+export const scoreOf = (fs: Finding[]): number => postureScore(Object.fromEntries(SEVS.map((v) => [v, fs.filter((f) => isOpen(f) && f.severity === v).length])) as Record<Severity, number>)
 
 /** 0 to 100. Each open finding adds a share, so a few serious ones weigh more than many small ones, and it never passes 100. */
 export function riskScore(findings: Finding[]): number {
@@ -98,7 +102,7 @@ export function buildAssets(sessions: SessionInfo[], findingsOf: (id: string) =>
       for (const k of before) if (!keys.has(k) && seen.has(k)) fixedDays.push(Math.max(0, (Date.parse(s.createdAt) - Date.parse(seen.get(k)!)) / 86400000))
       byKind.set(s.kind, keys)
       prev = keys
-      trend.push({ at: s.createdAt, risk: riskScore(fs), open: fs.filter(isOpen).length })
+      trend.push({ at: s.createdAt, risk: riskScore(fs), score: scoreOf(fs), open: fs.filter(isOpen).length })
       latest = fs
     }
     // Where scans of several kinds exist, the open picture is the newest finished scan of each kind put together.
@@ -108,7 +112,8 @@ export function buildAssets(sessions: SessionInfo[], findingsOf: (id: string) =>
     const plan = remediationPlan(current)
     const last = list[list.length - 1]
     const risk = riskScore(current)
-    out.push({ key, name: g.name, kind: g.kind, scans: list.length, lastScan: last.createdAt, lastSession: last.id, open, proven: current.filter((f) => isOpen(f) && f.exploit?.state === 'proven').length, risk, riskLabel: riskLabel(risk), trend, fixed: fixedDays.length, ...(fixedDays.length ? { mttrDays: Math.round((fixedDays.reduce((a, b) => a + b, 0) / fixedDays.length) * 10) / 10 } : {}), actions: plan.actions, dropIfDone: plan.before - plan.after, chains: chainsOf(current) })
+    const score = scoreOf(current)
+    out.push({ key, name: g.name, kind: g.kind, scans: list.length, lastScan: last.createdAt, lastSession: last.id, open, proven: current.filter((f) => isOpen(f) && f.exploit?.state === 'proven').length, risk, riskLabel: riskLabel(risk), score, trend, fixed: fixedDays.length, ...(fixedDays.length ? { mttrDays: Math.round((fixedDays.reduce((a, b) => a + b, 0) / fixedDays.length) * 10) / 10 } : {}), actions: plan.actions, dropIfDone: plan.before - plan.after, chains: chainsOf(current) })
   }
-  return out.sort((a, b) => b.risk - a.risk || a.name.localeCompare(b.name))
+  return out.sort((a, b) => a.score - b.score || b.risk - a.risk || a.name.localeCompare(b.name))
 }

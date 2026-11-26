@@ -22,53 +22,71 @@ export default function Recon(): React.JSX.Element {
   return (
     <>
       <PageHead title="Recon" desc="Map what a domain exposes before you test it: subdomains, live hosts and what they run, old URLs and parameters, JavaScript source maps, endpoints and keys, and files that should not be public. Read-only: nothing is attacked." />
-      <div className="flow">
-        <FlowStep n={1} title="Which domain" help="Its subdomains are included. Nothing outside it is touched." state={valid ? 'done' : 'current'}>
-          <input className="input mono" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="example.com" aria-label="Domain" />
-        </FlowStep>
-        <FlowStep n={2} title="How far" state="current">
-          <div className="choices" role="radiogroup" aria-label="Depth">
-            {(
-              [
-                ['passive', 'Passive', 'Certificate logs, the Wayback Machine and subfinder’s public sources, plus DNS. Nothing is sent to the site itself.'],
-                ['standard', 'Standard', 'Plus which hosts answer and what they run, a light crawl, every script checked for source maps, endpoints and keys, and a few exposed files.'],
-                ['deep', 'Deep', 'More hosts, pages and scripts, archived JavaScript too. Takes longer.']
-              ] as const
-            ).map(([id, t, d]) => (
-              <button key={id} className="choice" role="radio" aria-checked={depth === id} onClick={() => setDepth(id)}>
-                <strong>{t}</strong>
-                <span>{d}</span>
-              </button>
-            ))}
-          </div>
-          {sub && !sub.installed && (
-            <p className="hint" style={{ marginTop: 10 }}>
-              subfinder adds many more subdomains; it installs on the first recon, or now:{' '}
-              <button
-                className="link"
-                onClick={async () => {
-                  const r = await act('sf', () => api.invoke('tools:install', ['subfinder']))
-                  if (r) setTools(r)
-                }}
-              >
-                <Download size={11} /> {busy.has('sf') ? 'Installing…' : 'Install subfinder'}
-              </button>
-            </p>
+      <div className="step-split">
+        <div className="flow">
+          <FlowStep n={1} title="Which domain" help="Its subdomains are included. Nothing outside it is touched." state={valid ? 'done' : 'current'}>
+            <input className="input mono" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="example.com" aria-label="Domain" />
+          </FlowStep>
+          <FlowStep n={2} title="How far" state="current">
+            <div className="choices" role="radiogroup" aria-label="Depth">
+              {(
+                [
+                  ['passive', 'Passive', 'Certificate logs, the Wayback Machine and subfinder’s public sources, plus DNS. Nothing is sent to the site itself.'],
+                  ['standard', 'Standard', 'Plus which hosts answer and what they run, a light crawl, every script checked for source maps, endpoints and keys, and a few exposed files.'],
+                  ['deep', 'Deep', 'More hosts, pages and scripts, archived JavaScript too. Takes longer.']
+                ] as const
+              ).map(([id, t, d]) => (
+                <button key={id} className="choice" role="radio" aria-checked={depth === id} onClick={() => setDepth(id)}>
+                  <strong>{t}</strong>
+                  <span>{d}</span>
+                </button>
+              ))}
+            </div>
+            {sub && !sub.installed && (
+              <p className="hint" style={{ marginTop: 10 }}>
+                subfinder adds many more subdomains; it installs on the first recon, or now:{' '}
+                <button
+                  className="link"
+                  onClick={async () => {
+                    const r = await act('sf', () => api.invoke('tools:install', ['subfinder']))
+                    if (r) setTools(r)
+                  }}
+                >
+                  <Download size={11} /> {busy.has('sf') ? 'Installing…' : 'Install subfinder'}
+                </button>
+              </p>
+            )}
+          </FlowStep>
+          <FlowStep n={3} title="Who writes the report" help="The AI reads the recon results (never the site) with MacSec’s recon skills, and writes the attack surface map and where to look first." state="current">
+            <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
+          </FlowStep>
+          {needsOk && (
+            <label className="consent">
+              <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
+              <span>
+                <strong style={{ color: 'var(--ink)' }}>I own this domain, or have written permission to assess it</strong> (a bug bounty programme that includes it, for example).
+              </span>
+            </label>
           )}
-        </FlowStep>
-        <FlowStep n={3} title="Who writes the report" help="The AI reads the recon results (never the site) with MacSec’s recon skills, and writes the attack surface map and where to look first." state="current">
-          <ReviewerChoice value={reviewer} onChange={setReviewer} what="findings" />
-        </FlowStep>
-        {needsOk && (
-          <label className="consent">
-            <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
-            <span>
-              <strong style={{ color: 'var(--ink)' }}>I own this domain, or have written permission to assess it</strong> (a bug bounty programme that includes it, for example).
-            </span>
-          </label>
-        )}
-        <div className="flow-go glass">
-          <span className="hint grow">Ordinary reads at a gentle rate. You can watch every step, and the session keeps the hosts, scripts and findings.</span>
+        </div>
+        <aside className="split-aside" aria-label="Summary">
+          <h3>Recon summary</h3>
+          <dl>
+            <div>
+              <dt>Domain</dt>
+              <dd className="mono">{valid ? host : 'Not chosen yet'}</dd>
+            </div>
+            <div>
+              <dt>How far</dt>
+              <dd>{depth === 'passive' ? 'Passive: nothing is sent to the site' : depth === 'standard' ? 'Standard' : 'Deep'}</dd>
+            </div>
+            <div>
+              <dt>Report written by</dt>
+              <dd>{reviewer === 'none' ? 'MacSec rules only' : 'The AI reviewer'}</dd>
+            </div>
+          </dl>
+          <p className="hint">Ordinary reads at a gentle rate. You can watch every step, and the session keeps the hosts, scripts and findings.</p>
+          {needsOk && !ok && <p className="hint">Tick the permission box to start.</p>}
           <button
             className="btn btn-primary btn-lg"
             disabled={!valid || (needsOk && !ok) || busy.has('recon')}
@@ -79,7 +97,7 @@ export default function Recon(): React.JSX.Element {
           >
             <Radar size={17} /> Start recon
           </button>
-        </div>
+        </aside>
       </div>
     </>
   )

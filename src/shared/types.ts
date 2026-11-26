@@ -1084,8 +1084,10 @@ export interface AssetInfo {
   proven: number
   risk: number
   riskLabel: string
-  /** The risk after each finished scan, oldest first. */
-  trend: { at: string; risk: number; open: number }[]
+  /** The posture score (0 to 100, higher is better), the same number the Overview shows. */
+  score: number
+  /** The risk and score after each finished scan, oldest first. */
+  trend: { at: string; risk: number; score: number; open: number }[]
   fixed: number
   /** Average days between a finding first being seen and the first scan that no longer had it. */
   mttrDays?: number
