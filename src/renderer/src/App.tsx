@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Download, Plus } from 'lucide-react'
+import { Command, Download, Plus } from 'lucide-react'
 import type { UpdateInfo } from '@shared/types'
 import { AppProvider, useApp } from './store'
-import { NotificationLayer } from './components/Notifications'
+import { Bell_, NotificationLayer } from './components/Notifications'
 import ErrorBoundary from './components/ErrorBoundary'
 import Rail, { PAGE_ORDER } from './components/Rail'
 import ThisMac from './pages/ThisMac'
@@ -63,6 +63,10 @@ function EngineBar(): React.JSX.Element {
         )}
       </button>
       <span style={{ flex: 1 }} />
+      <button className="top-search" onClick={() => window.dispatchEvent(new Event('macsec:palette'))} aria-label="Search everything">
+        <Command size={13} /> Search <kbd>⌘K</kbd>
+      </button>
+      <Bell_ variant="top" />
       <button className="btn btn-primary" onClick={() => setPage('new')}>
         <Plus size={15} /> New test
       </button>

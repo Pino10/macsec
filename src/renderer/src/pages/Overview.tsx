@@ -4,8 +4,9 @@ import { coverage, coverageText, sparkPath, trends, type TopFinding } from '@sha
 import { latestPerTarget } from '@shared/latest'
 import { SEVERITIES, type Severity } from '@shared/types'
 import { useApp, type Page } from '../store'
-import { Counts, KindIcon, Spectrum, ago, kindName } from '../ui'
-import ThreatCore, { postureOf, postureScore, postureWord } from '../components/ThreatCore'
+import { Counts, KindIcon, PageHead, Spectrum, ago, kindName } from '../ui'
+import ScoreRing from '../components/ScoreRing'
+import { postureOf, postureScore, postureWord } from '../components/ThreatCore'
 import Watch from '../components/Watch'
 
 const LAUNCH: { page: Page; icon: React.ReactNode; g: string; title: string; text: string }[] = [
@@ -42,12 +43,21 @@ export default function Overview(): React.JSX.Element {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Overview</h1>
-          <p className="page-desc">Your security posture, from the latest test of each project, site and API. It changes when you test again or mark findings fixed, accepted or not a problem.</p>
-        </div>
-      </div>
+      <PageHead title="Overview" desc="Your latest result for each project, site and API. It changes when you test again or mark a finding fixed, accepted or not a problem.">
+        {has && (
+          <button
+            className="btn"
+            disabled={busy.has('retest') || running.length > 0}
+            title="Runs the newest test of each project, site and API again"
+            onClick={async () => {
+              const r = await act('retest', () => window.macsec.invoke('sessions:rerun-latest'))
+              if (r) notify({ kind: 'info', text: `${r.length} ${r.length === 1 ? 'test' : 'tests'} started again. The numbers update as they finish.` })
+            }}
+          >
+            <RefreshCw size={14} /> {running.length ? 'Testing…' : busy.has('retest') ? 'Starting…' : 'Test everything again'}
+          </button>
+        )}
+      </PageHead>
 
       {welcome && (
         <section className="welcome glass">
@@ -114,140 +124,149 @@ export default function Overview(): React.JSX.Element {
         </div>
       )}
 
-      <section className="hero glass">
-        <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-          <ThreatCore counts={totals} size={300} running={running.length > 0} hasData={has} score={score} />
-          {has && (
-            <button
-              className="btn btn-sm"
-              disabled={busy.has('retest') || running.length > 0}
-              title="Runs the newest test of each project, site and API again, so the core shows how things stand now"
-              onClick={async () => {
-                const r = await act('retest', () => window.macsec.invoke('sessions:rerun-latest'))
-                if (r) notify({ kind: 'info', text: `${r.length} ${r.length === 1 ? 'test' : 'tests'} started again. The core updates as they finish.` })
-              }}
-            >
-              <RefreshCw size={13} /> {running.length ? 'Testing…' : busy.has('retest') ? 'Starting…' : 'Test everything again'}
-            </button>
-          )}
-        </div>
-        <div style={{ display: 'grid', gap: 20 }}>
+      <section className="ov-kpis" aria-label="Summary">
+        <div className="kpi-card kpi-score">
+          <ScoreRing score={score} empty={!has} />
           <div>
-            <h2>{has ? `Posture: ${postureWord(score, true).toLowerCase()}, ${score} out of 100` : 'Run your first test'}</h2>
-            <p className="page-desc" style={{ marginTop: 0 }}>
-              {!has
-                ? 'Pick a project, a site or an API below. Results gather here, and the core in the middle shows how exposed you are.'
-                : totals.critical
-                  ? `${totals.critical} critical ${totals.critical === 1 ? 'problem needs' : 'problems need'} fixing first, across ${latest.size} ${latest.size === 1 ? 'target' : 'targets'}.`
-                  : totals.high
-                    ? `No critical problems. ${totals.high} high ${totals.high === 1 ? 'one is' : 'ones are'} worth fixing next.`
-                    : `Nothing critical or high across ${latest.size} ${latest.size === 1 ? 'target' : 'targets'}.`}
-            </p>
+            <span className="kpi-label">Posture</span>
+            <strong className="kpi-big kpi-word">{has ? postureWord(score, true) : 'No data yet'}</strong>
+            <span className="kpi-note">{has ? 'Out of 100, from the latest tests' : 'Run a test to see it'}</span>
           </div>
-          {has && <Spectrum counts={totals} />}
-          {has && (
-            <p className="coverage">
-              {cover.basedOn}{' '}
-              {cover.missing.length > 0 && (
-                <>
-                  Not tested yet:{' '}
-                  {cover.missing.map((m, i) => (
-                    <span key={m.area}>
-                      {i > 0 && ', '}
-                      <button className="link" onClick={() => setPage(m.page)}>
-                        {m.name}
-                      </button>
-                    </span>
-                  ))}
-                  . A good score only covers what was tested.
-                </>
-              )}
-            </p>
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Open findings</span>
+          <div className="kpi-sevs">
+            {(['critical', 'high', 'medium', 'low'] as Severity[]).map((k) => (
+              <span key={k} data-sev={k} data-zero={totals[k] === 0 ? '1' : undefined}>
+                <b>{totals[k]}</b>
+                {k}
+              </span>
+            ))}
+          </div>
+          {has && <Spectrum counts={totals} legend={false} />}
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Targets tested</span>
+          <strong className="kpi-big">{latest.size}</strong>
+          <span className="kpi-note">{running.length ? `${running.length} running now` : has ? 'Latest result of each' : 'Nothing tested yet'}</span>
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Scanners ready</span>
+          <strong className="kpi-big">
+            {tools.filter((t) => t.installed && t.method !== 'app').length}
+            <small>/{tools.filter((t) => t.method !== 'app').length}</small>
+          </strong>
+          <span className="kpi-note">{missing.length ? `${missing.length} not installed` : 'All installed'}</span>
+        </div>
+      </section>
+
+      {has && (
+        <p className="coverage">
+          {cover.basedOn}{' '}
+          {cover.missing.length > 0 && (
+            <>
+              Not tested yet:{' '}
+              {cover.missing.map((m, i) => (
+                <span key={m.area}>
+                  {i > 0 && ', '}
+                  <button className="link" onClick={() => setPage(m.page)}>
+                    {m.name}
+                  </button>
+                </span>
+              ))}
+              . A good score only covers what was tested.
+            </>
           )}
-          {has && top.length > 0 && (
-            <div>
-              <h3 className="fix-first-title">Fix these first</h3>
-              <div className="panel inner-well">
-                {top.map((f) => (
-                  <button key={`${f.session}-${f.id}`} className="row fix-row" onClick={() => showSession(f.session)}>
-                    <span className="sev" data-sev={f.severity}>
-                      {f.severity}
+        </p>
+      )}
+
+      <div className="dash-grid">
+        <div>
+          <h2 className="section-title">{has && top.length > 0 ? 'Fix these first' : 'Start here'}</h2>
+          <div className="panel">
+            {has && top.length > 0 ? (
+              top.map((f) => (
+                <button key={`${f.session}-${f.id}`} className="row fix-row" onClick={() => showSession(f.session)}>
+                  <span className="sev" data-sev={f.severity}>
+                    {f.severity}
+                  </span>
+                  <span className="grow" style={{ minWidth: 0 }}>
+                    <span className="row-title" style={{ display: 'block' }}>
+                      {f.title}
                     </span>
-                    <span style={{ minWidth: 0 }}>
-                      <span className="row-title" style={{ display: 'block' }}>
-                        {f.title}
-                      </span>
-                      <span className="row-sub">
-                        {f.sessionTitle}
-                        {f.where ? ` · ${f.where}` : ''}
-                      </span>
+                    <span className="row-sub">
+                      {f.sessionTitle}
+                      {f.where ? ` · ${f.where}` : ''}
+                    </span>
+                  </span>
+                  <ChevronRight size={16} style={{ color: 'var(--ink-3)' }} />
+                </button>
+              ))
+            ) : (
+              <>
+                <button className="row launch" onClick={() => testFully(setPage)}>
+                  <span className="glyph" style={{ ['--g' as string]: '#3ddc97' }}>
+                    <ShieldCheck size={18} />
+                  </span>
+                  <span className="grow">
+                    <span className="row-title" style={{ display: 'block' }}>Test a project fully</span>
+                    <span className="row-sub">Its code and its live site in one go, joined in one report.</span>
+                  </span>
+                  <ChevronRight size={16} style={{ color: 'var(--ink-3)' }} />
+                </button>
+                {LAUNCH.map((l) => (
+                  <button key={l.page} className="row launch" onClick={() => setPage(l.page)}>
+                    <span className="glyph" style={{ ['--g' as string]: l.g }}>{l.icon}</span>
+                    <span className="grow">
+                      <span className="row-title" style={{ display: 'block' }}>{l.title}</span>
+                      <span className="row-sub">{l.text}</span>
                     </span>
                     <ChevronRight size={16} style={{ color: 'var(--ink-3)' }} />
                   </button>
                 ))}
+              </>
+            )}
+          </div>
+        </div>
+        <div>
+          <h2 className="section-title">Recent tests</h2>
+          <div className="panel">
+            {sessions.length === 0 ? (
+              <div className="row">
+                <span className="hint">Every test is kept as a result you can reopen, export as a PDF or continue in Claude Code.</span>
               </div>
-            </div>
-          )}
-          {!(has && top.length > 0) && (
-          <div className="panel inner-well">
-            <button className="row launch" onClick={() => testFully(setPage)}>
-              <span className="glyph" style={{ ['--g' as string]: '#3ef0a8' }}>
-                <ShieldCheck size={20} />
-              </span>
-              <span>
-                <span className="row-title" style={{ display: 'block' }}>
-                  Test a project fully
-                </span>
-                <span className="row-sub">Its code and its live site in one go, joined in one report.</span>
-              </span>
-              <ChevronRight size={16} style={{ color: 'var(--ink-3)' }} />
+            ) : (
+              sessions.slice(0, 6).map((s) => (
+                <button key={s.id} className="row" onClick={() => showSession(s.id)}>
+                  <KindIcon kind={s.kind} size={15} />
+                  <span className="grow" style={{ minWidth: 0 }}>
+                    <span className="row-title" style={{ display: 'block' }}>{s.title}</span>
+                    <span className="row-sub">{s.status === 'running' ? s.steps.find((x) => x.status === 'running')?.label ?? 'Starting' : `${kindName(s.kind)}, ${ago(s.createdAt)}`}</span>
+                  </span>
+                  {s.status === 'running' ? <span className="dot" data-s="busy" /> : s.status === 'done' ? <Counts counts={s.counts} /> : <span className="hint">{s.status}</span>}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {has && top.length > 0 && (
+        <>
+          <h2 className="section-title">Start another test</h2>
+          <div className="launch-strip">
+            <button className="launch-chip" onClick={() => testFully(setPage)}>
+              <span className="glyph" style={{ ['--g' as string]: '#3ddc97' }}><ShieldCheck size={18} /></span>
+              <span><span className="row-title" style={{ display: 'block' }}>Test a project fully</span><span className="row-sub">Code and live site together.</span></span>
             </button>
             {LAUNCH.map((l) => (
-              <button key={l.page} className="row launch" onClick={() => setPage(l.page)}>
-                <span className="glyph" style={{ ['--g' as string]: l.g }}>
-                  {l.icon}
-                </span>
-                <span>
-                  <span className="row-title" style={{ display: 'block' }}>
-                    {l.title}
-                  </span>
-                  <span className="row-sub">{l.text}</span>
-                </span>
-                <ChevronRight size={16} style={{ color: 'var(--ink-3)' }} />
+              <button key={l.page} className="launch-chip" onClick={() => setPage(l.page)}>
+                <span className="glyph" style={{ ['--g' as string]: l.g }}>{l.icon}</span>
+                <span><span className="row-title" style={{ display: 'block' }}>{l.title}</span></span>
               </button>
             ))}
           </div>
-          )}
-        </div>
-      </section>
-
-      {has && top.length > 0 && (
-        <div className="launch-strip">
-          <button className="launch-chip glass" onClick={() => testFully(setPage)}>
-            <span className="glyph" style={{ ['--g' as string]: '#3ef0a8' }}>
-              <ShieldCheck size={20} />
-            </span>
-            <span>
-              <span className="row-title" style={{ display: 'block' }}>
-                Test a project fully
-              </span>
-              <span className="row-sub">Its code and its live site in one go.</span>
-            </span>
-          </button>
-          {LAUNCH.map((l) => (
-            <button key={l.page} className="launch-chip glass" onClick={() => setPage(l.page)}>
-              <span className="glyph" style={{ ['--g' as string]: l.g }}>
-                {l.icon}
-              </span>
-              <span>
-                <span className="row-title" style={{ display: 'block' }}>
-                  {l.title}
-                </span>
-                <span className="row-sub">{l.text}</span>
-              </span>
-            </button>
-          ))}
-        </div>
+        </>
       )}
 
       {trend.length > 0 && (
@@ -280,57 +299,6 @@ export default function Overview(): React.JSX.Element {
         </>
       )}
 
-      <div className="two" style={{ marginTop: 6 }}>
-        <div>
-          <h2 className="section-title">Needs attention</h2>
-          <div className="panel">
-            {worst.length === 0 ? (
-              <div className="row">
-                <ShieldCheck size={17} style={{ color: 'var(--ok)' }} />
-                <span className="hint">{has ? 'No critical or high findings in your latest tests.' : 'Problems that need fixing show up here.'}</span>
-              </div>
-            ) : (
-              worst.map((s) => (
-                <button key={s.id} className="row" onClick={() => showSession(s.id)}>
-                  <ShieldAlert size={17} style={{ color: s.counts.critical ? 'var(--sev-critical)' : 'var(--sev-high)' }} />
-                  <span className="grow">
-                    <span className="row-title" style={{ display: 'block' }}>
-                      {s.title}
-                    </span>
-                    <span className="row-sub">
-                      {kindName(s.kind)}, {ago(s.createdAt)}
-                    </span>
-                  </span>
-                  <Counts counts={s.counts} />
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-        <div>
-          <h2 className="section-title">Recent tests</h2>
-          <div className="panel">
-            {sessions.length === 0 ? (
-              <div className="row">
-                <span className="hint">Every test is kept as a session you can reopen, export as a PDF or continue in Claude Code.</span>
-              </div>
-            ) : (
-              sessions.slice(0, 6).map((s) => (
-                <button key={s.id} className="row" onClick={() => showSession(s.id)}>
-                  <KindIcon kind={s.kind} size={15} />
-                  <span className="grow">
-                    <span className="row-title" style={{ display: 'block' }}>
-                      {s.title}
-                    </span>
-                    <span className="row-sub">{s.status === 'running' ? s.steps.find((x) => x.status === 'running')?.label ?? 'Starting' : `${kindName(s.kind)}, ${ago(s.createdAt)}`}</span>
-                  </span>
-                  {s.status === 'running' ? <span className="dot" data-s="busy" /> : s.status === 'done' ? <Counts counts={s.counts} /> : <span className="hint">{s.status}</span>}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
       <Watch />
     </>
   )

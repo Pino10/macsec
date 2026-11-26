@@ -41,8 +41,18 @@ export default function ContainerRuntime(): React.JSX.Element {
         {st && <span className={`tag ${st.running ? 'tag-ok' : ''}`}>{st.running ? 'On' : 'Off'}</span>}
         <button className="link" onClick={() => void api.invoke('container:status').then(setSt).catch(() => undefined)}>Refresh</button>
       </div>
-      {st && !st.running && st.detail && <p className="hint mono" style={{ color: 'var(--sev-high)' }}>{st.detail}</p>}
-      {st && <p className="hint mono">Docker: {st.dockerPath} · host: {st.dockerHost || 'default'}</p>}
+      {st && !st.running && (
+        <p className="hint" style={{ color: 'var(--sev-high)' }}>
+          Docker is not running. Open Docker Desktop, or start Colima here, then press Refresh.
+        </p>
+      )}
+      {st && (
+        <details>
+          <summary className="hint">Technical details</summary>
+          <p className="hint mono">Docker: {st.dockerPath} · host: {st.dockerHost || 'default'}</p>
+          {!st.running && st.detail && <p className="hint mono">{st.detail}</p>}
+        </details>
+      )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="btn btn-sm" disabled={!st?.colima} onClick={() => void apply('container-start', () => api.invoke('container:start'))}>
           <Play size={13} /> Start
@@ -62,7 +72,7 @@ export default function ContainerRuntime(): React.JSX.Element {
               <input className="input mono" placeholder="HOME for the runtime (optional)" value={form.home} onChange={(e) => setForm({ ...form, home: e.target.value })} aria-label="Runtime HOME" />
               <input className="input mono" placeholder="COLIMA_HOME (optional)" value={form.colimaHome} onChange={(e) => setForm({ ...form, colimaHome: e.target.value })} aria-label="Colima home" />
               <input className="input mono" placeholder="LIMA_HOME (optional)" value={form.limaHome} onChange={(e) => setForm({ ...form, limaHome: e.target.value })} aria-label="Lima home" />
-              <input className="input mono" placeholder="Managed folder MacSec may delete on uninstall" value={form.managedDir} onChange={(e) => setForm({ ...form, managedDir: e.target.value })} aria-label="Managed folder" />
+              <input className="input mono" placeholder="Runtime folder inside the MacSec tools folder (the only kind removed on uninstall)" value={form.managedDir} onChange={(e) => setForm({ ...form, managedDir: e.target.value })} aria-label="Managed folder" />
             </div>
           </details>
           <div style={{ display: 'flex', gap: 8 }}>

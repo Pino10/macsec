@@ -53,7 +53,7 @@ function EngagementForm({ onSaved }: { onSaved: (e: Engagement) => void }): Reac
           <p className="flow-help">
             A controlled proof changes things or reads real data, so it needs the same thing a person would have in hand on site: who allowed it, for which hosts, until when, and how many requests. Everything here is stored on this Mac and printed with every run.
           </p>
-          <div className="choices" style={{ display: 'grid', gap: 10 }}>
+          <div className="form-stack">
             <label className="hint" style={{ display: 'grid', gap: 4 }}>
               Engagement type
               <select className="input" value={f.profile} onChange={(e) => set({ profile: e.target.value })}>
@@ -81,7 +81,7 @@ function EngagementForm({ onSaved }: { onSaved: (e: Engagement) => void }): Reac
             <input className="input" placeholder="Authority reference (contract, ticket, email subject, programme id)" value={f.authorityRef} onChange={(e) => set({ authorityRef: e.target.value })} aria-label="Authority reference" />
             <input className="input" placeholder="Who gave the authority (a person, or the programme)" value={f.authorizedBy} onChange={(e) => set({ authorizedBy: e.target.value })} aria-label="Who gave the authority" />
             <textarea className="input mono" rows={3} placeholder="Hosts the authority covers, one per line. shop.example.com, or *.example.com for its subdomains." value={f.hosts} onChange={(e) => set({ hosts: e.target.value })} aria-label="Hosts" />
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div className="form-row">
               <label className="hint" style={{ display: 'grid', gap: 4 }}>
                 Starts
                 <input className="input" type="date" value={f.startsAt} onChange={(e) => set({ startsAt: e.target.value })} />
