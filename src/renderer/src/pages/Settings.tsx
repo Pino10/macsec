@@ -24,8 +24,17 @@ export default function Settings(): React.JSX.Element {
   if (!settings) return <></>
   return (
     <>
-      <PageHead title="Settings" />
-      <h2 className="section-title" style={{ marginTop: 0 }}>Appearance</h2>
+      <PageHead title="Settings" desc="How MacSec looks, how it works for you, and what it keeps on this Mac." />
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label="Settings sections">
+          {[['set-appearance', 'Appearance'], ['set-general', 'Work'], ['set-ignored', 'Ignored findings'], ['set-storage', 'Storage and data'], ['set-support', 'Support and safety']].map(([id, label]) => (
+            <button key={id} onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="settings-body">
+      <h2 className="section-title" id="set-appearance" style={{ marginTop: 0 }}>Appearance</h2>
       <div className="panel">
         <div className="ms-row">
           <div className="grow">
@@ -85,7 +94,7 @@ export default function Settings(): React.JSX.Element {
           <Switch on={!!settings.explainSimply} label="Explain findings simply" onChange={() => void updateSettings({ explainSimply: !settings.explainSimply })} />
         </div>
       </div>
-      <h2 className="section-title">Things you told MacSec to ignore</h2>
+      <h2 className="section-title" id="set-ignored">Things you told MacSec to ignore</h2>
       <div className="panel">
         {ignored.length === 0 ? (
           <div className="ms-row">
@@ -108,7 +117,7 @@ export default function Settings(): React.JSX.Element {
           ))
         )}
       </div>
-      <h2 className="section-title">General</h2>
+      <h2 className="section-title" id="set-general">Work</h2>
       <div className="panel">
         <div className="ms-row">
           <div className="grow">
@@ -180,6 +189,9 @@ export default function Settings(): React.JSX.Element {
             <option value="choose">Choose another app…</option>
           </select>
         </div>
+      </div>
+      <h2 className="section-title" id="set-storage">Storage and data</h2>
+      <div className="panel">
         <div className="ms-row">
           <div className="grow">
             <div className="row-title">The MacSec folder</div>
@@ -243,6 +255,9 @@ export default function Settings(): React.JSX.Element {
             </button>
           )}
         </div>
+      </div>
+      <h2 className="section-title" id="set-support">Support and safety</h2>
+      <div className="panel">
         <div className="ms-row">
           <div className="grow">
             <div className="row-title">Logs for support</div>
@@ -275,6 +290,8 @@ export default function Settings(): React.JSX.Element {
         </button>
         {check && <span> {check}</span>}
       </p>
+        </div>
+      </div>
     </>
   )
 }

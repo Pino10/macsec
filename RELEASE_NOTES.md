@@ -1,3 +1,10 @@
+## 1.45.0
+
+- **Tools has search and filters.** Find a scanner by name or by what it checks, and show All, Installed, Not installed or Updates only.
+- **Settings has a section menu.** Appearance, Work, Ignored findings, Storage and data, and Support and safety, so you can jump to what you need. The long General list is split into clear groups.
+- **Assets: two fixes.** "Worst first" sorted the best first; it now puts the highest risk on top. The note that explained the score described it the wrong way round (the number is a risk, where higher is worse); it now says so, and the page shows "Risk: critical" next to the number. The Overview's number is the posture score, where higher is better, and is now labelled that way.
+- **Recent tests on the Overview** no longer let the severity badges overlap the text.
+
 ## 1.44.0
 
 A new look and a calmer way around the app. Nothing a scan does has changed.

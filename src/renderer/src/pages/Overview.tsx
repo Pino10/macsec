@@ -128,9 +128,9 @@ export default function Overview(): React.JSX.Element {
         <div className="kpi-card kpi-score">
           <ScoreRing score={score} empty={!has} />
           <div>
-            <span className="kpi-label">Posture</span>
+            <span className="kpi-label">Posture score</span>
             <strong className="kpi-big kpi-word">{has ? postureWord(score, true) : 'No data yet'}</strong>
-            <span className="kpi-note">{has ? 'Out of 100, from the latest tests' : 'Run a test to see it'}</span>
+            <span className="kpi-note">{has ? 'Higher is better, out of 100' : 'Run a test to see it'}</span>
           </div>
         </div>
         <div className="kpi-card">
