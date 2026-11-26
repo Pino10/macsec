@@ -4,7 +4,7 @@
  * directory it manages; an external Homebrew install is left for the person to remove.
  */
 import { execFile } from 'child_process'
-import { existsSync, rmSync } from 'fs'
+import { existsSync, realpathSync, rmSync } from 'fs'
 import { join, resolve, sep } from 'path'
 import type { ContainerStatus } from '../shared/types'
 import { dirs } from './paths'
@@ -69,16 +69,25 @@ export async function uninstallContainer(confirmed: boolean): Promise<{ removed:
   if (!confirmed) throw new Error('Confirm that you want to remove the container runtime link.')
   await run(colima(), ['stop'], 2 * 60_000).catch(() => undefined)
   const c = getSettings().container ?? {}
-  const managed = c.managedDir ? resolve(c.managedDir) : ''
-  const root = resolve(dirs.root()) + sep
-  // Delete a folder MacSec manages, or one that is clearly a runtime bundle the person pointed at
-  // and confirmed. Never delete /opt/homebrew, /usr/local or an arbitrary folder without markers.
-  const looksLikeRuntime = !!managed && existsSync(join(managed, 'bin', 'docker')) && (existsSync(join(managed, 'bin', 'colima')) || existsSync(join(managed, 'colima')))
+  // Only a folder inside MacSec's own tools folder is ever deleted. A folder the person pointed at
+  // elsewhere (even one that looks like a runtime) is left alone: it may hold other things.
+  let managed = ''
+  try {
+    managed = c.managedDir ? realpathSync(resolve(c.managedDir)) : ''
+  } catch {
+    managed = ''
+  }
+  let tools = resolve(dirs.root(), 'tools')
+  try {
+    tools = realpathSync(tools)
+  } catch {
+    // Not created yet: nothing under it can exist.
+  }
   let removed = false
-  if (managed && (managed.startsWith(root) || looksLikeRuntime)) {
+  if (managed && managed.startsWith(tools + sep)) {
     rmSync(managed, { recursive: true, force: true })
     removed = true
   }
   setSettings({ container: undefined })
-  return { removed, note: removed ? 'The managed runtime folder was deleted.' : 'The runtime was external, so its files were left in place; only the MacSec link was cleared.' }
+  return { removed, note: removed ? 'The managed runtime folder was deleted.' : 'The runtime is outside MacSec\'s own tools folder, so its files were left in place; only the MacSec link was cleared. You can delete that folder yourself.' }
 }

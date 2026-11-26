@@ -38,6 +38,7 @@ describe('the bounty draft', () => {
       id: 's1', title: 'App', target: 'https://app.example',
       findings: [
         { id: 'a', tool: 'x', title: 'IDOR on invoice', severity: 'high', category: 'web', confidence: 'confirmed', description: 'Other invoice read', proof: 'GET /invoice/2 -> 200', url: 'https://app.example/invoice/2' },
+        { id: 'p', tool: 'x', title: 'Maybe XSS', severity: 'medium', category: 'web', confidence: 'possible', description: 'Might reflect' },
         { id: 'b', tool: 'x', title: 'Info note', severity: 'info', category: 'web' },
         { id: 'c', tool: 'x', title: 'False', severity: 'high', category: 'web', verdict: 'false-positive' }
       ]
@@ -46,6 +47,10 @@ describe('the bounty draft', () => {
     expect(md).toContain('IDOR on invoice')
     expect(md).toContain('GET /invoice/2 -> 200')
     expect(md).not.toContain('Info note')
+    // An unproven finding is a lead, never a submission.
+    expect(md).not.toContain('## 2. Maybe XSS')
+    expect(md).toContain('Leads without proof')
+    expect(md).toContain('Maybe XSS')
     expect(md).not.toContain('False')
     expect(md).toContain('Program')
     expect(md).toContain('hackerone')

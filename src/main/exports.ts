@@ -236,7 +236,10 @@ export function sessionCsv(d: SessionDetail): string {
 
 /** A submission draft for one programme, from the findings that are actually open. */
 export function bountyReport(d: SessionDetail, program: { client: string; authorityRef: string; programme?: { platform?: string; url?: string; rateLimit?: string; exclusions?: string[] } } | null): string {
-  const open = d.findings.filter((f) => f.verdict !== 'false-positive' && !f.triage && f.severity !== 'info')
+  const all = d.findings.filter((f) => f.verdict !== 'false-positive' && !f.triage && f.severity !== 'info')
+  // Programmes penalise reports that cannot be reproduced, so only a finding with a recorded proof is drafted as a submission.
+  const open = all.filter((f) => f.confidence === 'confirmed' && !!f.proof)
+  const leads = all.filter((f) => !open.includes(f))
   const lines = [
     `# Bug bounty submission: ${program?.client || d.title}`,
     '',
@@ -287,6 +290,11 @@ export function bountyReport(d: SessionDetail, program: { client: string; author
       ''
     )
   }
-  if (!open.length) lines.push('No open finding to submit. Triaged, false-positive and info findings are excluded.')
+  if (!open.length) lines.push('No open finding to submit. Triaged, false-positive and info findings are excluded, and so is anything without a recorded proof.', '')
+  if (leads.length) {
+    lines.push('## Leads without proof (do not submit yet)', '', 'These were not proven, so they are not drafted as submissions. Prove each one yourself first.', '')
+    for (const f of leads.slice(0, 50)) lines.push(`- [${f.severity}] ${f.title} (${f.url ?? f.file ?? d.target})`)
+    lines.push('')
+  }
   return lines.join('\n')
 }

@@ -30,6 +30,22 @@ function read(): Config | null {
 
 export const desktopBridgePath = (): string => join(dirs.bin(), 'macsec-mcp')
 
+/** Keeps the script the Claude app starts up to date, so a fix to it reaches people who connected earlier. */
+export function refreshBridge(url: string, tokenFile: string): void {
+  if (!read()?.mcpServers?.macsec) return
+  const text = desktopBridge(url, tokenFile, 'MacSec')
+  let old = ''
+  try {
+    old = readFileSync(desktopBridgePath(), 'utf8')
+  } catch {
+    // Missing: written below.
+  }
+  if (old === text) return
+  mkdirSync(dirs.bin(), { recursive: true })
+  writeFileSync(desktopBridgePath(), text)
+  chmodSync(desktopBridgePath(), 0o755)
+}
+
 export function connectClaudeDesktop(url: string, tokenFile: string): { connected: boolean; path: string } {
   const cfg = read()
   if (!cfg) throw new Error('The Claude app’s settings file could not be read, so it was left as it is. Open the Claude app once, then try again.')

@@ -17,7 +17,7 @@ import { dirs } from './paths'
 import { getSettings, setSettings } from './settings'
 
 const CONTAINER = 'macsec-mobsf'
-const IMAGE = 'opensecurity/mobile-security-framework-mobsf:latest'
+const IMAGE = 'opensecurity/mobile-security-framework-mobsf:v4.4.5'
 const VOLUME = 'macsec-mobsf-data'
 const PORT = 8765
 const OUTSIDE_PORTS = [8765, 8000]
